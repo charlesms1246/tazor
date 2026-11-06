@@ -40,10 +40,15 @@ export type CompanyPlan = {
 };
 
 /** The records Tazor's demo needs on ENS. */
+/** `tazor.roles`: the registry's role bit positions, so anyone can read a company's bitmap without our code. */
+export const ROLES_RECORD = JSON.stringify({ APPROVER: 64, TAZOR_ADMIN: 68, AGENT: 72 });
+
 export const DEMO_RECORDS: CompanyPlan[] = [
   {
     label: 'acme',
-    texts: { name: 'Acme Industries', description: 'Demo buyer company on Tazor (Whitechain Sepolia)', url: 'https://taz0r.eth.limo', 'tazor.role': 'buyer' },
+    texts: { name: 'Acme Industries', description: 'Demo buyer company on Tazor (Whitechain Sepolia)', url: 'https://taz0r.eth.limo', 'tazor.role': 'buyer', 'tazor.roles': ROLES_RECORD,
+      // earlier accounts of the same company (v1, the mandate test account), so the app links their history via ENS
+      'tazor.aliases': '0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6,0x18d15B034C645dbbFCb9c68238A14D059f632513' },
     whitechainAccount: '0xb99A12652BEe98429ae31EA0529A0b63f1073721',
     members: [
       { label: 'priya', address: '0x00aBed5bDddf794c415eE746d3E4De5332cC5450', name: 'Priya Sharma, Finance' },
@@ -54,7 +59,7 @@ export const DEMO_RECORDS: CompanyPlan[] = [
   },
   {
     label: 'bluejay',
-    texts: { name: 'Bluejay Logistics', description: 'Demo supplier company on Tazor (Whitechain Sepolia)', url: 'https://taz0r.eth.limo', 'tazor.role': 'supplier' },
+    texts: { name: 'Bluejay Logistics', description: 'Demo supplier company on Tazor (Whitechain Sepolia)', url: 'https://taz0r.eth.limo', 'tazor.role': 'supplier', 'tazor.roles': ROLES_RECORD },
     whitechainAccount: '0xc1dce946D192e344251972470237F1471C93876c',
     members: [],
   },

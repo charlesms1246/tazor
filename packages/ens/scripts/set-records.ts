@@ -10,7 +10,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { SEPOLIA } from '../src/company.ts';
 import {
-  DEMO_RECORDS, ETH_COIN_TYPE, WHITECHAIN_SEPOLIA_COIN_TYPE, alreadySet, isRetryable, memberRegistryAbi, recordCalls,
+  DEMO_RECORDS, ETH_COIN_TYPE, ROLES_RECORD, WHITECHAIN_SEPOLIA_COIN_TYPE, alreadySet, isRetryable, memberRegistryAbi, recordCalls,
   registerMemberCall, type Call, type Expect,
 } from '../src/records.ts';
 
@@ -36,7 +36,9 @@ console.log(`${SEND ? 'SEND' : 'DRY RUN'} on Sepolia via ${RPC} as ${account.add
 const plan: Call[] = [];
 const afterRegister: Call[] = [];
 // COMPANY_PLAN='{"label","texts","whitechainAccount","members"}' sets one other company's records (e.g. the sandbox) instead of the demo set
-const PLANS = process.env.COMPANY_PLAN ? [JSON.parse(process.env.COMPANY_PLAN)] : DEMO_RECORDS;
+// every company also publishes its role bit map (tazor.roles) unless the plan sets one
+const PLANS = (process.env.COMPANY_PLAN ? [JSON.parse(process.env.COMPANY_PLAN)] : DEMO_RECORDS)
+  .map((c: (typeof DEMO_RECORDS)[number]) => ({ ...c, texts: { 'tazor.roles': ROLES_RECORD, ...c.texts } }));
 for (const c of PLANS) {
   const name = `${c.label}.taz0r.eth`;
   plan.push(...recordCalls(name, c.texts, [[WHITECHAIN_SEPOLIA_COIN_TYPE, c.whitechainAccount]]));

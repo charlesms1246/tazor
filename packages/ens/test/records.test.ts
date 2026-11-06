@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeFunctionData, namehash, toHex } from 'viem';
-import { DEMO_RECORDS, WHITECHAIN_SEPOLIA_COIN_TYPE, alreadySet, coinTypeForChain, dnsEncode, isRetryable, recordCalls, registerMemberCall, resolverAbi, memberRegistryAbi } from '../src/records.ts';
+import { DEMO_RECORDS, ROLES_RECORD, WHITECHAIN_SEPOLIA_COIN_TYPE, alreadySet, coinTypeForChain, dnsEncode, isRetryable, recordCalls, registerMemberCall, resolverAbi, memberRegistryAbi } from '../src/records.ts';
 
 test('ENSIP-11 coin types', () => {
   assert.equal(coinTypeForChain(1874), 0x80000752n);
@@ -21,8 +21,8 @@ test('DNS wire encoding', () => {
 test('planned calls decode to the right resolver and registry arguments', () => {
   const acme = DEMO_RECORDS.find((c) => c.label === 'acme')!;
   const calls = recordCalls('acme.taz0r.eth', acme.texts, [[WHITECHAIN_SEPOLIA_COIN_TYPE, acme.whitechainAccount]]);
-  assert.equal(calls.length, 5);
-  const addr = decodeFunctionData({ abi: resolverAbi, data: calls[4].data });
+  assert.equal(calls.length, 7, 'name, description, url, tazor.role, tazor.roles, tazor.aliases, Whitechain address');
+  const addr = decodeFunctionData({ abi: resolverAbi, data: calls[6].data });
   assert.equal(addr.functionName, 'setAddress');
   assert.deepEqual(addr.args, [dnsEncode('acme.taz0r.eth'), 0x80000752n, '0xb99a12652bee98429ae31ea0529a0b63f1073721']);
   const text = decodeFunctionData({ abi: resolverAbi, data: calls.find((c) => c.describe.includes('tazor.role'))!.data });
@@ -44,4 +44,14 @@ test('skip-if-set comparisons and retryable errors', () => {
   assert.equal(alreadySet(calls[1].expect!, '0x0000000000000000000000000000000000000001'), false);
   for (const m of ['HTTP 429 Too Many Requests', 'in-flight transaction limit reached for delegated accounts', 'gapped-nonce tx from delegated accounts', 'nonce too low']) assert.ok(isRetryable(m), m);
   assert.equal(isRetryable('execution reverted: EACUnauthorizedAccountRoles'), false);
+});
+
+test('tazor.roles: every demo company publishes the role bit map, identical to the web app\'s check', async () => {
+  const { ROLE_BITS_RECORD } = await import('../../../apps/web/lib/role-bits.ts');
+  assert.equal(ROLES_RECORD, ROLE_BITS_RECORD);
+  for (const c of DEMO_RECORDS) {
+    const calls = recordCalls(`${c.label}.taz0r.eth`, c.texts, [[WHITECHAIN_SEPOLIA_COIN_TYPE, c.whitechainAccount]]);
+    const text = decodeFunctionData({ abi: resolverAbi, data: calls.find((x) => x.describe.includes('tazor.roles'))!.data });
+    assert.deepEqual(text.args, [dnsEncode(`${c.label}.taz0r.eth`), 'tazor.roles', '{"APPROVER":64,"TAZOR_ADMIN":68,"AGENT":72}']);
+  }
 });
