@@ -1,0 +1,20 @@
+/* Long hex values wrap inside the steps instead of pushing the page sideways. */
+.onboard .addr { white-space: normal; flex-wrap: wrap; max-width: 100%; }
+.onboard .addr > a, .onboard .addr > span { overflow-wrap: anywhere; min-width: 0; }
+.onboard .step > .stack { min-width: 0; }
+.onboard-tech summary { cursor: pointer; color: var(--muted); font-size: var(--fs-small); padding: 4px 0; }
+.onboard-tech[open] summary { margin-bottom: 4px; }
+.admit-box {
+  margin: 0; padding: 12px 14px;
+  background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-inner);
+  font-family: var(--mono); font-size: 12px; line-height: 18px; color: var(--text);
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all;
+  max-height: 168px; overflow-y: auto;
+}
+.admit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admit-actions .btn { min-height: 44px; }
+.admit-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.admit-pills .pill { white-space: normal; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; line-height: 16px; }
+@media (max-width: 480px) {
+  .admit-actions .btn { flex: 1 1 100%; }
+}

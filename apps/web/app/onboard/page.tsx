@@ -7,7 +7,12 @@ import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { loadPasskey, savePasskey, type StoredPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { passkeySigner } from '@/lib/approver-signature.ts';
+import { admitCommand, admitted, checkAdmission, type Admission } from '@/lib/admission.ts';
+import { companyRegistry } from '@/lib/people.ts';
+import { useCompany } from '@/lib/company.ts';
 import '../_invoice/touch.css';
+import './onboard.css';
 
 export default function OnboardPage() {
   const [stored, setStored] = useState<StoredPasskey | null>(null);
@@ -18,6 +23,41 @@ export default function OnboardPage() {
   const [deploy, setDeploy] = useState<{ txHash: string | null } | null>(null);
 
   useEffect(() => setStored(loadPasskey()), []);
+
+  const company = useCompany();
+  const [admission, setAdmission] = useState<Admission | null>(null);
+  const [checking, setChecking] = useState(false);
+  const fullSigner = signer || (stored ? passkeySigner(stored.verifier, stored.x, stored.y) : '');
+  let command = '';
+  try { command = stored && fullSigner ? admitCommand(stored.approverAccount, fullSigner, company.id) : ''; } catch { command = ''; }
+  const onCheck = async () => {
+    if (!stored) return;
+    setChecking(true);
+    try {
+      const reg = await companyRegistry(company.account).catch(() => null);
+      setAdmission(await checkAdmission(stored.approverAccount, reg?.registry ?? null));
+    } finally {
+      setChecking(false);
+    }
+  };
+  useEffect(() => { if (stored) void onCheck(); }, [stored?.approverAccount, company.account]);
+  // Keep checking while an admin runs the command, so the page turns green by itself.
+  const done = admission ? admitted(admission) : false;
+  useEffect(() => {
+    if (!stored || done) return;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void onCheck(); }, 15_000);
+    return () => clearInterval(t);
+  }, [stored?.approverAccount, company.account, done]);
+  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function'), []);
+  const onCopy = () => {
+    navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
+  };
+  const onShare = () => {
+    navigator.share?.({ title: 'Add me as a Tazor approver', text: `Please add me as an approver for ${company.name}. Run this from the Tazor repo (testnet):\n\n${command}` }).catch(() => {});
+  };
+  const mark = (v: boolean | null | undefined) => (v === true ? 'done' : v === false ? 'not yet' : 'unknown');
 
   const onCreate = async () => {
     setBusy(true);
@@ -50,9 +90,10 @@ export default function OnboardPage() {
   const created = !!stored;
   const deployed = !!deploy;
   return (
-    <div className="page tz-touch">
+    <div className="page tz-touch onboard">
+      <a href="/company/" className="small" data-testid="back-company" style={{ display: 'inline-block', marginBottom: 8 }}>← Company</a>
       <PageHeader
-        title="Approver onboarding"
+        title="Approver setup"
         subtitle="Create a passkey on this device; your approver account is derived from it and deployed for you."
       />
 
@@ -65,7 +106,7 @@ export default function OnboardPage() {
             <span className="step-n">1</span>
             <div className="stack">
               <span style={{ fontWeight: 500 }}>Create a passkey</span>
-              <p className="muted">Your passkey stays in your device keychain. Face ID or your device PIN unlocks it whenever you approve.</p>
+              <p className="muted">Your passkey stays in your device keychain. Face ID, fingerprint or your device PIN unlocks it whenever you approve.</p>
               <div className="row">
                 <button data-testid="create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create passkey</button>
               </div>
@@ -81,13 +122,20 @@ export default function OnboardPage() {
               {!stored ? (
                 <p className="muted">Appears here after you create the passkey: its address is computed from the passkey&apos;s public key.</p>
               ) : (
-                <dl className="kv">
-                  <dt>Approver account (predicted)</dt>
-                  <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="approver-account" /></dd>
-                  {signer && <><dt>Signer id</dt><dd><span className="mono break" data-testid="signer">{signer}</span></dd></>}
-                  <dt>Passkey x</dt><dd><span className="mono break">{stored.x}</span></dd>
-                  <dt>Passkey y</dt><dd><span className="mono break">{stored.y}</span></dd>
-                </dl>
+                <>
+                  <dl className="kv">
+                    <dt>Approver account</dt>
+                    <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="approver-account" /></dd>
+                  </dl>
+                  <details className="onboard-tech">
+                    <summary>Technical details</summary>
+                    <dl className="kv">
+                      {signer && <><dt>Signer id</dt><dd><span className="mono break" data-testid="signer">{signer}</span></dd></>}
+                      <dt>Passkey x</dt><dd><span className="mono break">{stored.x}</span></dd>
+                      <dt>Passkey y</dt><dd><span className="mono break">{stored.y}</span></dd>
+                    </dl>
+                  </details>
+                </>
               )}
             </div>
           </div>
@@ -104,6 +152,42 @@ export default function OnboardPage() {
                 </p>
               ) : (
                 <p className="muted">The relayer deploys your account on Whitechain. Without one, anyone can deploy it later with createAccount([signer id]).</p>
+              )}
+            </div>
+          </div>
+
+          <div className="step" data-done={admission ? admitted(admission) : false} data-testid="admit-step">
+            <span className="step-n">4</span>
+            <div className="stack">
+              <span style={{ fontWeight: 500 }}>Ask your admin to add you</span>
+              {!stored ? (
+                <p className="muted">After you create a passkey, send your approver account to an admin of {company.name}. They add you once, and you can approve payments from then on.</p>
+              ) : (
+                <>
+                  <p className="muted">Send this command to an admin of {company.name} ({company.ens}). They run it once from the Tazor repo on testnet: it marks you verified in the WB Soul mirror (simulated KYC), gives you the approver role on ENS and syncs it to Whitechain. This page updates when it&apos;s done.</p>
+                  <dl className="kv">
+                    <dt>Your approver account</dt>
+                    <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="admit-account" /></dd>
+                  </dl>
+                  {command && (
+                    <>
+                      <pre className="admit-box" data-testid="admit-command">{command}</pre>
+                      <div className="admit-actions">
+                        <button type="button" className="btn btn-primary" onClick={onCopy} data-testid="admit-copy">{copied ? 'Copied' : 'Copy command'}</button>
+                        {canShare && <button type="button" className="btn" onClick={onShare} data-testid="admit-share">Send to admin…</button>}
+                      </div>
+                    </>
+                  )}
+                  <div className="admit-pills">
+                    {admission && <>
+                      <Pill tone={admission.deployed ? 'positive' : 'neutral'} testId="admit-deployed">Account deployed: {mark(admission.deployed)}</Pill>
+                      <Pill tone={admission.verified ? 'info' : 'neutral'} testId="admit-verified">Verified (simulated): {mark(admission.verified)}</Pill>
+                      <Pill tone={admission.approver ? 'positive' : 'neutral'} testId="admit-role">Approver on Whitechain: {mark(admission.approver)}</Pill>
+                    </>}
+                    <button type="button" className="btn btn-sm" onClick={onCheck} disabled={checking} data-testid="admit-check">{checking ? 'Checking…' : 'Check again'}</button>
+                  </div>
+                  {admission && admitted(admission) && <Notice tone="positive" testId="admit-done">You are an approver for {company.name}. Open a payment link in Approvals to approve it with your passkey.</Notice>}
+                </>
               )}
             </div>
           </div>
