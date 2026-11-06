@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://rpc.testnet.whitechain.io; img-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Tazor · send a signed payment through Ethereum</title>
+<style>
+  :root { --ink: #07081e; --muted: #4a5567; --border: #e6e6ec; --raised: #f3f5f6; --blue: #0066ff; --pos: #0b7350; --neg: #c4342c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/22px system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #f8faf9; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; line-height: 30px; margin: 0 0 4px; }
+  .lead { color: var(--muted); margin: 0 0 20px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+  textarea { width: 100%; min-height: 96px; padding: 10px; border: 1px solid #c7d0dc; border-radius: 10px; font: 12px/18px ui-monospace, Menlo, monospace; word-break: break-all; }
+  button { min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--ink); background: var(--ink); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #fff; color: var(--ink); border-color: #c7d0dc; }
+  button:disabled { opacity: .5; cursor: default; }
+  dl { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 6px 12px; margin: 0; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .note { font-size: 13px; color: var(--muted); }
+  .ok { color: var(--pos); font-weight: 600; } .err { color: var(--neg); }
+  a { color: var(--blue); }
+  @media (max-width: 480px) { dl { grid-template-columns: 1fr; } dd { margin-bottom: 6px; } button { flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Send a signed payment through Ethereum</h1>
+  <p class="lead">For when Tazor's site or servers are unavailable. This page is one file: save it and open it from your own computer, or host it anywhere. It talks only to your wallet and to Whitechain's public RPC; nothing goes to Tazor.</p>
+
+  <section class="card">
+    <label for="blob"><b>1. Paste the signed payment</b></label>
+    <p class="note">On Tazor's Pay page, after approving: "Send via Ethereum" → "Copy signed payment". It starts with <code>tazor-signed-payment:1:</code></p>
+    <textarea id="blob" spellcheck="false" autocomplete="off" placeholder="tazor-signed-payment:1:…"></textarea>
+    <p id="parse-error" class="err" role="alert" hidden></p>
+  </section>
+
+  <section class="card" id="summary" hidden>
+    <b>2. Check it</b>
+    <dl style="margin-top: 10px">
+      <dt>Company</dt><dd id="s-company"></dd>
+      <dt>Pays</dt><dd id="s-amount"></dd>
+      <dt>To</dt><dd id="s-payee"></dd>
+      <dt>Invoice</dt><dd id="s-invoice"></dd>
+      <dt>Approved by</dt><dd id="s-approvers"></dd>
+      <dt>Valid until</dt><dd id="s-expiry"></dd>
+    </dl>
+    <p class="note">Ethereum checks that the approvers hold the approver role on the company's ENS name, then forwards the payment to Whitechain, which checks their signatures. If anything was changed, Whitechain refuses the payment and nothing is paid.</p>
+  </section>
+
+  <section class="card" id="send" hidden>
+    <b>3. Send it from your wallet (Ethereum Sepolia)</b>
+    <p class="note">Any Sepolia account with a little test ETH can send it; it doesn't have to be yours. You only pay the Ethereum gas.</p>
+    <div class="row">
+      <button id="send-btn">Connect wallet and send</button>
+      <button id="copy-btn" class="secondary">Copy the transaction instead</button>
+    </div>
+    <p id="send-status" class="note" role="status"></p>
+  </section>
+</main>
+
+<script>
+// BEGIN ENCODER (pure; also checked by the web app's unit tests against viem)
+const FORWARD_SELECTOR = '412b807d'; // forward(string,address,(bytes32,address,address,uint256,uint64,uint256),address[],bytes[])
+const INVOICE_PAID_TOPIC = '0x7a05aaf744ebd5f96e174163a4ee081a0d4669c1b00781f732d69c7ebe0902e8'; // InvoicePaid(address,uint256,address,uint256,bool)
+const PREFIX = 'tazor-signed-payment:1:';
+const strip = (h) => h.replace(/^0x/, '').toLowerCase();
+const uint = (n) => BigInt(n).toString(16).padStart(64, '0');
+const address = (a) => strip(a).padStart(64, '0');
+const bytes32 = (h) => strip(h).padEnd(64, '0');
+const utf8hex = (s) => Array.from(new TextEncoder().encode(s), (b) => b.toString(16).padStart(2, '0')).join('');
+const dynamic = (hex) => uint(hex.length / 2) + hex.padEnd(Math.ceil(hex.length / 64) * 64, '0');
+function bytesArray(items) {
+  const encs = items.map((h) => dynamic(strip(h)));
+  let at = 32 * items.length;
+  const offsets = encs.map((e) => { const o = uint(at); at += e.length / 2; return o; });
+  return uint(items.length) + offsets.join('') + encs.join('');
+}
+function encodeForward(p) {
+  const a = p.auth;
+  const tail1 = dynamic(utf8hex(p.label));
+  const tail2 = uint(p.approvers.length) + p.approvers.map(address).join('');
+  const tail3 = bytesArray(p.signatures);
+  const head = 32 * 10;
+  return '0x' + FORWARD_SELECTOR
+    + uint(head) + address(p.account)
+    + bytes32(a.invoiceHash) + address(a.account) + address(a.payee) + uint(a.amount) + uint(a.expiry) + uint(a.nonce)
+    + uint(head + tail1.length / 2) + uint(head + tail1.length / 2 + tail2.length / 2)
+    + tail1 + tail2 + tail3;
+}
+function decodeBlob(text) {
+  const t = text.trim();
+  if (!t.startsWith(PREFIX)) throw new Error('This is not a Tazor signed payment (it should start with "tazor-signed-payment:1:").');
+  let p;
+  try {
+    const b = atob(t.slice(PREFIX.length).replace(/-/g, '+').replace(/_/g, '/'));
+    p = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(b, (c) => c.charCodeAt(0))));
+  } catch (e) { throw new Error('The signed payment is damaged; copy it again.'); }
+  const isAddr = (v) => typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v);
+  const isHex = (v) => typeof v === 'string' && /^0x([0-9a-fA-F]{2})*$/.test(v);
+  const isUint = (v) => typeof v === 'string' && /^\d+$/.test(v);
+  const ok = p && p.v === 1 && p.sepoliaChainId === 11155111 && isAddr(p.gate) && isAddr(p.paymentModule) && isAddr(p.account)
+    && typeof p.label === 'string' && /^[a-z0-9-]{1,63}$/.test(p.label) && p.auth && /^0x[0-9a-fA-F]{64}$/.test(p.auth.invoiceHash)
+    && isAddr(p.auth.account) && isAddr(p.auth.payee) && isUint(p.auth.amount) && isUint(p.auth.expiry) && isUint(p.auth.nonce)
+    && Array.isArray(p.approvers) && Array.isArray(p.signatures) && p.approvers.length > 0 && p.approvers.length === p.signatures.length
+    && p.approvers.every(isAddr) && p.signatures.every(isHex) && p.auth.account.toLowerCase() === p.account.toLowerCase();
+  if (!ok) throw new Error('The signed payment is incomplete; copy it again.');
+  return p;
+}
+const usdt = (base) => { const s = BigInt(base).toString().padStart(7, '0'); const w = s.slice(0, -6); const f = s.slice(-6).replace(/0+$/, '').padEnd(2, '0'); return `${w}.${f} USDT`; };
+const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+// END ENCODER
+
+const WHITECHAIN_RPC = 'https://rpc.testnet.whitechain.io';
+const WC_EXPLORER = 'https://explorer.testnet.whitechain.io';
+const $ = (id) => document.getElementById(id);
+let payment = null;
+let started = 0;
+
+async function wcRpc(method, params) {
+  const r = await fetch(WHITECHAIN_RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message);
+  return j.result;
+}
+
+function show(p) {
+  $('s-company').textContent = `${p.label}.taz0r.eth (${short(p.account)})`;
+  $('s-amount').textContent = usdt(p.auth.amount);
+  $('s-payee').textContent = p.supplier ? `${p.supplier} (${short(p.auth.payee)})` : short(p.auth.payee);
+  $('s-invoice').textContent = p.invoiceId || 'not named';
+  $('s-approvers').textContent = `${p.approvers.length} approver${p.approvers.length === 1 ? '' : 's'}: ${p.approvers.map(short).join(', ')}`;
+  $('s-expiry').textContent = new Date(Number(p.auth.expiry) * 1000).toUTCString();
+  $('summary').hidden = false; $('send').hidden = false;
+}
+
+$('blob').addEventListener('input', () => {
+  const t = $('blob').value;
+  payment = null; $('summary').hidden = true; $('send').hidden = true; $('parse-error').hidden = true;
+  if (!t.trim()) return;
+  try { payment = decodeBlob(t); show(payment); } catch (e) { $('parse-error').textContent = e.message; $('parse-error').hidden = false; }
+});
+
+$('copy-btn').addEventListener('click', async () => {
+  if (!payment) return;
+  const tx = JSON.stringify({ chainId: 11155111, to: payment.gate, data: encodeForward(payment) });
+  try { await navigator.clipboard.writeText(tx); $('send-status').textContent = 'Copied: send it to the EnsGate address on Sepolia from any wallet or tool, then come back to watch for delivery.'; }
+  catch { $('send-status').textContent = tx; }
+});
+
+async function watch(fromBlock) {
+  const topics = [INVOICE_PAID_TOPIC, '0x' + address(payment.account), '0x' + uint(payment.auth.nonce)];
+  for (let i = 0; i < 120; i++) {
+    try {
+      const logs = await wcRpc('eth_getLogs', [{ address: payment.paymentModule, topics, fromBlock: '0x' + fromBlock.toString(16), toBlock: 'latest' }]);
+      const hit = logs.find((l) => l.data.slice(-1) === '1');
+      if (hit) {
+        const s = Math.round((Date.now() - started) / 1000);
+        $('send-status').innerHTML = '';
+        const ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = `✓ Delivered on Whitechain in ${s} s. `;
+        const a = document.createElement('a'); a.href = `${WC_EXPLORER}/tx/${hit.transactionHash}`; a.target = '_blank'; a.rel = 'noreferrer'; a.textContent = 'View the payment';
+        $('send-status').append(ok, a);
+        return;
+      }
+      if (logs.length) { $('send-status').textContent = 'This invoice was already paid on Whitechain (not through Ethereum).'; return; }
+    } catch (e) { /* keep watching */ }
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+  $('send-status').textContent = 'Not delivered yet after 20 minutes. Whitechain usually sees Ethereum deposits in about a minute; check the Sepolia transaction.';
+}
+
+$('send-btn').addEventListener('click', async () => {
+  if (!payment) return;
+  const eth = window.ethereum;
+  if (!eth) { $('send-status').textContent = 'No browser wallet found. Use "Copy the transaction instead" and send it from any wallet.'; return; }
+  $('send-btn').disabled = true;
+  try {
+    const [from] = await eth.request({ method: 'eth_requestAccounts' });
+    try { await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] }); }
+    catch (e) { if (e && e.code === 4902) throw new Error('Turn on the Sepolia test network in your wallet (MetaMask: Settings → Advanced → Show test networks), then try again.'); throw e; }
+    const data = encodeForward(payment);
+    const fromBlock = Math.max(0, parseInt(await wcRpc('eth_blockNumber', []), 16) - 20);
+    $('send-status').textContent = 'Confirm in your wallet…';
+    const hash = await eth.request({ method: 'eth_sendTransaction', params: [{ from, to: payment.gate, data }] });
+    started = Date.now();
+    $('send-status').innerHTML = '';
+    const sent = document.createElement('span'); sent.textContent = 'Sent on Ethereum Sepolia. ';
+    const a = document.createElement('a'); a.href = `https://sepolia.etherscan.io/tx/${hash}`; a.target = '_blank'; a.rel = 'noreferrer'; a.textContent = 'View on Etherscan';
+    const w = document.createElement('span'); w.textContent = ' · Watching for delivery on Whitechain (about a minute)…';
+    $('send-status').append(sent, a, w);
+    watch(fromBlock);
+  } catch (e) {
+    $('send-status').textContent = (e && e.message) ? e.message : String(e);
+    $('send-btn').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
