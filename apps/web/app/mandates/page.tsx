@@ -5,6 +5,7 @@ import { formatUnits, getAddress, isAddress, isHex, parseUnits, type Address, ty
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
+import { RELAYER_WRITE_TIMEOUT_MS, relayerFailure } from '@/lib/relayer-off.ts';
 import {
   PERIODS, decodeAvailable, decodeMandateDigest, decodeMandateOf, encodeAvailableCall, encodeCreateMandate,
   encodeMandateDigestCall, encodePull, findMandate, mandateDigest, mandateModuleFor, mandateRelayerBody, type Mandate, type MandateModuleRef,
@@ -31,8 +32,8 @@ async function relay(path: string, body: unknown): Promise<Hex> {
   const relayerUrl = getRelayerUrl();
   if (!relayerUrl) throw new Error('Relayer URL is not configured; use the calldata instead.');
   const res = await fetch(`${relayerUrl}${path}`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000),
-  }).catch(() => { throw new Error('Relayer unreachable; use the calldata instead.'); });
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(RELAYER_WRITE_TIMEOUT_MS),
+  }).catch((e) => { throw relayerFailure(e, 'You can also use the calldata instead.'); });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? `relayer returned ${res.status}`);
   return json.txHash;

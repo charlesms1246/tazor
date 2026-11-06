@@ -12,6 +12,7 @@ import type { Invoice } from '@/lib/invoice.ts';
 import { isV2Account } from '@/lib/pay-v2.ts';
 import { defaultAuthParams, mergeApprovals, type Approval } from '@/lib/payment.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
+import { RELAYER_WRITE_TIMEOUT_MS, relayerFailure } from '@/lib/relayer-off.ts';
 import { ethCall, getReceipt } from '@/lib/rpc.ts';
 import { recordEvent, type EventKind } from '@/lib/events.ts';
 import { upsertInbox } from '@/lib/inbox.ts';
@@ -188,9 +189,9 @@ export default function RunsPage() {
     const relayerUrl = getRelayerUrl();
     if (!relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata".');
     const res = await fetch(`${relayerUrl}/payrun`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20_000),
+      method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(RELAYER_WRITE_TIMEOUT_MS),
       body: JSON.stringify(payRunRelayerBody(run.account, run.auths, approvals)),
-    }).catch(() => { throw new Error('Relayer unreachable: use "Copy calldata".'); });
+    }).catch((e) => { throw relayerFailure(e, 'Use "Copy calldata".'); });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
     setTx(body.txHash);

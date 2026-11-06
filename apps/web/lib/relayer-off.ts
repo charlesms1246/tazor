@@ -34,3 +34,18 @@ export function restoreRelayer(): void {
   } catch { setRelayerUrl(null); }
   globalThis.dispatchEvent?.(new Event(RELAYER_OFF_EVENT));
 }
+
+/** How long pages wait for the relayer to submit a transaction and see it confirmed. */
+export const RELAYER_WRITE_TIMEOUT_MS = 60_000;
+
+/** A plain explanation of why a request to the relayer failed before any answer came back. */
+export function relayerFailure(e: unknown, fallback: string): Error {
+  if (isRelayerSimulatedOff()) {
+    return new Error(`Relayer unreachable: the relayer is switched off on this device (Security & settings → "Turn back on"). ${fallback}`);
+  }
+  const name = (e as { name?: string })?.name;
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    return new Error(`Relayer unreachable: it didn't answer within ${RELAYER_WRITE_TIMEOUT_MS / 1000} s. It may still have sent the transaction, so check again in a minute before retrying. ${fallback}`);
+  }
+  return new Error(`Relayer unreachable: the network request failed (offline, or blocked by a browser extension). ${fallback}`);
+}

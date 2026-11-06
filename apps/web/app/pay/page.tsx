@@ -10,6 +10,7 @@ import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/inv
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
+import { RELAYER_WRITE_TIMEOUT_MS, relayerFailure } from '@/lib/relayer-off.ts';
 import { counterfactualApproval, unwrap6492 } from '@/lib/erc6492.ts';
 import { ethCall, getBlockTimestamp, getReceipt, rpc } from '@/lib/rpc.ts';
 import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInjectedWallet } from '@/lib/ensgate.ts';
@@ -256,11 +257,11 @@ export default function PayPage() {
     if (!relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata" or "Send via Ethereum".');
     const started = Date.now();
     const res = await fetch(`${relayerUrl}/pay`, {
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(RELAYER_WRITE_TIMEOUT_MS),
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(relayerBody(auth, approvals)),
-    }).catch(() => { throw new Error('Relayer unreachable: use "Send via Ethereum" below, or "Copy calldata".'); });
+    }).catch((e) => { throw relayerFailure(e, 'Use "Send via Ethereum" below, or "Copy calldata".'); });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
     setTx({ hash: body.txHash, started });
