@@ -11,6 +11,7 @@ import { MANDATE_MODULE_V2 } from './mandate.ts';
 import { sandboxFromEnv } from './sandbox/config.ts';
 import { createSandboxPorts } from './sandbox/ports.ts';
 import { createSandbox } from './sandbox/service.ts';
+import { createGuard, limitsFromEnv } from './guard.ts';
 
 export const DEFAULT_SEPOLIA_RPC = 'https://sepolia.gateway.tenderly.co';
 export const DEFAULT_ROLE_CACHE = '0x8AC436e5BB681aE4d576e0131391aE3AACA88BDe';
@@ -76,10 +77,16 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
       ports: createSandboxPorts({ config: sandboxEnv.config, whitechain: whitechainSepolia, wcRpc: rpcUrl, sepoliaRpc, relayer: sender, roleSync }),
     })
     : undefined;
+  // drain protection: rate limits plus a balance floor and daily budget read from the relayer's own WBT balance
+  const guard = sender ? createGuard({
+    limits: limitsFromEnv(env),
+    balance: () => client.getBalance({ address: sender.address }),
+    gasPrice: () => client.getGasPrice(),
+  }) : undefined;
   const handler = createHandler({
     sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id,
     mandateModuleV2: getAddress(env.MANDATE_MODULE_V2 || MANDATE_MODULE_V2), paymentModuleV2: getAddress(env.PAYMENT_MODULE_V2 || PAYMENT_MODULE_V2),
-    roleSync, cronSecret, mirror, sandbox,
+    roleSync, cronSecret, mirror, sandbox, guard,
   });
-  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror, sandbox };
+  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror, sandbox, guard };
 }

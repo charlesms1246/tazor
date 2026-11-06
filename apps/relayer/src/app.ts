@@ -12,7 +12,8 @@ import { REVOCATION_LIST_V2, pickRevocationList } from './revoke-list.ts';
 import { ENTRY_POINT_V08, RpcError, encodeHandleOps, parseUserOp, paymasterRpc } from './userop.ts';
 import type { MirrorService } from './mirror-service.ts';
 import type { Sandbox } from './sandbox/service.ts';
-import { handleSandbox } from './sandbox/routes.ts';
+import { clientIp, handleSandbox } from './sandbox/routes.ts';
+import { Paused, Throttled, type Guard, type GuardedRoute } from './guard.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -62,12 +63,15 @@ export function createHandler(deps: {
   mirror?: MirrorService;
   /** Autopilot sandbox (/sandbox/*); only when every SANDBOX_* variable is set. */
   sandbox?: Sandbox;
+  /** Rate limits, the balance floor and the daily gas budget for every route that spends the relayer's gas. */
+  guard?: Guard;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown, headers: Record<string, string> = {}) => {
       res.writeHead(status, { 'content-type': 'application/json', ...CORS, ...headers }).end(JSON.stringify(body));
       console.log(`${req.method} ${req.url} ${status}`);
     };
+    const guard = (route: GuardedRoute, account?: string) => deps.guard?.check(route, clientIp(req), account);
     try {
       if (req.method === 'OPTIONS') return void res.writeHead(204, CORS).end();
       const path = new URL(req.url ?? '/', 'http://relayer').pathname;
@@ -81,9 +85,11 @@ export function createHandler(deps: {
           mandateModule: deps.mandateModule ?? null,
           roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? deps.mirror?.registries ?? [],
           ...(deps.mirror ? await mirrorHealthJson(deps.mirror) : { mirrorEnabled: false, mirrorReason: 'mirror not configured' }),
+          ...(deps.guard ? { gas: await deps.guard.health() } : {}),
           sandbox: { enabled: !!deps.sandbox, account: deps.sandbox?.config.account ?? null, registry: deps.sandbox?.config.registry ?? null },
         });
       }
+      if (deps.sandbox && req.method === 'POST' && path === '/sandbox/admit') await guard('/sandbox/admit');
       if (deps.sandbox && (await handleSandbox(req, path, deps.sandbox, readJson, reply))) return;
       if (deps.mirror && req.method === 'POST' && path === '/mirror') {
         const body = (await readJson(req)) as { account?: unknown; target?: unknown } | null;
@@ -101,6 +107,7 @@ export function createHandler(deps: {
         if (typeof registry !== 'string' || !isAddress(registry) || typeof account !== 'string' || !isAddress(account)) {
           throw new BadRequest('registry and account must be addresses');
         }
+        await guard('/sync', account);
         return reply(200, syncJson(await deps.roleSync.syncAccount(getAddress(registry), getAddress(account))));
       }
       if ((deps.roleSync || deps.mirror) && req.method === 'GET' && path === '/watch') {
@@ -120,6 +127,7 @@ export function createHandler(deps: {
           : create ? await pickMandateModule(deps.client, create.mandate.account, { ...mods, v1: mods.v1 })
           : await findMandateModule(deps.client, pull!.mandateId, { v1: mods.v1, v2: mods.v2 });
         if (!deps.sender || !to) return reply(503, { error: 'relayer not configured', to: to ?? null, data });
+        await guard(create ? '/mandate' : '/pull', create ? create.mandate.account : pull!.mandateId);
         return reply(200, { txHash: await deps.sender.send(to, data), mandateModule: to });
       }
       if (req.method === 'POST' && req.url === '/revoke') {
@@ -133,6 +141,7 @@ export function createHandler(deps: {
           : undefined;
         const list = byAccount ?? pickRevocationList(json, deps.revocationList, listV2);
         if (!deps.sender || !list) return reply(503, { error: 'relayer not configured', to: list ?? null, data });
+        await guard('/revoke', parseRevokeRequest(json).account);
         return reply(200, { txHash: await deps.sender.send(list, data) });
       }
       if (req.method === 'POST' && req.url === '/approver') {
@@ -142,6 +151,7 @@ export function createHandler(deps: {
         const account = await a.predict(signer);
         if (await a.isDeployed(account)) return reply(200, { account, txHash: null });
         if (!deps.sender) return reply(503, { error: 'relayer not configured', account });
+        await guard('/approver', signer);
         return reply(200, { account, txHash: await deps.sender.send(a.factory, a.createCalldata(signer)) });
       }
       if (req.method === 'POST' && (req.url === '/pay' || req.url === '/pay/calldata')) {
@@ -155,6 +165,7 @@ export function createHandler(deps: {
           return reply(200, { to, data });
         }
         if (!deps.sender || !deps.paymentModule) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
+        await guard('/pay', parsed.account);
         if (!deps.client || !deps.approvers) return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
         // a v2 company pays through PaymentModuleV2 (same payOne signature, its own invoice digest and policy checks)
         const to = await pickModule(deps.client, parsed.account, deps.paymentModule, deps.paymentModuleV2 ?? PAYMENT_MODULE_V2);
@@ -166,6 +177,7 @@ export function createHandler(deps: {
       if (req.method === 'POST' && req.url === '/payrun') {
         const parsed = parsePayRunRequest(await readJson(req));
         if (!deps.sender || !deps.paymentModule || !deps.client || !deps.approvers) return reply(503, { error: 'relayer not configured; use Copy calldata' });
+        await guard('/payrun', parsed.account);
         const p = await preparePayRun(deps.client, deps.approvers.factory, deps.paymentModule, deps.paymentModuleV2 ?? PAYMENT_MODULE_V2, parsed);
         const deployTxs = [];
         for (const d of p.deploys) deployTxs.push(await deps.sender.send(d.to, d.data));
@@ -186,11 +198,14 @@ export function createHandler(deps: {
         const body = (await readJson(req)) as { userOp?: unknown } | null;
         const op = parseUserOp(body?.userOp, { requireSignature: true });
         if (!deps.sender) return reply(503, { error: 'relayer not configured' });
+        await guard('/userop', op.sender);
         return reply(200, { txHash: await deps.sender.send(ENTRY_POINT_V08, encodeHandleOps(op, deps.sender.address)) });
       }
       return reply(404, { error: 'not found' });
     } catch (e) {
       if (e instanceof BadRequest) return reply(400, { error: e.message });
+      if (e instanceof Throttled) return reply(429, { error: e.message, retryAfterSec: e.retryAfterSec }, { 'retry-after': String(e.retryAfterSec) });
+      if (e instanceof Paused) return reply(503, { error: e.message, paused: true });
       if (e instanceof SimulationFailed) return reply(422, { error: `simulation reverted: ${e.message}` });
       return reply(502, { error: 'upstream error' });
     }
