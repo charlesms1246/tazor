@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
 import { config } from '@/lib/config.ts';
+import { invoiceHash } from '@/lib/invoice.ts';
 import { encodeInvoiceLink } from '@/lib/invoice-link.ts';
 import {
-  buildInvoice, formTotal, invoiceStatus, lineTotal, loadInvoices, newInvoiceId, saveInvoice,
-  type InvoiceForm, type LineForm, type StoredInvoice,
+  buildInvoice, draftTax, formTotal, invoiceStatus, lineTotal, loadInvoices, loadLogo, LOGO_MAX_BYTES, LOGO_TYPES, newInvoiceId,
+  parseRate, parseUsdt, saveInvoice, saveLogo, withTax, type InvoiceForm, type LineForm, type StoredInvoice,
 } from '@/lib/invoices-store.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { InvoicePaper, paperFromInvoice, printInvoice, type PaperInvoice } from '../_invoice/paper.tsx';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -26,22 +28,67 @@ export default function InvoicesPage() {
   const [created, setCreated] = useState<StoredInvoice | null>(null);
   const [list, setList] = useState<StoredInvoice[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [taxRate, setTaxRate] = useState('');
+  const [taxLabel, setTaxLabel] = useState('GST');
+  const [logo, setLogo] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState('');
+  const [viewing, setViewing] = useState<StoredInvoice | null>(null);
+  const [preview, setPreview] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  useEffect(() => { setList(loadInvoices()); setPayments(loadPayments()); }, []);
+  useEffect(() => { setList(loadInvoices()); setPayments(loadPayments()); setLogo(loadLogo()); }, []);
 
-  const set = (patch: Partial<InvoiceForm>) => { setForm({ ...form, ...patch }); setError(''); };
+  const set = (patch: Partial<InvoiceForm>) => { setForm({ ...form, ...patch }); setError(''); setDirty(true); };
   const setLine = (n: number, patch: Partial<LineForm>) => set({ lines: form.lines.map((l, i) => (i === n ? { ...l, ...patch } : l)) });
-  const total = formTotal(form);
+  const tax = draftTax(form, taxRate, taxLabel);
+  const total = formTotal(form) + (tax?.amount ?? 0n);
+  const taxRateError = taxRate.trim() !== '' && parseRate(taxRate) === null;
+
+  const onLogo = (file: File | undefined) => {
+    setLogoError('');
+    if (!file) return;
+    if (!LOGO_TYPES.includes(file.type)) return setLogoError('Use a PNG, JPG or SVG image.');
+    if (file.size > LOGO_MAX_BYTES) return setLogoError('The logo must be 200 KB or smaller.');
+    const r = new FileReader();
+    r.onload = () => {
+      const url = String(r.result);
+      if (!saveLogo(url)) setLogoError('This browser would not store the logo; it shows until you reload.');
+      setLogo(url);
+    };
+    r.onerror = () => setLogoError('Could not read that file.');
+    r.readAsDataURL(file);
+  };
+  const onRemoveLogo = () => { saveLogo(null); setLogo(null); setLogoError(''); };
+
+  const draft: PaperInvoice = {
+    id: null, supplierName: form.supplierName, payee: form.payee, buyer: form.customer, issued: null,
+    due: form.dueDate ? Math.floor(new Date(`${form.dueDate}T00:00:00Z`).getTime() / 1000) || null : null,
+    lines: form.lines.map((l) => ({
+      description: l.description,
+      quantity: /^[1-9]\d*$/.test(l.quantity.trim()) ? BigInt(l.quantity.trim()) : null,
+      unitPrice: parseUsdt(l.unitPrice),
+    })),
+    memo: form.memo, tax,
+  };
+  const shown = viewing ?? (dirty ? null : created);
+  const paper = shown ? paperFromInvoice(shown.invoice, shown.createdAt) : draft;
+  const shownStatus = shown ? invoiceStatus(shown.invoice, payments) : 'draft';
+  const paidTx = shown && shownStatus === 'paid'
+    ? payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(shown.invoice); } catch { return false; } })?.txHash ?? null
+    : null;
 
   const onCreate = async () => {
     setBusy(true); setError(''); setCreated(null);
     try {
-      const r = buildInvoice(form, newInvoiceId());
+      if (taxRateError) return setError('Tax % must be a number from 0 to 100 with up to 2 decimals.');
+      const r = buildInvoice(withTax(form, taxRate, taxLabel), newInvoiceId());
       if ('error' in r) return setError(r.error);
       const link = await encodeInvoiceLink(r.invoice, location.origin);
       const stored = { invoice: r.invoice, link, createdAt: Math.floor(Date.now() / 1000) };
       if (!saveInvoice(stored)) setError('Created, but this browser would not save it to the list; copy the link now.');
       setCreated(stored);
+      setViewing(null);
+      setDirty(false);
       setList(loadInvoices());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -54,7 +101,7 @@ export default function InvoicesPage() {
     <div className="page">
       <PageHeader title="Invoices" subtitle="Create a payment link; your customer approves it with a passkey and pays in USDT on Whitechain." />
 
-      <div className="grid-2">
+      <div className="inv-split">
         <Card title="Create invoice" subtitle="The link carries the invoice encrypted; only someone with the link can read it.">
           <div className="stack">
             <div className="fields-2">
@@ -116,6 +163,27 @@ export default function InvoicesPage() {
               </Field>
             </div>
 
+            <div className="fields-2">
+              <Field label="Tax %" hint="Optional; added as a final line.">
+                <span className="input-affix">
+                  <input data-testid="inv-tax-rate" className="input num" inputMode="decimal" value={taxRate} onChange={(e) => { setTaxRate(e.target.value); setError(''); setDirty(true); }} placeholder="0" style={{ textAlign: 'right' }} />
+                  <span>%</span>
+                </span>
+              </Field>
+              <Field label="Tax label">
+                <input data-testid="inv-tax-label" className="input" value={taxLabel} onChange={(e) => { setTaxLabel(e.target.value); setDirty(true); }} />
+              </Field>
+            </div>
+            {taxRateError && <Notice tone="negative" testId="inv-tax-error">Tax % must be a number from 0 to 100 with up to 2 decimals.</Notice>}
+
+            <Field label="Logo" hint="PNG, JPG or SVG, up to 200 KB. Your logo shows on your copy and PDF; the customer's link shows your name.">
+              <span className="row" style={{ gap: 8 }}>
+                <input data-testid="inv-logo" type="file" accept="image/png,image/jpeg,image/svg+xml" className="input" onChange={(e) => { onLogo(e.target.files?.[0]); e.target.value = ''; }} />
+                {logo && <button type="button" data-testid="inv-logo-remove" className="btn btn-sm btn-ghost" onClick={onRemoveLogo}>Remove logo</button>}
+              </span>
+            </Field>
+            {logoError && <Notice tone="negative" testId="inv-logo-error">{logoError}</Notice>}
+
             {error && <Notice tone="negative" testId="inv-error">{error}</Notice>}
             <div className="row">
               <button data-testid="inv-create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create payment link</button>
@@ -128,6 +196,7 @@ export default function InvoicesPage() {
                   <span className="row">
                     <CopyButton value={created.link} label="Copy link" />
                     <a className="btn btn-sm" data-testid="inv-open" href={created.link} target="_blank" rel="noreferrer">Open</a>
+                    <button type="button" className="btn btn-sm" data-testid="inv-pdf" onClick={() => { setViewing(null); setDirty(false); setPreview(true); setTimeout(printInvoice, 50); }}>Download PDF</button>
                   </span>
                 </span>
               </Notice>
@@ -135,37 +204,26 @@ export default function InvoicesPage() {
           </div>
         </Card>
 
-        <Card title="Preview" subtitle="What your customer sees after opening the link." testId="inv-preview">
-          <div className="stack">
-            <div className="spread">
-              <span style={{ fontWeight: 500 }}>{form.supplierName.trim() || <span className="faint">Supplier name</span>}</span>
-              <span className="num" style={{ fontWeight: 500 }}>{amt(total)}</span>
-            </div>
-            <dl className="kv">
-              <dt>Invoice</dt><dd>{created ? created.invoice.id : <span className="faint">Assigned when you create the link</span>}</dd>
-              <dt>Pay to</dt><dd>{form.payee.trim() ? <span className="mono break">{form.payee.trim()}</span> : <span className="faint">Payee</span>}</dd>
-              <dt>Buyer account</dt><dd>{form.customer.trim() ? <span className="mono break">{form.customer.trim()}</span> : <span className="faint">Customer company account</span>}</dd>
-              <dt>Due</dt><dd className="num">{form.dueDate || <span className="faint">Due date</span>}</dd>
-              <dt>Memo</dt><dd>{form.memo.trim() || <span className="faint">None</span>}</dd>
-            </dl>
-            <div className="table-wrap"><table className="table table-stack">
-              <thead><tr><th>Description</th><th className="num">Qty</th><th className="num">Total</th></tr></thead>
-              <tbody>
-                {form.lines.map((l, n) => {
-                  const t = lineTotal(l);
-                  return (
-                    <tr key={n}>
-                      <td>{l.description.trim() || <span className="faint">Line {n + 1}</span>}</td>
-                      <td className="num">{l.quantity}</td>
-                      <td className="num">{t === null ? <span className="faint">—</span> : amt(t)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table></div>
-            <p className="small muted">The customer approves with Face ID; the supplier is shown as verified only if its admin holds a WB Soul (simulated on testnet).</p>
+
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="paper-toggle">
+            <button type="button" data-testid="inv-preview-toggle" className="btn" aria-expanded={preview} onClick={() => setPreview(!preview)}>
+              {preview ? 'Hide invoice' : 'Preview invoice'}
+            </button>
           </div>
-        </Card>
+          <div className="paper-col paper-sticky" data-open={preview || viewing ? 'true' : 'false'} data-testid="inv-preview">
+            {viewing && (
+              <div className="spread">
+                <span className="small muted">Viewing {viewing.invoice.id} (read-only)</span>
+                <span className="row" style={{ gap: 8 }}>
+                  <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
+                  <button type="button" className="btn btn-sm btn-ghost" data-testid="inv-view-close" onClick={() => setViewing(null)}>Back to editing</button>
+                </span>
+              </div>
+            )}
+            <InvoicePaper invoice={paper} status={shownStatus} link={shown?.link ?? null} txHash={paidTx} logo={logo} />
+          </div>
+        </div>
       </div>
 
       <Card title="Invoices on this device" flush testId="inv-list">
@@ -180,12 +238,13 @@ export default function InvoicesPage() {
               {list.map((s) => {
                 const paid = invoiceStatus(s.invoice, payments) === 'paid';
                 return (
-                  <tr key={s.link} data-testid="inv-row">
+                  <tr key={s.link} data-testid="inv-row" className="inv-row" data-selected={viewing?.link === s.link ? 'true' : undefined} onClick={() => { setViewing(s); setPreview(true); }} style={{ cursor: 'pointer' }}>
                     <td>{s.invoice.id}<span className="cell-sub">To <Addr value={s.invoice.buyerAccount} href={`${config.explorer}/address/${s.invoice.buyerAccount}`} /> · due {day(s.invoice.dueDate)}</span></td>
                     <td className="num">{amt(s.invoice.amount)}</td>
                     <td><Pill tone={paid ? 'positive' : 'info'} testId="inv-status">{paid ? 'Paid' : 'Sent'}</Pill></td>
                     <td>
-                      <span className="row" style={{ gap: 8 }}>
+                      <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => { setViewing(s); setPreview(true); }}>View</button>
                         <CopyButton value={s.link} label="Copy link" />
                         <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
                       </span>
