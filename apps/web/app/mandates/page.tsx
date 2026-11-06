@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatUnits, getAddress, isAddress, isHex, parseUnits, type Hex } from 'viem';
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
+import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import {
   PERIODS, decodeAvailable, decodeMandateDigest, decodeMandateOf, encodeAvailableCall, encodeCreateMandate,
   encodeMandateDigestCall, encodeMandateOfCall, encodePull, mandateDigest, mandateRelayerBody, type Mandate,
@@ -17,8 +18,9 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const days = (s: bigint) => `${Number(s) / 86400} days`;
 
 async function relay(path: string, body: unknown): Promise<Hex> {
-  if (!config.relayerUrl) throw new Error('Relayer URL is not configured; use the calldata instead.');
-  const res = await fetch(`${config.relayerUrl}${path}`, {
+  const relayerUrl = getRelayerUrl();
+  if (!relayerUrl) throw new Error('Relayer URL is not configured; use the calldata instead.');
+  const res = await fetch(`${relayerUrl}${path}`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000),
   }).catch(() => { throw new Error('Relayer unreachable; use the calldata instead.'); });
   const json = await res.json();

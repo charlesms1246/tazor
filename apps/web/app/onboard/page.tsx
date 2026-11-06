@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPasskey } from '@/lib/webauthn.ts';
 import { predictApproverAccount } from '@/lib/approver.ts';
 import { config } from '@/lib/config.ts';
+import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { loadPasskey, savePasskey, type StoredPasskey } from '@/lib/storage.ts';
 
 export default function OnboardPage() {
@@ -28,8 +29,9 @@ export default function OnboardPage() {
       setSigner(p.signer);
       const saved = savePasskey(record) ? 'Saved on this device.' : 'Could not save on this device; copy the values below.';
       setNote(saved);
-      if (!config.relayerUrl) return setNote(`${saved} No relayer configured: anyone can deploy this account later with createAccount([signer id]).`);
-      const res = await fetch(`${config.relayerUrl}/approver`, {
+      const relayerUrl = getRelayerUrl();
+      if (!relayerUrl) return setNote(`${saved} No relayer configured: anyone can deploy this account later with createAccount([signer id]).`);
+      const res = await fetch(`${relayerUrl}/approver`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signer: p.signer }),
       });
       const body = await res.json();

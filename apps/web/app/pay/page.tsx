@@ -7,6 +7,7 @@ import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
 import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/invoice-auth.ts';
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
+import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { ethCall, getBlockTimestamp, getReceipt, rpc } from '@/lib/rpc.ts';
 import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInjectedWallet } from '@/lib/ensgate.ts';
 import { appendPayment, loadPasskey } from '@/lib/storage.ts';
@@ -136,9 +137,10 @@ export default function PayPage() {
   const onPay = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
     if (v2) throw new Error('The relayer submits v1 payments only; for this v2 company use "Copy calldata" (PaymentModuleV2) or "Send via Ethereum".');
-    if (!config.relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata" or "Send via Ethereum".');
+    const relayerUrl = getRelayerUrl();
+    if (!relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata" or "Send via Ethereum".');
     const started = Date.now();
-    const res = await fetch(`${config.relayerUrl}/pay`, {
+    const res = await fetch(`${relayerUrl}/pay`, {
       signal: AbortSignal.timeout(15_000),
       method: 'POST',
       headers: { 'content-type': 'application/json' },
