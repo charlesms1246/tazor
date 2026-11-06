@@ -48,6 +48,8 @@ export default function CheckoutPage() {
   const [tab, setTabState] = useState<Tab>('overview');
   const [linked, setLinked] = useState<Address | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  /** From a customer's refund request link: open that order's refund with this amount (capped at what is left). */
+  const [askedRefund, setAskedRefund] = useState<string | null>(null);
   const [demo, setDemo] = useState(true);
   // deep links: ?merchant=0x…&tab=agents, or /checkout/#subscriptions
   useEffect(() => {
@@ -56,6 +58,8 @@ export default function CheckoutPage() {
     if (isAddress(m)) setLinked(getAddress(m));
     const o = q.get('order')?.trim().toLowerCase() ?? '';
     if (/^0x[0-9a-f]{64}$/.test(o)) setFocus(o);
+    const r = q.get('refund')?.trim() ?? '';
+    if (/^\d+(\.\d{1,6})?$/.test(r) && Number(r) > 0) setAskedRefund(r);
     const t = q.get('tab');
     if (isTab(t)) setTabState(t);
     setDemo(demoOn());
@@ -110,6 +114,17 @@ export default function CheckoutPage() {
     return () => clearInterval(t);
   }, [focus, focusFound, load]);
   useEffect(() => { if (focusFound) document.querySelector('[data-focus="true"]')?.scrollIntoView({ block: 'center' }); }, [focusFound]);
+  useEffect(() => {
+    if (!focusFound || !askedRefund) return;
+    const o = data?.orders.find((x) => x.id.toLowerCase() === focus);
+    if (!o) return;
+    const left = Number(o.amount - o.refunded) / 1e6;
+    setAskedRefund(null);
+    if (left <= 0) return toast('This order is already fully refunded', 'error');
+    setRefunding({ id: o.id, amount: String(Math.min(Number(askedRefund), left)) });
+    setTimeout(() => (document.querySelector('[data-testid="co-refund-confirm"]') as HTMLElement | null)?.focus(), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFound, askedRefund]);
 
   // the merchant webhooks are tested for: a linked ?merchant= first, else the selected company
   const merchant = linked ?? (ready ? company.account : null);

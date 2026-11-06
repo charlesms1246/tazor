@@ -18,6 +18,9 @@ import { Card, Empty, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import '../_invoice/touch.css';
 import '../_invoice/paper.css';
 import '../_checkout/checkout.css';
+import '../_invoice/reminder.css';
+import { MerchantBadge } from '../_soul/merchant-badge.tsx';
+import { RefundRequest } from '../_checkout/refund-request.tsx';
 
 const nameOf = (a: string) => companyByAccount(a)?.name ?? ensLabelOf(a) ?? null;
 const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null);
@@ -133,7 +136,8 @@ export default function ReceiptPage() {
             <Pill tone={status === 'Paid' ? 'positive' : status === 'Refunded' ? 'neutral' : 'warning'} testId="receipt-status">{status}</Pill>
           </div>
           <dl className="kv">
-            <dt>Merchant</dt><dd data-testid="receipt-merchant">{merchantName && <b>{merchantName} </b>}<AddrChip value={p.merchant} href={explorer(p.merchant)} /></dd>
+            <dt>Merchant</dt><dd data-testid="receipt-merchant">{merchantName && <b>{merchantName} </b>}<AddrChip value={p.merchant} href={explorer(p.merchant)} />
+              <MerchantBadge merchant={p.merchant} /></dd>
             <dt>Paid with</dt><dd data-testid="receipt-method">{methodLabel(p.method)}</dd>
             <dt>{p.method === 'signed' ? 'Paid by' : 'Refunds go to'}</dt><dd>{payerName && <b>{payerName} </b>}<AddrChip value={p.payer} href={explorer(p.payer)} /></dd>
             <dt>Paid</dt><dd className="num" data-testid="receipt-paid-at">{when(p.paidAt * 1000)}{state.paidTx && <> · <a href={explorerTx(state.paidTx)} target="_blank" rel="noreferrer" data-tx={state.paidTx}>View transaction</a></>}</dd>
@@ -178,6 +182,13 @@ export default function ReceiptPage() {
           </table></div>
         </Card>
       )}
+
+      {net > 0n && (
+        <RefundRequest orderId={state.id} merchant={p.merchant} business={merchantName} order={state.number ?? shortRef(state.id)} paid={usdtText(p.amount).replace(/ USDT$/, '')}
+          paidOn={p.paidAt ? new Date(p.paidAt * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null} refundable={Number(net) / 1e6} />
+      )}
+
+      <p className="small" style={{ margin: 0 }}><a href={`/me/?address=${p.payer}`} data-testid="receipt-my-payments">All my payments →</a> <span className="muted">every Checkout payment from {p.method === 'signed' ? 'this wallet' : 'this refund address'}, across all businesses</span></p>
 
       <Card title="Share this receipt" subtitle="Anyone with the link can check it on Whitechain.">
         <div className="receipt-share">
