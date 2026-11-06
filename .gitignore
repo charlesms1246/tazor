@@ -21,7 +21,7 @@ next-env.d.ts
 # foundry (dependencies reinstall via contracts/install-deps.sh)
 contracts/lib/
 cache/
-broadcast/*/dry-run/
+contracts/broadcast/
 
 # vendored checkouts
 vendor/
