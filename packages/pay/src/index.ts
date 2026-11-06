@@ -12,7 +12,7 @@ export {
   readyToShip, requiredStage, DEFAULT_SHIP_POLICY, type ShipPolicy, type ShipDecision, type ReadyStage,
   type Order, type Plan, type Signer, type Stage, type OrderStatus,
 } from './checkout.ts';
-export { DEPOSIT_CHECKOUT, depositOrder, depositStatus, watchDeposit, depositRefundTypedData, depositRefundNonce, addressQrSvg, encodeDepositOrder, depositAbi, type DepositOrder, type DepositStatus } from './deposit.ts';
+export { DEPOSIT_CHECKOUT, depositOrder, depositStatus, watchDeposit, depositRefundTypedData, depositRefundNonce, addressQrSvg, paymentUri, encodeDepositOrder, depositAbi, type DepositOrder, type DepositStatus } from './deposit.ts';
 export { verifyWebhook, signWebhook, parseSignatureHeader, type WebhookEvent, type VerifyResult } from './webhooks.ts';
 export { payFetch, buildPayment, pickRequirement, encodePaymentHeader, decodePaymentHeader, decodePaymentResponse, type PaymentRequirements, type PaymentPayload } from './x402.ts';
 export { demoWallet } from './demo-wallet.ts';

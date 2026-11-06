@@ -2,7 +2,7 @@
 import { createInvoiceLink, DEFAULT_EXPLORER, watchPayment, type InvoiceInput, type InvoiceLink, type LineInput, type Payment } from './core.ts';
 import { accountSigner, CHECKOUT, EXPLORER, orderId, orderRef, payOrder, readyToShip, RELAYER_URL, walletSigner, watchOrder, type Eip1193, type Order, type ShipPolicy, type Signer, type Stage } from './checkout.ts';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { addressQrSvg, depositOrder, watchDeposit, type DepositOrder, type DepositStatus } from './deposit.ts';
+import { addressQrSvg, depositOrder, paymentUri, watchDeposit, type DepositOrder, type DepositStatus } from './deposit.ts';
 
 export const ATTRIBUTES = [
   'supplier-name', 'supplier-account', 'payee', 'buyer', 'amount', 'lines', 'memo', 'due', 'app-url', 'label',
@@ -153,7 +153,7 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       this.dispatchEvent(new CustomEvent('tazor-ready', { detail: { orderId, stage, waitFor: d.waitFor, reason: d.reason, ...extra }, bubbles: true, composed: true }));
     }
     #stage: Stage | null = null;
-    #dep: { open: boolean; refundTo: string; busy: boolean; error: string; order?: DepositOrder; address?: string; id?: string; qr?: string; status?: DepositStatus } = { open: false, refundTo: '', busy: false, error: '' };
+    #dep: { open: boolean; refundTo: string; busy: boolean; error: string; order?: DepositOrder; address?: string; id?: string; qr?: string; uri?: string; status?: DepositStatus } = { open: false, refundTo: '', busy: false, error: '' };
 
     async #openDeposit() {
       this.#dep = { ...this.#dep, open: true, error: '' };
@@ -170,7 +170,7 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       try {
         const o = orderFromAttributes((n) => this.getAttribute(n));
         const d = await depositOrder({ merchant: o.merchant, amount: o.amount, ref: o.ref, deadline: o.deadline, refundTo, relayer: this.getAttribute('relayer') || undefined });
-        this.#dep = { ...this.#dep, busy: false, order: d.order, address: d.depositAddress, id: d.orderId, qr: await addressQrSvg(d.depositAddress), status: { status: 'waiting' } };
+        this.#dep = { ...this.#dep, busy: false, order: d.order, address: d.depositAddress, id: d.orderId, uri: paymentUri(d.depositAddress, d.order.amount), qr: await addressQrSvg(paymentUri(d.depositAddress, d.order.amount)), status: { status: 'waiting' } };
         this.#render();
         this.#stop?.();
         this.#stop = watchDeposit(d.order, (st) => {
@@ -238,7 +238,8 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
         const kv = el('div', 'kv');
         const addrRow = el('span'); addrRow.append(el('span', 'mono', shortAddr(this.#dep.address)), document.createTextNode(' '), copy(this.#dep.address, 'Copy address'));
         const amtRow = el('span'); amtRow.append(el('b', '', `${amount} USDT`), document.createTextNode(' '), copy(amount, 'Copy amount'));
-        kv.append(el('span', 'k', 'Send'), amtRow, el('span', 'k', 'Token'), el('span', '', 'USDT'), el('span', 'k', 'Network'), el('span', '', 'Whitechain'), el('span', 'k', 'To'), addrRow);
+        const linkRow = el('span'); if (this.#dep.uri) linkRow.append(copy(this.#dep.uri, 'Copy payment link'), document.createTextNode(' '), el('span', 'note', 'EIP-681: wallet apps fill in the token, network and amount'));
+        kv.append(el('span', 'k', 'Send'), amtRow, el('span', 'k', 'Token'), el('span', '', 'USDT'), el('span', 'k', 'Network'), el('span', '', 'Whitechain'), el('span', 'k', 'To'), addrRow, el('span', 'k', 'Link'), linkRow);
         box.append(el('b', '', 'Withdraw from WhiteBIT (or send from any wallet)'), qr, kv);
         box.append(el('span', 'note', `Send exactly ${amount} USDT on Whitechain. Any extra comes back to ${shortAddr(this.#dep.refundTo)}; so does everything if the order expires. Testnet: any USDT transfer on Whitechain Sepolia stands in for the WhiteBIT withdrawal.`));
         const ol = el('ol');

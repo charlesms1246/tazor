@@ -91,13 +91,24 @@ export function depositRefundTypedData(id: Hex, merchant: Address, amount: bigin
 }
 
 /** An SVG QR code for the deposit address (just the address, which every exchange's withdrawal screen accepts). */
-export async function addressQrSvg(address: string, cell = 4): Promise<string> {
+/**
+ * An EIP-681 payment request for a USDT transfer on Whitechain: wallets that read it pre-fill the token, network,
+ * recipient and exact amount. `ethereum:<USDT>@1874/transfer?address=<to>&uint256=<base units>`.
+ */
+export function paymentUri(to: string, amountBaseUnits: bigint | string, opts: { token?: string; chainId?: number } = {}): string {
+  const amount = BigInt(amountBaseUnits);
+  if (amount <= 0n) throw new Error('amount must be positive');
+  return `ethereum:${getAddress(opts.token ?? USDT)}@${opts.chainId ?? CHAIN_ID}/transfer?address=${getAddress(to)}&uint256=${amount}`;
+}
+
+/** A QR code (SVG) of any text: an address, or an EIP-681 payment request from paymentUri(). */
+export async function addressQrSvg(text: string, cell = 4): Promise<string> {
   type Qr = { addData(s: string): void; make(): void; createSvgTag(o: { cellSize: number; margin: number; scalable: boolean }): string };
   // the app's own QR library (bundled into tazor-pay.js); it ships no types at this path
   // @ts-ignore
   const { default: qrcode } = (await import('../../../apps/web/node_modules/qrcode-generator/dist/qrcode.mjs')) as { default: (type: number, level: string) => Qr };
   const qr = qrcode(0, 'M');
-  qr.addData(getAddress(address));
+  qr.addData(/^0x[0-9a-fA-F]{40}$/.test(text) ? getAddress(text) : text);
   qr.make();
   return qr.createSvgTag({ cellSize: cell, margin: 2, scalable: true });
 }
