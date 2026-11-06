@@ -418,3 +418,15 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .hero-value { font-size: 34px; line-height: 40px; }
   .hero-actions .btn { flex: 1; }
 }
+
+/* ---------- timeline ---------- */
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; }
+.timeline li:not(:last-child)::before { content: ""; position: absolute; left: 9px; top: 18px; bottom: 0; width: 2px; background: var(--rule); }
+.tl-dot { width: 20px; height: 20px; border-radius: 999px; border: 2px solid var(--wc-blue); background: var(--surface); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px var(--wc-blue); }
+.timeline li[data-tone="done"] .tl-dot { border-color: var(--positive); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px var(--positive); }
+.timeline li[data-tone="bad"] .tl-dot { border-color: var(--negative); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px var(--negative); }
+.timeline li[data-tone="warn"] .tl-dot { border-color: #ed7536; box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 10px #ed7536; }
+.timeline li[data-tone="pending"] .tl-dot { border-color: var(--control); border-style: dashed; box-shadow: none; }
+.tl-title { font-weight: 500; line-height: 20px; }
+.tl-meta { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--faint); }
