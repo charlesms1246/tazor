@@ -15,7 +15,8 @@
     "test:e2e": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_PAYMENT_MODULE=0x0000000000000000000000000000000000007000 NEXT_PUBLIC_APPROVER_ACCOUNT_FACTORY=0x0000000000000000000000000000000000007001 NEXT_PUBLIC_RELAYER_URL=http://relayer.test next build && playwright test",
     "ipfs:car": "node scripts/ipfs-car.mjs",
     "build:ipfs": "NEXT_TELEMETRY_DISABLED=1 next build && node scripts/ipfs-car.mjs",
-    "preview": "zsh scripts/preview.sh"
+    "preview": "zsh scripts/preview.sh",
+    "deploy:vercel": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) next build && find dist/tazor-app -mindepth 1 -maxdepth 1 ! -name vercel.json ! -name .vercel -exec rm -rf {} + && cp -R out/. dist/tazor-app/ && cd dist/tazor-app && vercel deploy --prod --yes"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
