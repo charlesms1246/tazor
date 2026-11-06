@@ -48,11 +48,12 @@ export async function sendWithInjectedWallet(to: Address, data: Hex, gas: bigint
   try {
     await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId }] });
   } catch (e) {
-    if ((e as { code?: number }).code !== 4902) throw e;
-    await eth.request({
-      method: 'wallet_addEthereumChain',
-      params: [{ chainId, chainName: 'Sepolia', rpcUrls: [config.sepolia.rpcUrl], nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 }, blockExplorerUrls: [config.sepolia.explorer] }],
-    });
+    // Sepolia is built into every major wallet; adding it with our own details makes wallets warn about a
+    // look-alike network, so ask the person to enable test networks instead.
+    if ((e as { code?: number }).code === 4902) {
+      throw new Error('Your wallet needs the Sepolia test network turned on (in MetaMask: Settings → Advanced → Show test networks), then tap again.');
+    }
+    throw e;
   }
   return (await eth.request({ method: 'eth_sendTransaction', params: [{ from, to, data, gas: toHex((gas * 12n) / 10n) }] })) as Hex;
 }
