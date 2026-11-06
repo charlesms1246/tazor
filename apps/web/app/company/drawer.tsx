@@ -12,12 +12,14 @@ import { BackupSigner } from './backup.tsx';
 import { RemovePerson } from './remove.tsx';
 import { SoulStatus } from '@/app/_soul/soul-badge.tsx';
 import { ensAddressUrl, ensRolesUrl, registryEventsUrl } from './links.ts';
+import { syncText, type SyncState } from '@/lib/rolesync.ts';
 
 const bitmap = (b: bigint | undefined) => (b === undefined ? 'unreadable' : `0x${b.toString(16)}`);
 
 /** Right-side panel for one person: ENS vs Whitechain roles, WB Soul, links, timeline and access actions. */
-export function PersonDrawer({ person, account, ens, registry, onClose }: {
+export function PersonDrawer({ person, account, ens, registry, onClose, sync }: {
   person: Person; account: Address; ens: string; registry: Address | null; onClose: () => void;
+  sync?: { hosted: boolean; state?: SyncState; run: () => void };
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const [isMe, setIsMe] = useState(false);
@@ -72,6 +74,25 @@ export function PersonDrawer({ person, account, ens, registry, onClose }: {
               </div>
             </div>
           </div>
+
+          <section className="drawer-section">
+            <h3>Role sync</h3>
+            {sync?.hosted ? (
+              <div className="row">
+                <button className="btn btn-sm" data-testid="person-sync" disabled={!registry || sync.state?.phase === 'syncing'} onClick={sync.run}>Sync now</button>
+                {sync.state && (
+                  <span className="small muted" data-testid="person-drawer-sync-state">
+                    {syncText(sync.state)}
+                    {sync.state.phase === 'synced' && sync.state.tx && <> · <a href={`${config.explorer}/tx/${sync.state.tx}`} target="_blank" rel="noreferrer">tx</a></>}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="small muted" data-testid="person-sync-manual">
+                Hosted role sync isn&apos;t available from this device. Anyone can run the role sync by submitting the ENS proof to the role cache. <a href="/docs/company-on-ens/#how-a-role-change-reaches-whitechain">How to sync</a>
+              </p>
+            )}
+          </section>
 
           <section className="drawer-section">
             <h3>WB Soul</h3>

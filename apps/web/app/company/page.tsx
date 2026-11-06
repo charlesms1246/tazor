@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Address } from 'viem';
 import './company.css';
 import { config } from '@/lib/config.ts';
@@ -11,6 +11,9 @@ import { SoulStatus } from '@/app/_soul/soul-badge.tsx';
 import { BackupSigner } from './backup.tsx';
 import { RemovePerson } from './remove.tsx';
 import { ensNameUrl, ensRegistryUrl, ensRolesUrl, registryEventsUrl } from './links.ts';
+import { getRelayerUrl } from '@/lib/relayer-url.ts';
+import { recordEvent } from '@/lib/events.ts';
+import { PENDING_RETRY_MS, pickAutoSync, relayerRoleSync, requestSync, stateFromResult, syncText, type SyncState } from '@/lib/rolesync.ts';
 import { Addr, Card, Empty, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
 const SYNC_SECONDS = 84;
@@ -45,6 +48,68 @@ export default function CompanyPage() {
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [company.account]);
+
+  // Hosted role sync: the relayer proves ENS roles onto Whitechain on demand. Without it, the manual note shows.
+  const [hosted, setHosted] = useState<'checking' | 'on' | 'off'>('checking');
+  const [syncs, setSyncs] = useState<Record<string, SyncState>>({});
+  const autoDone = useRef<string | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  useEffect(() => {
+    setHosted('checking');
+    setSyncs({});
+    const url = getRelayerUrl();
+    if (!url) { setHosted('off'); return; }
+    relayerRoleSync(url).then((r) => setHosted(r?.enabled ? 'on' : 'off'));
+  }, [company.account]);
+
+  const reloadQuietly = useCallback(async () => {
+    try {
+      const list = await loadPeople(company.account);
+      setPeople(list);
+      setSelected((sel) => (sel ? list.find((x) => x.address.toLowerCase() === sel.address.toLowerCase()) ?? sel : sel));
+    } catch { /* keep the current table */ }
+  }, [company.account]);
+
+  const runSync = useCallback(async (p: Person, retried = false): Promise<void> => {
+    const url = getRelayerUrl();
+    const key = p.address.toLowerCase();
+    if (!url || !registry) return;
+    setSyncs((m) => ({ ...m, [key]: { phase: 'syncing' } }));
+    try {
+      const r = await requestSync(url, registry, p.address);
+      setSyncs((m) => ({ ...m, [key]: stateFromResult(r, retried) }));
+      if (r.status === 'synced') {
+        recordEvent({
+          subject: p.address, kind: 'role-synced', at: Date.now(), title: `${p.label} role synced from ENS to Whitechain for ${company.ens}`,
+          detail: 'relayer role sync', ...(r.tx ? { tx: r.tx, chain: 'whitechain' as const } : {}),
+        });
+      }
+      if (r.status === 'synced' || r.status === 'in-sync') await reloadQuietly();
+      if (r.status === 'pending-l1' && !retried) timers.current.push(setTimeout(() => { void runSync(p, true); }, PENDING_RETRY_MS));
+    } catch (e) {
+      setSyncs((m) => ({ ...m, [key]: { phase: 'error', message: e instanceof Error ? e.message : String(e) } }));
+    }
+  }, [registry, company.ens, reloadQuietly]);
+
+  useEffect(() => {
+    if (hosted !== 'on' || !people || !registry || autoDone.current === company.account) return;
+    autoDone.current = company.account;
+    const queue = pickAutoSync(people);
+    void (async () => { for (const p of queue) await runSync(p); })();
+  }, [hosted, people, registry, company.account, runSync]);
+
+  const syncLine = (p: Person) => {
+    const st = syncs[p.address.toLowerCase()];
+    if (!st) return null;
+    return (
+      <span className="cell-sub" data-testid="person-sync-state">
+        {syncText(st)}
+        {st.phase === 'synced' && st.tx && <> · <a href={`${config.explorer}/tx/${st.tx}`} target="_blank" rel="noreferrer">tx</a></>}
+      </span>
+    );
+  };
 
   return (
     <div className="page">
@@ -102,7 +167,8 @@ export default function CompanyPage() {
                       <td><SoulStatus address={p.address} /></td>
                       <td>
                         <Pill tone={STATUS[p.whitechain].tone} testId="person-status">{STATUS[p.whitechain].text}</Pill>
-                        {p.whitechain === 'out-of-sync' && (
+                        {syncLine(p)}
+                        {p.whitechain === 'out-of-sync' && hosted !== 'on' && !syncs[p.address.toLowerCase()] && (
                           <span className="cell-sub" data-testid="person-sync-note">
                             ENS and the role cache disagree. Role cache last synced {p.cacheAgeSec !== undefined ? agoText(p.cacheAgeSec) : 'at an unknown time'}
                             {p.cachedAt ? ` (L1 block ${p.cachedAt.toLocaleString('en-US')})` : ''}; run syncRoles. <a href="/docs/company-on-ens/#how-a-role-change-reaches-whitechain">How to sync</a>
@@ -150,7 +216,7 @@ export default function CompanyPage() {
           <div className="well">
             <div className="small faint">2 · Proof</div>
             <div style={{ fontWeight: 500, marginTop: 4 }}>Proven to Whitechain</div>
-            <p className="small muted" style={{ marginTop: 4 }}>The watcher submits a storage proof to the role cache. Measured: <span className="num">{SYNC_SECONDS} s</span> from ENS change to cached role.</p>
+            <p className="small muted" style={{ marginTop: 4 }}>The relayer (on demand or in a daily sweep), or anyone, submits a storage proof to the role cache. Measured: <span className="num">{SYNC_SECONDS} s</span> from ENS change to cached role.</p>
           </div>
           <div className="well">
             <div className="small faint">3 · Whitechain</div>
@@ -159,7 +225,10 @@ export default function CompanyPage() {
           </div>
         </div>
       </Card>
-      {selected && <PersonDrawer person={selected} account={company.account} ens={company.ens} registry={registry} onClose={close} />}
+      {selected && (
+        <PersonDrawer person={selected} account={company.account} ens={company.ens} registry={registry} onClose={close}
+          sync={{ hosted: hosted === 'on', state: syncs[selected.address.toLowerCase()], run: () => { void runSync(selected); } }} />
+      )}
     </div>
   );
 }

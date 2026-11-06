@@ -26,7 +26,7 @@ const CACHE: Record<string, [bigint, bigint]> = {
 };
 const REVOKED = new Set([MEERA]);
 
-async function mock(page: Page) {
+async function mock(page: Page, cache: Record<string, [bigint, bigint]> = Object.fromEntries(Object.entries(CACHE).map(([k, v]) => [k, [...v] as [bigint, bigint]]))) {
   // Real WB Soul is read from Whitechain mainnet; the demo people have no mainnet Soul.
   await page.route('https://rpc.whitechain.io/', async (route) => {
     const { id } = route.request().postDataJSON();
@@ -47,7 +47,7 @@ async function mock(page: Page) {
       if (s === SEL.registryOf) return route.fulfill(reply(id, enc(['address'], [REGISTRY])));
       if (s === SEL.number) return route.fulfill(reply(id, enc(['uint64'], [L1_NOW])));
       if (s === SEL.isRevoked) return route.fulfill(reply(id, enc(['bool'], [REVOKED.has(arg(d, 1))])));
-      if (s === SEL.rolesOf) return route.fulfill(reply(id, enc(['uint256', 'uint64'], CACHE[arg(d, 1)] ?? [0n, 0n])));
+      if (s === SEL.rolesOf) return route.fulfill(reply(id, enc(['uint256', 'uint64'], cache[arg(d, 1)] ?? [0n, 0n])));
       if (s === SEL.roles) return route.fulfill(reply(id, enc(['uint256'], [ENS[arg(d, 1)] ?? 0n])));
       if (s === SEL.soulOf) return route.fulfill(reply(id, enc(['uint256'], [arg(d, 0) === MEERA ? 0n : 1n])));
       if (s === SEL.soulAttributeValue) return route.fulfill(reply(id, '0x0000000000000000000000000000000000000001000000000000000000000000'));
@@ -99,4 +99,55 @@ test('person drawer: ENS bitmap, ENS explorer link, registry events, Escape clos
   await page.keyboard.press('Escape');
   await expect(drawer).toHaveCount(0);
   await expect(page.getByTestId('manage-access')).toBeVisible();
+});
+
+const SYNC_TX = `0x${'5c'.repeat(32)}`;
+const freshCache = () => Object.fromEntries(Object.entries(CACHE).map(([k, v]) => [k, [...v] as [bigint, bigint]]));
+
+async function mockRelayer(page: Page, cache: Record<string, [bigint, bigint]>, status: 'synced' | 'pending-l1', bodies: unknown[]) {
+  const json = (b: unknown) => ({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(b) });
+  await page.route('http://relayer.test/health', (route) => route.fulfill(json({ ok: true, roleSync: true, watchRegistries: [REGISTRY] })));
+  await page.route('http://relayer.test/sync', async (route) => {
+    const body = route.request().postDataJSON();
+    bodies.push(body);
+    if (status === 'synced') cache[String(body.account).toLowerCase()] = [ENS[String(body.account).toLowerCase()] ?? 0n, L1_NOW];
+    await route.fulfill(json(status === 'synced' ? { status, tx: SYNC_TX, roles: '0' } : { status }));
+  });
+}
+
+test('hosted role sync: an out-of-sync person syncs automatically to Synced with the tx', async ({ page }) => {
+  const cache = freshCache();
+  const bodies: unknown[] = [];
+  await mock(page, cache);
+  await mockRelayer(page, cache, 'synced', bodies);
+  await page.goto('/company/');
+  const ravi = page.locator(`[data-testid="person-row"][data-address="${RAVI}"]`);
+  await expect(ravi.getByTestId('person-sync-state')).toContainText('Synced');
+  await expect(ravi.getByTestId('person-sync-state').getByRole('link', { name: 'tx' })).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${SYNC_TX}`);
+  await expect(ravi.getByTestId('person-status')).toHaveText('In sync');
+  await expect(ravi.getByTestId('person-sync-note')).toHaveCount(0);
+  expect(bodies).toEqual([{ registry: '0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1', account: '0xeD7335f5aD5E60691B0d88A4b8921a65c7e4c3Cb' }]);
+});
+
+test('hosted role sync: pending-l1 shows the waiting message', async ({ page }) => {
+  const cache = freshCache();
+  await mock(page, cache);
+  await mockRelayer(page, cache, 'pending-l1', []);
+  await page.goto('/company/');
+  const ravi = page.locator(`[data-testid="person-row"][data-address="${RAVI}"]`);
+  await expect(ravi.getByTestId('person-sync-state')).toHaveText('Waiting for Whitechain to see the ENS change (~1 min)');
+  await expect(ravi.getByTestId('person-status')).toHaveText('Out of sync');
+});
+
+test('drawer Sync now syncs a person on demand', async ({ page }) => {
+  const cache = freshCache();
+  const bodies: { account?: string }[] = [];
+  await mock(page, cache);
+  await mockRelayer(page, cache, 'synced', bodies);
+  await page.goto('/company/');
+  await page.locator(`[data-testid="person-row"][data-address="${CFO}"]`).click();
+  const drawer = page.getByTestId('person-drawer');
+  await drawer.getByTestId('person-sync').click();
+  await expect(drawer.getByTestId('person-drawer-sync-state')).toContainText('Synced');
+  expect(bodies.some((b) => String(b.account).toLowerCase() === CFO)).toBe(true);
 });
