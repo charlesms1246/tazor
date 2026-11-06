@@ -1,0 +1,16 @@
+.soul-status { display: grid; gap: 6px; }
+.soul-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 22px; }
+.soul-label { min-width: 132px; font-size: var(--fs-small); color: var(--muted); }
+a.soul-label { color: var(--muted); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+a.soul-label:hover { color: var(--text); text-decoration-color: currentColor; }
+.soul-live { font-family: var(--mono); font-size: 11px; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; color: var(--positive); }
+.soul-lookup .soul-form { display: flex; gap: 8px; margin-top: 16px; }
+.soul-lookup .soul-form .input { flex: 1; min-width: 0; }
+.soul-lookup .soul-hint { margin: 8px 0 16px; }
+.soul-lookup .soul-stats { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.soul-example { padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; font-size: 12px; }
+.soul-example:hover { text-decoration: underline; }
+@media (max-width: 480px) {
+  .soul-lookup .soul-form { flex-direction: column; }
+  .soul-label { min-width: 0; width: 100%; }
+}
