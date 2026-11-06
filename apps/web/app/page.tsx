@@ -14,7 +14,9 @@ import { TIMINGS } from '@/lib/timings.ts';
 import { Card, CopyButton, Notice, PageHeader, short } from './_ui/index.tsx';
 import { Timeline } from './_ui/timeline.tsx';
 import { startTour } from './_tour/tour.tsx';
-import { useCompany } from '@/lib/company.ts';
+import { isCompanyAccount, useCompany } from '@/lib/company.ts';
+import { DemoControls } from './_demo/demo-banner.tsx';
+import { DEMO_CHANGED } from '@/lib/demo-seed.ts';
 import { pendingInbox, loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
 import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
 import { checkHealth, type Health } from '@/lib/health.ts';
@@ -111,19 +113,21 @@ export default function Home() {
     syncInbox(); syncEvents();
     globalThis.addEventListener(INBOX_CHANGED, syncInbox);
     globalThis.addEventListener(EVENTS_CHANGED, syncEvents);
+    const syncAll = () => { setPayments(loadPayments()); setInvoices(loadInvoices()); setMandates(loadMandates().length); syncInbox(); syncEvents(); };
+    globalThis.addEventListener(DEMO_CHANGED, syncAll);
     setPayments(loadPayments());
     setInvoices(loadInvoices());
     setMandates(loadMandates().length);
     setHasPasskey(loadPasskey() !== null);
     setReady(true);
-    return () => { globalThis.removeEventListener(INBOX_CHANGED, syncInbox); globalThis.removeEventListener(EVENTS_CHANGED, syncEvents); };
+    return () => { globalThis.removeEventListener(INBOX_CHANGED, syncInbox); globalThis.removeEventListener(EVENTS_CHANGED, syncEvents); globalThis.removeEventListener(DEMO_CHANGED, syncAll); };
   }, []);
 
   const flows = useMemo(() => (activity ? dailyFlows(activity, 7) : null), [activity]);
   const totals = flows ? sumFlows(flows) : null;
 
   const now = Date.now() / 1000;
-  const mine = (a: string) => a.toLowerCase() === ACCOUNT.toLowerCase();
+  const mine = (a: string) => isCompanyAccount(company, a);
   const open = invoices.filter((s) => (mine(s.invoice.supplierAccount) || mine(s.invoice.payee)) && invoiceStatus(s.invoice, payments) !== 'paid');
   const overdue = open.filter((s) => s.invoice.dueDate < now);
   const awaiting = open.filter((s) => s.invoice.dueDate >= now);
@@ -261,6 +265,7 @@ export default function Home() {
               </ul>
             </Card>
           )}
+          <DemoControls />
           <Card title="Latest events" subtitle="What happened on this device, step by step" testId="events">
             {events.length === 0
               ? <p className="muted">Invoices you create, approvals and payments show up here as a timeline.</p>
