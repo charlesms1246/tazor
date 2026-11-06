@@ -39,7 +39,7 @@ test('createInvoiceLink: the app decodes the link to the identical invoice, with
   const again = await createInvoiceLink(order);
   assert.equal(again.invoiceHash, l.invoiceHash);
   assert.notEqual(again.url, l.url);
-  assert.ok(again.url.startsWith('https://tazor-app.vercel.app/pay/#v1.'), 'default app URL');
+  assert.ok(again.url.startsWith('https://tazor.charlesms.dev/pay/#v1.'), 'default app URL');
 });
 
 test('tax: a final "<label> <rate>%" line rounded half-up, which the app shows as tax again', async () => {

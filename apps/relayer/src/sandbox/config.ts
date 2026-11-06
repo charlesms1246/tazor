@@ -61,7 +61,7 @@ export function sandboxFromEnv(env: Record<string, string | undefined>): { confi
       companyId: env.SANDBOX_COMPANY_ID || 'sandbox',
       mandateId: /^0x[0-9a-fA-F]{64}$/.test(env.SANDBOX_MANDATE_ID?.trim() ?? '') ? (env.SANDBOX_MANDATE_ID!.trim() as Hex) : null,
       claimId: /^(0x[0-9a-fA-F]{1,64}|\d{1,78})$/.test(env.SANDBOX_CLAIM_ID?.trim() ?? '') ? env.SANDBOX_CLAIM_ID!.trim() : null,
-      appUrl: env.SANDBOX_APP_URL || 'https://tazor-app.vercel.app',
+      appUrl: env.SANDBOX_APP_URL || 'https://tazor.charlesms.dev',
       contracts: {
         usdt: getAddress(env.USDT || ADDRESSES.usdt),
         approverFactory: getAddress(env.APPROVER_ACCOUNT_FACTORY || ADDRESSES.approverFactory),

@@ -126,8 +126,12 @@ async function api(name: string, args: Record<string, string>, c: Ctx = {}): Pro
   return { ok: false, error: `unknown call ${name}` };
 }
 
+/** Tazor's own app domains: a link to any of them opens on this one, because passkeys only work on the domain that made them. */
+const APP_HOSTS = ['tazor-app.vercel.app', 'tazor.charlesms.dev', 'taz0r.eth.limo'];
+
 function navigate(url: string): boolean {
-  const next = new URL(url, location.href);
+  let next = new URL(url, location.href);
+  if (next.origin !== location.origin && APP_HOSTS.includes(next.hostname)) next = new URL(`${next.pathname}${next.search}${next.hash}`, location.origin);
   const samePage = next.origin === location.origin && next.pathname === location.pathname && next.search === location.search;
   if (samePage && next.hash !== location.hash) { location.hash = next.hash; return false; }
   location.assign(next.href);

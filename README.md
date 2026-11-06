@@ -22,8 +22,8 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
   4. "Accountant export (CSV)".
 
   Both demo wallets live in your browser, are testnet-only, and are topped up with test USDT by Tazor's sandbox. Live run: pay [`0x0750…304b`](https://explorer.testnet.whitechain.io/tx/0x0750f8241c6093f45048908fbc0aa37a1aafdebb895d8185aa866dfa321a304b), refund [`0x2d24…9496`](https://explorer.testnet.whitechain.io/tx/0x2d24a044e637d714ce09ab4438bf57961c9f71870729ef69a3f5f75eddd19496).
-- **The merchant console and receipts:** https://tazor-app.vercel.app/checkout/
-- **The whole story in one click:** https://tazor-app.vercel.app/autopilot/
+- **The merchant console and receipts:** https://tazor.charlesms.dev/checkout/ (mirror: tazor-app.vercel.app)
+- **The whole story in one click:** https://tazor.charlesms.dev/autopilot/
 - **Reproduce from a terminal:** `scripts/hosted-checkout-live.ts` (pay → refund → webhooks) and `scripts/accountant-export.ts`.
 
 **Why on-chain USDT on Whitechain, not a card or bank rail:**
@@ -33,7 +33,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 
 ## Who it's for: B2B2C, and how it reaches them
 
-**B2B2C:** Tazor serves the **business**. The business serves **its customers**, who are other businesses, clinics or consumers, and they pay without gas, a seed phrase or a chain choice. A business starts in about a minute at [`/start/`](https://tazor-app.vercel.app/start/). It gets:
+**B2B2C:** Tazor serves the **business**. The business serves **its customers**, who are other businesses, clinics or consumers, and they pay without gas, a seed phrase or a chain choice. A business starts in about a minute at [`/start/`](https://tazor.charlesms.dev/start/). It gets:
 - a 15-line snippet for its site;
 - a hosted payment link and QR if it has no site;
 - its dashboard and accountant export.
@@ -425,7 +425,7 @@ I plan to apply. The milestone that makes the strongest case is **one real merch
 - **Accounting export is approximate:** the ISO 20022 file is camt.054-style (USDT, 6 dp; not XSD-valid). The Tally CSV columns are a mapping, not an official Tally import template.
 - **Role sync is expensive:** syncing ENS roles onto Whitechain costs about 0.96M gas per sync. It runs only when roles change (on demand from the app, or the relayer's daily sweep), never on the payment path.
 - **Sandbox and simulated counterparties:** the Autopilot's sandbox company uses testnet demo keys held by the relayer to act as the admin and a supplier, and a `MirrorOperator` lets the relayer verify new guests on the simulated WB Soul mirror (capped at 40 a day; the deployer can take it back). Both are labelled in the app and exist only on testnet.
-- **Passkeys are bound to the website they were created on** (WebAuthn `rpId` = the page's hostname). Passkeys made on `tazor-app.vercel.app` only sign there. An approver who adds a **backup key** (an ordinary wallet key, offered during onboarding) can still approve from any other copy of Tazor, the standalone fallback page or the CLI, so losing the website never strands a company's funds.
+- **Passkeys are bound to the website they were created on** (WebAuthn `rpId` = the page's hostname). Passkeys made on `tazor.charlesms.dev` only sign there (and ones made on the `tazor-app.vercel.app` mirror only sign on the mirror). An approver who adds a **backup key** (an ordinary wallet key, offered during onboarding) can still approve from any other copy of Tazor, the standalone fallback page or the CLI, so losing the website never strands a company's funds.
 - **Live passkey payments:** the first scripted payments above used approvers' ECDSA backup signers. Real passkey approvals (phone Face ID / fingerprint) are now live too, through the Autopilot on the sandbox company: a single invoice [`0xcdc1…cb8b`](https://explorer.testnet.whitechain.io/tx/0xcdc14f2187ff7d5d427363c95d498428ce74bbdf396bab54307818076ff7cb8b) and a two-invoice payment run in one transaction [`0x6782…033e`](https://explorer.testnet.whitechain.io/tx/0x678234fc0b258ba95bc73a99f481009db2c203ff1f2ee5110ba128013213033e). Passkeys are bound to the domain they were created on.
 - **Checkout limits:**
   - Webhook history is kept per serverless instance unless an Upstash store is configured (`KV_REST_API_*`). Delivery happens inline, with 3 retries and no background queue.
