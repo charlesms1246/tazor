@@ -1,0 +1,70 @@
+/* Docked on the right on desktop, a bottom sheet on a phone; it never covers the page with an overlay. */
+.ap-panel {
+  position: fixed; z-index: 85; right: 16px; top: 44px; bottom: 16px;
+  width: 340px; display: flex; flex-direction: column;
+  background: var(--surface); color: var(--text); font-family: var(--font);
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  box-shadow: 0 16px 48px rgba(7, 8, 30, 0.2), 0 2px 6px rgba(7, 8, 30, 0.08);
+  overflow: hidden;
+}
+.ap-panel[data-open="false"] { bottom: auto; }
+.ap-head { flex: none; border-bottom: 1px solid var(--border); }
+.ap-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 16px;
+  border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.ap-badge { font-weight: 600; }
+.ap-count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.ap-mode { margin-left: auto; font-size: var(--fs-small); color: var(--muted); }
+.ap-bar { height: 3px; background: var(--rule); }
+.ap-bar span { display: block; height: 100%; background: var(--wc-blue); transition: width 300ms ease; }
+.ap-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.ap-step h2 { font-size: var(--fs-section); line-height: 22px; }
+.ap-why { margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 18px; }
+.ap-callout {
+  display: grid; gap: 8px; padding: 14px; border-radius: var(--radius-inner);
+  background: var(--wc-ink); color: #ffffff; font-size: 15px; line-height: 21px;
+}
+.ap-callout b { font-weight: 600; }
+.ap-callout-sub { color: #c9d4e4; font-size: 12px; line-height: 16px; }
+.ap-callout .btn { justify-self: start; background: var(--wc-lime); border-color: var(--wc-lime); color: var(--wc-ink); }
+.ap-error { padding: 10px 12px; border-radius: var(--radius-inner); background: var(--pill-negative-bg); color: var(--pill-negative-ink); font-size: 13px; overflow-wrap: anywhere; }
+.ap-log { flex: 1; min-height: 80px; overflow-y: auto; margin: 0; padding: 0; list-style: none; display: grid; align-content: start; gap: 6px; font-size: 12px; line-height: 17px; }
+.ap-log li { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; }
+.ap-time { font-family: var(--mono); color: var(--faint); font-size: 11px; }
+.ap-text { overflow-wrap: anywhere; }
+.ap-log li[data-kind="ok"] .ap-text { color: var(--positive); }
+.ap-log li[data-kind="warn"] .ap-text { color: var(--pill-warning-ink); }
+.ap-log li[data-kind="error"] .ap-text { color: var(--negative); }
+.ap-log li[data-kind="user"] .ap-text { font-weight: 600; }
+.ap-sim { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: var(--radius-chip); background: var(--pill-warning-bg); color: var(--pill-warning-ink); font-size: 10px; line-height: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ap-controls { flex: none; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.ap-ring {
+  position: fixed; z-index: 84; pointer-events: none;
+  border-radius: var(--radius-inner); outline: 2px solid var(--wc-blue);
+  box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.18);
+  transition: top 120ms ease, left 120ms ease, width 120ms ease, height 120ms ease;
+}
+.ap-ring[data-tap="true"] { outline: 3px solid var(--wc-lime); box-shadow: 0 0 0 6px rgba(220, 242, 24, 0.35); animation: ap-pulse 1.2s ease-in-out infinite; }
+.ap-ring-label {
+  position: absolute; left: 0; top: -30px; padding: 4px 10px; border-radius: var(--radius-chip);
+  background: var(--wc-ink); color: var(--wc-lime); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+@keyframes ap-pulse { 50% { box-shadow: 0 0 0 10px rgba(220, 242, 24, 0.15); } }
+
+@media (min-width: 901px) {
+  /* leave room for the panel so it never covers page content */
+  body:has(.ap-panel[data-open="true"]) .main { padding-right: 372px; }
+}
+@media (max-width: 900px) {
+  /* sits just above the bottom navigation bar */
+  .ap-panel { left: 8px; right: 8px; top: auto; bottom: calc(72px + env(safe-area-inset-bottom)); width: auto; max-height: 50vh; }
+  .ap-panel[data-open="false"] { bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .ap-body { padding: 12px 16px; gap: 10px; }
+  .ap-log { min-height: 48px; max-height: 18vh; }
+  .ap-controls .btn { flex: 1 1 0; min-height: 44px; }
+  body:has(.ap-panel[data-open="true"]) .main { padding-bottom: 52vh; }
+  body:has(.ap-panel[data-open="false"]) .main { padding-bottom: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .ap-ring, .ap-bar span { transition: none; animation: none; } }

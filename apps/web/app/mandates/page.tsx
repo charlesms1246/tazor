@@ -149,7 +149,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
           </div>
         )}
         {error && <Notice tone="negative"><span data-testid="m-error">{error}</span></Notice>}
-        {tx && <Notice tone="positive">Mandate created: <TxLink hash={tx} /></Notice>}
+        {tx && <Notice tone="positive" testId="m-tx">Mandate created: <TxLink hash={tx} /></Notice>}
         {calldata && <div className="well"><p className="small muted">Send to MandateModule <span className="mono break">{config.mandateModule}</span> on Whitechain:</p><code className="break small">{calldata}</code></div>}
       </div>
     </Card>

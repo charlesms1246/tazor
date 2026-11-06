@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { COMPANIES, setCompany, useCompany } from '@/lib/company.ts';
 import { CommandPalette, openPalette } from '../_cmdk/palette.tsx';
 import { Tour } from '../_tour/tour.tsx';
+import { AutopilotPanel } from '../_autopilot/panel.tsx';
 
 const ICONS: Record<string, ReactNode> = {
   home: <path d="M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H9.5v-4h-3v4H3a.5.5 0 0 1-.5-.5z" />,
@@ -21,6 +22,7 @@ const ICONS: Record<string, ReactNode> = {
   approvals: <><path d="M2.5 4.5h11v8h-11z" /><path d="m2.5 5 5.5 4 5.5-4" /></>,
   company: <><path d="M2.5 13.5V4l5-2v11.5M7.5 6h6v7.5" /><path d="M2 13.5h12M4.5 6.5h1M4.5 9h1M10 8.5h1M10 11h1" /></>,
   security: <><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></>,
+  autopilot: <><path d="M8 1.8 9.6 6.4 14.2 8 9.6 9.6 8 14.2 6.4 9.6 1.8 8 6.4 6.4z" /></>,
   docs: <><path d="M3 2.5h7.5L13 5v8.5H3z" /><path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" /></>,
   developers: <><path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5 14 8l-3.5 3.5" /></>,
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
@@ -39,7 +41,7 @@ export function Wordmark() {
 
 type Item = { href: string; label: string; icon: string; short?: string };
 const GROUPS: { label?: string; items: Item[] }[] = [
-  { items: [{ href: '/', label: 'Home', icon: 'home' }] },
+  { items: [{ href: '/', label: 'Home', icon: 'home' }, { href: '/autopilot/', label: 'Autopilot', icon: 'autopilot' }] },
   {
     label: 'Receive',
     items: [
@@ -195,6 +197,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
       <CommandPalette />
       <Tour />
+      <AutopilotPanel />
     </>
   );
 }
