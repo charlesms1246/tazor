@@ -4,7 +4,8 @@ import { SimulationFailed, type Sender } from './sender.ts';
 import { parseSigner, type ApproverDeployer } from './approver.ts';
 import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
 import { encodeCreateMandate, encodePull, parseMandateRequest, parsePullRequest } from './mandate.ts';
-import type { PublicClient } from 'viem';
+import { getAddress, isAddress, type PublicClient } from 'viem';
+import type { RoleSync, ScanSummary, SyncResult } from './sync.ts';
 import { PAYMENT_MODULE_V2, parsePayRunRequest, preparePayRun } from './payrun.ts';
 import { preparePayOne } from './pay-counterfactual.ts';
 import { REVOCATION_LIST_V2, pickRevocationList } from './revoke-list.ts';
@@ -14,8 +15,21 @@ const MAX_BODY = 64 * 1024;
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type',
+  'access-control-allow-headers': 'content-type, authorization',
 };
+
+/** JSON-safe view of a sync result (bigints as decimal strings). */
+const syncJson = (r: SyncResult) => ({
+  status: r.status, registry: r.registry, account: r.account,
+  ...(r.tx ? { tx: r.tx } : {}), ...(r.roles !== undefined ? { roles: r.roles.toString() } : {}), ...(r.l1Block !== undefined ? { l1Block: r.l1Block.toString() } : {}),
+});
+const scanJson = (s: ScanSummary) => ({
+  from: s.from.toString(), to: s.to.toString(), changes: s.changes, deferred: s.deferred,
+  results: s.results.map((r) => ('error' in r ? r : syncJson(r))),
+});
+
+export const WATCH_LOOKBACK = 7200n;
+export const DOCS_URL = 'https://taz0r.eth.limo/docs/relayer-api/';
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
   let size = 0;
@@ -32,6 +46,10 @@ export function createHandler(deps: {
   sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer; revocationList?: `0x${string}`;
   mandateModule?: `0x${string}`; client?: PublicClient; paymentModuleV2?: `0x${string}`; revocationListV2?: `0x${string}`;
   paymaster?: `0x${string}`; chainId?: number;
+  /** ENS → Whitechain role syncing (POST /sync, GET /watch); absent when no prover or sender is configured. */
+  roleSync?: RoleSync;
+  /** When set, GET /watch requires `authorization: Bearer <cronSecret>` (Vercel cron sends it). */
+  cronSecret?: string;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -40,12 +58,29 @@ export function createHandler(deps: {
     };
     try {
       if (req.method === 'OPTIONS') return void res.writeHead(204, CORS).end();
+      const path = new URL(req.url ?? '/', 'http://relayer').pathname;
+      if (req.method === 'GET' && path === '/') {
+        return reply(200, { name: 'Tazor relayer', chainId: deps.chainId ?? 1874, relayer: deps.sender?.address ?? null, health: '/health', docs: DOCS_URL });
+      }
       if (req.method === 'GET' && req.url === '/health') {
         return reply(200, {
           ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null,
           approverAccountFactory: deps.approvers?.factory ?? null, revocationList: deps.revocationList ?? null,
           mandateModule: deps.mandateModule ?? null,
+          roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? [],
         });
+      }
+      if (deps.roleSync && req.method === 'POST' && path === '/sync') {
+        const body = (await readJson(req)) as { registry?: unknown; account?: unknown } | null;
+        const { registry, account } = body ?? {};
+        if (typeof registry !== 'string' || !isAddress(registry) || typeof account !== 'string' || !isAddress(account)) {
+          throw new BadRequest('registry and account must be addresses');
+        }
+        return reply(200, syncJson(await deps.roleSync.syncAccount(getAddress(registry), getAddress(account))));
+      }
+      if (deps.roleSync && req.method === 'GET' && path === '/watch') {
+        if (deps.cronSecret && req.headers.authorization !== `Bearer ${deps.cronSecret}`) return reply(401, { error: 'unauthorized' });
+        return reply(200, scanJson(await deps.roleSync.scanOnce({ lookback: WATCH_LOOKBACK })));
       }
       if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
         const json = await readJson(req);
