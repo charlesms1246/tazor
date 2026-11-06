@@ -56,14 +56,14 @@ export default function OnboardPage() {
       />
 
       <Card>
+        <div style={{ paddingBottom: 12 }}>
+          <Pill tone="info" testId="wb-label">Verified by WhiteBIT (simulated on testnet)</Pill>
+        </div>
         <div className="steps">
           <div className="step" data-done={created}>
             <span className="step-n">1</span>
             <div className="stack">
-              <div className="spread">
-                <span style={{ fontWeight: 500 }}>Create a passkey</span>
-                <Pill tone="info" testId="wb-label">Verified by WhiteBIT (simulated on testnet)</Pill>
-              </div>
+              <span style={{ fontWeight: 500 }}>Create a passkey</span>
               <p className="muted">Your passkey stays in your device keychain. Face ID or your device PIN unlocks it whenever you approve.</p>
               <div className="row">
                 <button data-testid="create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create passkey</button>
