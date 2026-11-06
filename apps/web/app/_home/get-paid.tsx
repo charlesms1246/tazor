@@ -18,7 +18,8 @@ const ALSO: { label: string; href: string }[] = [
 export function StoryStrip() {
   return (
     <section className="getpaid" aria-label="Get paid on Whitechain" data-testid="story">
-      <div className="getpaid-head">Get paid on Whitechain, in three steps</div>
+      <div className="getpaid-head story-head">Get paid on Whitechain, in three steps
+        <a className="btn btn-sm btn-primary" href="/start/" data-testid="story-start">Start accepting USDT</a></div>
       <ol className="getpaid-list story-list">
         {STEPS.map((s) => (
           <li key={s.n}>

@@ -5,13 +5,8 @@ import { DEMO_CHANGED, clearDemo, demoCounts, isDemoLoaded, seedDemo } from '../
 import { DEMO_RUN_DATE } from '../../lib/demo-data.ts';
 import './demo.css';
 
-/** Loads or clears the live testnet history on this device. */
-export function DemoControls() {
+function useLoaded() {
   const [loaded, setLoaded] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const n = demoCounts();
-
   useEffect(() => {
     const sync = () => setLoaded(isDemoLoaded());
     sync();
@@ -19,43 +14,48 @@ export function DemoControls() {
     window.addEventListener('storage', sync);
     return () => { window.removeEventListener(DEMO_CHANGED, sync); window.removeEventListener('storage', sync); };
   }, []);
+  return loaded;
+}
 
+/**
+ * Invoices empty state: load the invoices from our testnet runs onto this device. Invoice contents never go on-chain
+ * (only their hash does), so this is the only way to see them here; each one links to its real payment transaction.
+ */
+export function SampleInvoices() {
+  const loaded = useLoaded();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (loaded !== false) return null;
+  const n = demoCounts();
   const onLoad = async () => {
-    setBusy(true);
-    setError(null);
+    setBusy(true); setError(null);
     try {
-      if (!(await seedDemo())) setError('This browser would not save the demo data.');
-      // Every card on the page reads its stores once, so reload to show the history everywhere.
+      if (!(await seedDemo())) setError('This browser would not save the sample invoices.');
+      // every card reads its stores once, so reload to show them everywhere
       else location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
-      setLoaded(isDemoLoaded());
     }
   };
-  const onClear = () => { clearDemo(); setLoaded(isDemoLoaded()); location.reload(); };
-
-  if (loaded === null) return null;
-
   return (
-    <section className="card demo-controls" data-testid="demo-controls" data-loaded={loaded ? 'true' : 'false'}>
-      <div className="card-head">
-        <div>
-          <h2>{loaded ? 'Demo data loaded' : 'Live testnet history'}</h2>
-          <p>
-            {loaded
-              ? `Records from our ${DEMO_RUN_DATE} testnet runs are on this device, each linked to its real transaction. Clearing removes only those records.`
-              : `Show our live testnet history: ${n.invoices} invoices, ${n.payments} payments and the Ethereum fallback, all with real transactions.`}
-          </p>
-        </div>
-        <div className="row">
-          {loaded
-            ? <button type="button" className="btn btn-sm" onClick={onClear} data-testid="demo-clear">Clear demo data</button>
-            : <button type="button" className="btn btn-sm btn-primary" onClick={onLoad} disabled={busy} data-testid="demo-load">{busy ? 'Loading…' : 'Load demo data'}</button>}
-        </div>
-      </div>
-      {error && <p className="small" role="alert" style={{ color: 'var(--negative)' }} data-testid="demo-error">{error}</p>}
-    </section>
+    <div className="demo-samples" data-testid="inv-samples">
+      <button type="button" className="btn btn-sm" onClick={onLoad} disabled={busy} data-testid="inv-load-samples">{busy ? 'Loading…' : 'Load sample invoices from our testnet runs'}</button>
+      <span className="small muted">{n.invoices} invoices from our {DEMO_RUN_DATE} runs, each linked to its real payment.</span>
+      {error && <span className="small" role="alert" style={{ color: 'var(--negative)' }} data-testid="inv-samples-error">{error}</span>}
+    </div>
+  );
+}
+
+/** Shown under the invoice list while the samples are on this device. */
+export function ClearSampleInvoices() {
+  const loaded = useLoaded();
+  if (!loaded) return null;
+  return (
+    <p className="small muted demo-samples-clear" data-testid="inv-samples-loaded">
+      Includes sample invoices from our {DEMO_RUN_DATE} testnet runs.{' '}
+      <button type="button" className="btn btn-sm btn-ghost" onClick={() => { clearDemo(); location.reload(); }} data-testid="inv-clear-samples">Remove samples</button>
+    </p>
   );
 }

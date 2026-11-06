@@ -105,7 +105,7 @@ test('mandates: tracking the live mandate shows terms and what is available now'
 test('home page shows the measured payment time, linked to the timing docs', async ({ page }) => {
   await page.goto('/');
   const badge = page.getByTestId('speed-badge');
-  await expect(badge).toContainText('3.6 s');
+  await expect(badge).toContainText('about 4 s');
   await expect(badge).toHaveAttribute('href', '/docs/timings/');
   await expect(page.getByTestId('host')).toHaveText('localhost:4173');
   await expect(page.getByTestId('build')).toHaveText('unversioned');

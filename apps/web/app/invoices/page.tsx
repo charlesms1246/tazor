@@ -12,6 +12,7 @@ import {
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { ClearSampleInvoices, SampleInvoices } from '../_demo/demo-banner.tsx';
 import { InvoicePaper, paperFromInvoice, printInvoice, type PaperInvoice } from '../_invoice/paper.tsx';
 import { HistoryTimeline } from '../_invoice/history.tsx';
 import { useHistory, useSubjectHistory } from '@/lib/chain-history.ts';
@@ -402,9 +403,10 @@ export default function InvoicesPage() {
                     <button type="button" className="btn btn-sm" data-testid="inv-switch-supplier" onClick={() => setCompany(otherCompany.id)}>Switch to {otherCompany.name} to send an invoice</button>
                   </div>
                 )}
+                <SampleInvoices />
               </Empty>
             ) : (
-              <Empty><span data-testid="inv-bills-empty">No bills for {company.name} yet. When a supplier sends a payment link and it is opened here, it appears in this list.</span></Empty>
+              <Empty><span data-testid="inv-bills-empty">No bills for {company.name} yet. When a supplier sends a payment link and it is opened here, it appears in this list.</span><SampleInvoices /></Empty>
             )}
           </div>
         ) : (
@@ -458,6 +460,7 @@ export default function InvoicesPage() {
             )}
           </>
         )}
+        <ClearSampleInvoices />
       </Card>
 
       {viewing && (

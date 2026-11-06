@@ -1,6 +1,2 @@
-.demo-controls .card-head { flex-wrap: wrap; gap: 12px; }
-.demo-controls .card-head > div:first-child { flex: 1 1 280px; min-width: 0; }
-@media (max-width: 480px) {
-  .demo-controls .card-head > .row { flex: 1 1 100%; }
-  .demo-controls .card-head > .row .btn { flex: 1 1 100%; min-height: 44px; }
-}
+.demo-samples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.demo-samples-clear { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; padding: 12px 24px 16px; }

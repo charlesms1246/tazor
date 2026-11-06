@@ -12,10 +12,8 @@ import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 import { dailyFlows, niceMax, sumFlows, type DayFlow } from '@/lib/dashboard.ts';
 import { TIMINGS } from '@/lib/timings.ts';
 import { Card, CopyButton, Notice, PageHeader, short } from './_ui/index.tsx';
-import { Timeline } from './_ui/timeline.tsx';
 import { startTour } from './_tour/tour.tsx';
 import { useCompany, useDirectoryStatus } from '@/lib/company.ts';
-import { DemoControls } from './_demo/demo-banner.tsx';
 import { DEMO_CHANGED } from '@/lib/demo-seed.ts';
 import { loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
 import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
@@ -25,8 +23,9 @@ import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
 import { INR_RATE_NOTE, inrText, usdtNumber } from '@/lib/money.ts';
 import { StoryStrip } from './_home/get-paid.tsx';
+import { ActivityList, mergeActivity } from './_home/activity.tsx';
 import './_invoice/touch.css';
-import { allCheckoutLogs, checkoutAddress, checkoutTotals, decodeCheckoutLogs, depositCheckoutAddress, merchantView } from '@/lib/checkout.ts';
+import { allCheckoutLogs, checkoutAddress, checkoutLedger, checkoutMerchants, decodeCheckoutLogs, demoOn, depositCheckoutAddress, loadWatch, merchantView, type OrderRow } from '@/lib/checkout.ts';
 
 const PAY_TIME = TIMINGS.find((t) => t.action.startsWith('Pay an approved'))?.tazor ?? '';
 
@@ -84,15 +83,26 @@ export default function Home() {
   const latest = useLatestEvents(ACCOUNT, 8);
   const history = useHistory(ACCOUNT);
   // Checkout revenue for this company (orders paid to it minus refunds), read from Whitechain's explorer
-  const [checkoutSum, setCheckoutSum] = useState<ReturnType<typeof checkoutTotals> | null>(null);
+  // Checkout sales for the same addresses the Checkout page shows (yours, watched, and the demo shops when on)
+  const [checkoutOrders, setCheckoutOrders] = useState<OrderRow[] | null>(null);
+  const [checkoutDemo, setCheckoutDemo] = useState(false);
   useEffect(() => {
     if ((!checkoutAddress() && !depositCheckoutAddress()) || !company.account || /^0x0{40}$/.test(company.account)) return;
     let live = true;
+    const demo = demoOn();
+    setCheckoutDemo(demo);
+    const merchants = checkoutMerchants({ own: [company.account, ...company.aliases], watch: loadWatch(), demo });
     allCheckoutLogs(4)
-      .then((logs) => { if (live) setCheckoutSum(checkoutTotals(merchantView(decodeCheckoutLogs(logs), [company.account, ...company.aliases]).orders)); })
-      .catch(() => undefined);
+      .then((logs) => { if (live) setCheckoutOrders(merchantView(decodeCheckoutLogs(logs), merchants).orders); })
+      .catch(() => { if (live) setCheckoutOrders([]); });
     return () => { live = false; };
   }, [company.account, company.aliases]);
+  const today = useMemo(() => {
+    if (!checkoutOrders) return null;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const rows = checkoutLedger(checkoutOrders).filter((r) => (r.at ?? 0) >= start.getTime());
+    return { orders: rows.filter((r) => r.type === 'Payment').length, net: rows.reduce((t, r) => t + r.net, 0n), all: checkoutOrders.length };
+  }, [checkoutOrders]);
   const [health, setHealth] = useState<Health | null>(null);
   const [people, setPeople] = useState<Person[] | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -191,20 +201,21 @@ export default function Home() {
           </div>
           {balance !== null && <div className="hero-inr" style={{ fontSize: 13, opacity: 0.75, marginTop: 2 }} title={INR_RATE_NOTE} data-testid="balance-inr">{inrText(balance)} · indicative</div>}
           <div className="hero-meta">
-            <span className="mono">{short(ACCOUNT)}</span>
-            <CopyButton value={ACCOUNT} label="Copy account address" />
+            {/^0x0{40}$/.test(ACCOUNT) || company.status === 'loading'
+              ? <span className="skeleton dark" style={{ height: 14, width: 120 }} data-testid="hero-account-loading" />
+              : <><span className="mono">{short(ACCOUNT)}</span><CopyButton value={ACCOUNT} label="Copy account address" /></>}
             {balanceError
               ? <button type="button" className="hero-link" onClick={refresh}>Couldn&apos;t reach Whitechain · Retry</button>
               : stamp && <span>· updated {stamp}</span>}
           </div>
           <div className="hero-actions">
-            <a className="btn btn-lime" href="/invoices/">Create invoice</a>
-            <a className="btn btn-on-dark" href="/approvals/">Pay</a>
-            <a className="btn btn-on-dark" href="/mandates/">Collect</a>
+            <a className="btn btn-lime" href="/start/" data-testid="hero-start">Start accepting USDT</a>
+            <a className="btn btn-on-dark" href="/checkout/">Checkout</a>
+            <a className="btn btn-on-dark" href="/invoices/">Create invoice</a>
           </div>
           {PAY_TIME && (
             <a className="hero-badge" href="/docs/timings/" data-testid="speed-badge">
-              <span className="dot" />Payments settle in {PAY_TIME} on Whitechain · see how we measured
+              <span className="dot" />Customers pay in about 4 s on Whitechain · see how we measured
             </a>
           )}
         </section>
@@ -223,13 +234,15 @@ export default function Home() {
       <StoryStrip />
 
       <section className="lanes" aria-label="Overview" data-tour="lanes">
+        <a className="lane" href="/checkout/" data-testid="lane-checkout">
+          <span className="lane-label">Checkout today</span>
+          <span className="lane-value num">{today === null ? '…' : `${today.net < 0n ? '−' : ''}${usdtNumber(today.net < 0n ? -today.net : today.net)}`}<span className="kpi-unit">USDT net</span></span>
+          <span className="lane-sub">{today === null ? 'Reading Checkout sales…' : `${today.orders} order${today.orders === 1 ? '' : 's'} today · ${today.all} in all${checkoutDemo ? ' (incl. demo shops)' : ''}`}</span>
+        </a>
         <a className="lane" href="/invoices/" data-testid="lane-receivables">
           <span className="lane-label">Receivables</span>
           <span className="lane-value num">{usdt2dp(openTotal)}<span className="kpi-unit">USDT</span></span>
           <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''} · ${inrText(openTotal)}`}</span>
-          {checkoutSum && checkoutSum.orders > 0 && (
-            <span className="lane-sub" data-testid="lane-checkout">Checkout: {usdtNumber(checkoutSum.net)} USDT net from {checkoutSum.orders} order{checkoutSum.orders === 1 ? '' : 's'}{checkoutSum.refunded > 0n ? ` · ${usdtNumber(checkoutSum.refunded)} refunded` : ''}</span>
-          )}
           {overdue.length > 0 && <span className="pill pill-negative lane-pill">Overdue</span>}
         </a>
         <a className="lane" href="/approvals/" data-testid="lane-payables">
@@ -237,11 +250,6 @@ export default function Home() {
           <span className="lane-value num">{pending.length}</span>
           <span className="lane-sub">{pending.length === 0 ? 'Nothing to approve' : `${usdt2dp(pendingTotal)} USDT to approve`}</span>
           {pending.length > 0 && <span className="pill pill-info lane-pill">Review</span>}
-        </a>
-        <a className="lane" href="/company/" data-testid="lane-controls">
-          <span className="lane-label">Approvers</span>
-          <span className="lane-value num">{people === null ? '…' : approvers.length}</span>
-          <span className="lane-sub">{people === null ? 'Reading roles from ENS…' : syncing ? `${syncing} syncing to Whitechain` : revoked ? `All in sync · ${revoked} removed` : 'All in sync with ENS'}</span>
         </a>
         <a className="lane" href="/security/" data-testid="lane-health">
           <span className="lane-label">System health</span>
@@ -252,34 +260,18 @@ export default function Home() {
       </section>
 
       <div className="home-bottom">
-        <Card title="Recent activity" flush testId="activity" actions={<a href="/export/" className="small">Statement</a>}>
-          {activity === null && !activityError && (
+        <Card title="Activity" subtitle="USDT in and out, plus approvals, refunds and role changes; newest first" flush testId="activity" actions={<a href="/export/" className="small">Statement</a>}>
+          {activity === null && !activityError && latest.events.length === 0 && events.length === 0 ? (
             <div style={{ padding: '0 24px 24px' }}>{[0, 1, 2, 3, 4].map((i) => <div key={i} style={{ height: 52, display: 'flex', alignItems: 'center' }}><span className="skeleton" style={{ width: '100%' }} /></div>)}</div>
-          )}
-          {activityError && <div style={{ padding: '0 24px 24px' }}><p className="muted">Activity is unavailable while the explorer can&apos;t be reached.</p></div>}
-          {activity && activity.length === 0 && <div style={{ padding: '0 24px 24px' }}><p className="muted">No USDT has moved through this account yet.</p></div>}
-          {activity && activity.length > 0 && (
-            <div className="table-wrap"><table className="table">
-              <tbody>
-                {activity.slice(0, 6).map((t) => {
-                  const other = t.incoming ? t.from : t.to;
-                  const name = nameOf(other);
-                  return (
-                    <tr key={t.id}>
-                      <td>
-                        <span className="who">
-                          <span className="avatar" aria-hidden="true">{(name ?? other.slice(2)).slice(0, 1).toUpperCase()}</span>
-                          <span className="who-text">{name ?? <span className="mono">{short(other)}</span>}<span className="cell-sub">{t.incoming ? 'Received' : 'Paid'} · {when(t.time)}</span></span>
-                        </span>
-                      </td>
-                      <td className="num"><span className={t.incoming ? 'in' : undefined}>{t.incoming ? '+' : '−'}{usdt2dp(t.amount)}</span> <span className="faint">USDT</span>
-                        <span className="cell-sub"><a href={`${config.explorer}/tx/${t.txHash}`} target="_blank" rel="noreferrer">Transaction</a></span></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table></div>
-          )}
+          ) : (() => {
+            const rows = mergeActivity(activity ?? [], latest.events.length > 0 ? latest.events : events, 8);
+            return (<>
+              {activityError && <div style={{ padding: '0 24px 12px' }}><p className="muted small" style={{ margin: 0 }}>USDT transfers are unavailable while the explorer can&apos;t be reached.</p></div>}
+              {rows.length === 0
+                ? <div style={{ padding: '0 24px 24px' }}><p className="muted" data-testid="activity-empty">Nothing yet. Payments, refunds, approvals and role changes show up here.</p></div>
+                : <ActivityList rows={rows} nameOf={(a) => nameOf(a as `0x${string}`)} />}
+            </>);
+          })()}
         </Card>
 
         <div className="stack">
@@ -296,14 +288,6 @@ export default function Home() {
               </ul>
             </Card>
           )}
-          <DemoControls />
-          <Card title="Latest events" subtitle="From the chain and this device, newest first" testId="events">
-            {latest.loading && latest.events.length === 0 && events.length === 0
-              ? <p className="muted">Reading the chain…</p>
-              : (latest.events.length > 0 ? latest.events : events).length === 0
-                ? <p className="muted">Invoices, approvals and payments show up here as a timeline.</p>
-                : <Timeline events={(latest.events.length > 0 ? latest.events : events).slice(0, 8)} testId="home-events" />}
-          </Card>
         </div>
       </div>
     </div>
