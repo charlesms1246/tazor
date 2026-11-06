@@ -1,3 +1,4 @@
+import { toEventSelector } from 'viem';
 import type { Action, Ctx, Step } from './engine.ts';
 
 /** The pitch, end to end, on the real pages. Values the run learns (links, accounts, txs) live in ctx. */
@@ -6,6 +7,14 @@ const SHOP = 'https://bluejay-shop.vercel.app';
 /** A relayer address that never answers: the page sees exactly what it sees when our servers are down. */
 export const OFFLINE_RELAYER = 'https://relayer-offline.invalid';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+
+/** MandateCreated(bytes32 indexed mandateId, address indexed account, address indexed payee, uint256, uint64, uint64), same in v1 and v2. */
+export const MANDATE_CREATED = toEventSelector('MandateCreated(bytes32,address,address,uint256,uint64,uint64)');
+/** MandateModule v1 and MandateModuleV2 on Whitechain Sepolia: the only emitters the run trusts for the mandate id. */
+export const MANDATE_MODULES = ['0xB6f4F1B437AC30223D3661bD7bdd12aAec73aC32', '0x24b6eC6f6bf7e58bB3266b0b2701aE451ab7220F'];
+
+/** The id of the mandate this run created: from its MandateCreated log, else the page's contract check. */
+export const mandateForCollect = (c: Ctx) => c.mandateId || ((c.mandate ?? '').match(/0x[0-9a-fA-F]{64}/) ?? [''])[0];
 
 /** Human names for the elements the Autopilot acts on, used in its messages. */
 export const LABELS: Record<string, string> = {
@@ -142,7 +151,8 @@ export const STORY: Step[] = [
       { do: 'click', testid: 'm-submit' },
       { do: 'waitFor', wait: { testid: 'm-tx' }, timeout: 120_000, say: 'Creating the mandate on Whitechain…' },
       { do: 'capture', testid: 'm-tx', attr: 'href', inner: 'a', as: 'mandateCreated', tx: 'whitechain', say: (_v, c) => `✓ Mandate approved: ${c.supplierName || 'the supplier'} may collect up to 0.30 USDT a period` },
-      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: (c.mandate.match(/0x[0-9a-fA-F]{64}/) ?? [''])[0] }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
+      { do: 'receiptLog', key: 'mandateCreatedTx', chain: 'whitechain', topic0: MANDATE_CREATED, topic: 1, addresses: MANDATE_MODULES, as: 'mandateId', say: 'Read the new mandate’s id from its transaction.', optional: true },
+      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: mandateForCollect(c) }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
     ],
   },
   {

@@ -312,3 +312,73 @@ test('story reads raw values from attributes, never from the readable text', () 
   assert.deepEqual(attrOf('run-tx'), ['href in a']);
   assert.deepEqual([...new Set(attrOf('pay-success-tx'))], ['href']);
 });
+
+test('receiptLog: the mandate id comes from the MandateCreated log of the module, not from a stale capture', async () => {
+  const { MANDATE_CREATED, MANDATE_MODULES, mandateForCollect } = await import('../app/_autopilot/story.ts');
+  const ID = `0x${'a7'.repeat(32)}`;
+  const OLD = `0x${'99'.repeat(32)}`;
+  const w = world();
+  const logsByTx: Record<string, { address: string; topics: string[] }[]> = {
+    [TX]: [
+      { address: '0x000000000000000000000000000000000000dEaD', topics: [MANDATE_CREATED, `0x${'bb'.repeat(32)}`] },   // wrong emitter
+      { address: MANDATE_MODULES[1], topics: [`0x${'cc'.repeat(32)}`, `0x${'cc'.repeat(32)}`] },                       // wrong event
+      { address: MANDATE_MODULES[1].toLowerCase(), topics: [MANDATE_CREATED, ID, `0x${'00'.repeat(32)}`] },
+    ],
+  };
+  let polls = 0;
+  const deps = { ...w.deps(), receiptLogs: async (_c: string, h: string) => (++polls < 3 ? null : logsByTx[h] ?? []) };
+  const step: Step = { id: 'm', title: 'Mandate', why: '', actions: [
+    { do: 'capture', testid: 'digest', attr: 'data-value', as: 'mandate' },
+    { do: 'capture', testid: 'mtx', attr: 'href', as: 'mandateCreated', tx: 'whitechain' },
+    { do: 'receiptLog', key: 'mandateCreatedTx', chain: 'whitechain', topic0: MANDATE_CREATED, topic: 1, addresses: MANDATE_MODULES, as: 'mandateId', say: 'id read', optional: true },
+    { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: mandateForCollect(c) }) }, say: 'collect' },
+  ] };
+  w.el.set('digest', { attrs: { 'data-value': OLD } });
+  w.el.set('mtx', { attrs: { href: `https://explorer/tx/${TX}` } });
+  const r = createRunner([step], deps);
+  r.start('presenter');
+  await settle(r, w, (s) => s?.status === 'done');
+  assert.ok(polls >= 3, 'waits for the receipt');
+  assert.equal(r.state()!.ctx.mandateId, ID);
+  assert.ok(w.calls.includes(`api:counterparty:${JSON.stringify({ action: 'collect', mandate: ID })}`), 'collect gets the on-chain id');
+
+  // no matching log: optional, falls back to the page's value
+  const deps2 = { ...w.deps(), receiptLogs: async () => [] };
+  const r2 = createRunner([step], deps2);
+  w.calls.length = 0;
+  r2.start('presenter');
+  await settle(r2, w, (s) => s?.status === 'done');
+  assert.equal(r2.state()!.ctx.mandateId, undefined);
+  assert.ok(w.calls.includes(`api:counterparty:${JSON.stringify({ action: 'collect', mandate: OLD })}`));
+  assert.equal(mandateForCollect({ mandateId: ID, mandate: OLD }), ID);
+  assert.equal(mandateForCollect({ mandate: `digest ${OLD}` }), OLD);
+});
+
+test('a step (re)start clears its own captured values, so Retry never reuses a previous attempt; shared keys stay', async () => {
+  const { ownKeys } = await import('../app/_autopilot/engine.ts');
+  const w = world();
+  const steps: Step[] = [
+    { id: 'a', title: 'A', why: '', actions: [{ do: 'capture', testid: 'link', as: 'lastLink' }, { do: 'capture', testid: 'x', as: 'aValue' }] },
+    { id: 'b', title: 'B', why: '', actions: [
+      { do: 'capture', testid: 'link', as: 'lastLink' },
+      { do: 'capture', testid: 'digest', attr: 'data-value', as: 'mandate' },
+      { do: 'waitFor', wait: { testid: 'never' }, timeout: 500, say: 'waiting' },
+    ] },
+  ];
+  assert.deepEqual(ownKeys(steps, 1).sort(), ['mandate', 'mandateTx']);
+  assert.deepEqual(ownKeys(steps, 0).sort(), ['aValue', 'aValueTx']);
+  w.el.set('link', { text: 'L1' });
+  w.el.set('x', { text: 'X' });
+  w.el.set('digest', { attrs: { 'data-value': 'OLD' } });
+  const r = createRunner(steps, w.deps());
+  r.start('presenter');
+  await settle(r, w, (s) => s?.status === 'failed');
+  assert.equal(r.state()!.ctx.mandate, 'OLD');
+  // the page no longer offers the value: a retry must not carry OLD forward
+  w.el.delete('digest');
+  r.retry();
+  await settle(r, w, (s) => s?.status === 'failed');
+  assert.equal(r.state()!.ctx.mandate, undefined, 'stale value cleared on retry');
+  assert.equal(r.state()!.ctx.lastLink, 'L1', 'shared key kept');
+  assert.equal(r.state()!.ctx.aValue, 'X', "another step's value kept");
+});

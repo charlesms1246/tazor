@@ -55,6 +55,15 @@ async function receipt(chain: Chain, hash: string): Promise<'ok' | 'reverted' | 
 }
 
 const client = createSandboxClient(() => process.env.NEXT_PUBLIC_SANDBOX_URL || getRelayerUrl());
+async function receiptLogs(chain: Chain, hash: string): Promise<{ address: string; topics: string[] }[] | null> {
+  try {
+    const r = await rpc<{ logs: { address: string; topics: string[] }[] } | null>(chain === 'sepolia' ? config.sepolia.rpcUrl : config.rpcUrl, 'eth_getTransactionReceipt', [hash]);
+    return r ? r.logs : null;
+  } catch {
+    return null;
+  }
+}
+
 const sandbox = () => getSandbox(() => fromClient(client));
 
 /** The sandbox supplier's display name, from GET /sandbox/status. */
@@ -113,6 +122,7 @@ const deps: Omit<Deps, 'onChange'> = {
   setCompany: (id) => setCompany(id as never),
   api: (n, a) => api(n, a),
   receipt,
+  receiptLogs,
   save: (s) => { try { if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); } catch { /* storage unavailable */ } },
   load: () => { try { return parseState(localStorage.getItem(KEY)); } catch { return null; } },
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),

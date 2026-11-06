@@ -41,6 +41,8 @@ export type Action = { mode?: Mode } & (
   | { do: 'capture'; testid: string; as: string; attr?: string; inner?: string; say?: (v: string, c: Ctx) => string; tx?: Chain }
   | { do: 'api'; call: ApiCall; say: string; sim?: boolean; expectRefusal?: boolean; saveAs?: string; retry?: { while: (r: ApiResult) => boolean; everyMs: number; maxMs: number; say: string } }
   | { do: 'assertChain'; key: string; chain: Chain }
+  /** Reads topics[topic] of the first log with topic0 (from one of `addresses`) in the receipt of ctx[key]; stores it as ctx[as]. */
+  | { do: 'receiptLog'; key: string; chain: Chain; topic0: string; topic: number; addresses: string[]; as: string; say: string; optional?: boolean }
   | { do: 'log'; text: Val; kind?: LogKind }
 );
 
@@ -58,6 +60,8 @@ export type Deps = {
   setCompany(id: string): void;
   api(name: string, args: Record<string, string>, c: Ctx): Promise<ApiResult>;
   receipt(chain: Chain, hash: string): Promise<'ok' | 'reverted' | null>;
+  /** The receipt's logs, or null while it isn't mined yet. */
+  receiptLogs?(chain: Chain, hash: string): Promise<{ address: string; topics: string[] }[] | null>;
   save(s: RunState | null): void;
   load(): RunState | null;
   sleep(ms: number): Promise<void>;
@@ -104,6 +108,14 @@ export function parseState(raw: string | null): RunState | null {
 }
 
 export const appliesTo = (x: { mode?: Mode; modes?: Mode[] }, m: Mode) => (x.modes ? x.modes.includes(m) : x.mode ? x.mode === m : true);
+
+/** Keys a step writes into ctx; keys written by more than one step (e.g. "the last link seen") are shared and kept. */
+export function ownKeys(steps: Step[], index: number): string[] {
+  const writes = (st: Step) => st.actions.flatMap((a) => (a.do === 'capture' ? [a.as, `${a.as}Tx`] : a.do === 'receiptLog' ? [a.as] : a.do === 'api' && a.saveAs ? [a.saveAs] : []));
+  const mine = new Set(writes(steps[index]));
+  for (const [i, st] of steps.entries()) if (i !== index) for (const k of writes(st)) mine.delete(k);
+  return [...mine];
+}
 
 export function createRunner(steps: Step[], deps: Deps) {
   let st: RunState | null = deps.load();
@@ -256,6 +268,28 @@ export function createRunner(steps: Step[], deps: Deps) {
         }
         throw new Error('Timed out waiting for the transaction to be confirmed.');
       }
+      case 'receiptLog': {
+        const h = s.ctx[a.key];
+        if (!h || !TX.test(h) || !deps.receiptLogs) {
+          if (a.optional) return 'next';
+          throw new Error('No transaction was recorded for this step.');
+        }
+        const want = a.addresses.map((x) => x.toLowerCase());
+        for (let i = 0; i < 60; i++) {
+          if (g !== gen) throw new Aborted();
+          const logs = await deps.receiptLogs(a.chain, h);
+          if (logs) {
+            const hit = logs.find((l) => want.includes(l.address.toLowerCase()) && l.topics[0]?.toLowerCase() === a.topic0.toLowerCase());
+            const v = hit?.topics[a.topic];
+            if (v) { cur().ctx = { ...cur().ctx, [a.as]: v }; log('info', a.say); return 'next'; }
+            if (a.optional) return 'next';
+            throw new Error('The transaction did not record what this step expected.');
+          }
+          await deps.sleep(1000);
+        }
+        if (a.optional) return 'next';
+        throw new Error('Timed out waiting for the transaction to be confirmed.');
+      }
       case 'log': log(a.kind ?? 'info', val(a.text, s.ctx)); return 'next';
     }
   }
@@ -272,7 +306,12 @@ export function createRunner(steps: Step[], deps: Deps) {
         const step = steps[s.step];
         if (!step) { s.status = 'done'; s.highlight = undefined; s.prompt = undefined; log('ok', 'Autopilot finished: every step ran on the real pages.'); return; }
         if (!appliesTo(step, s.mode)) { s.step++; s.action = 0; emit(); continue; }
-        if (s.action === 0 && !s.log.some((l) => l.step === step.id && l.text === step.title)) log('info', step.title);
+        if (s.action === 0) {
+          // a fresh attempt never reuses values captured by an earlier attempt of this step
+          const own = ownKeys(steps, s.step);
+          if (own.some((k) => k in s.ctx)) { s.ctx = Object.fromEntries(Object.entries(s.ctx).filter(([k]) => !own.includes(k))); emit(); }
+          if (!s.log.some((l) => l.step === step.id && l.text === step.title)) log('info', step.title);
+        }
         const a = step.actions[s.action];
         if (!a) {
           if (!s.done.includes(step.id)) s.done = [...s.done, step.id];
