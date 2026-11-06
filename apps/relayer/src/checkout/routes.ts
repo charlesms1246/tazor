@@ -6,6 +6,7 @@ import type { Guard, GuardedRoute } from '../guard.ts';
 import type { Webhooks } from '../webhooks.ts';
 import { clientIp } from '../sandbox/routes.ts';
 import { Conflict, type Checkout } from './service.ts';
+import { recentWithReplay } from './replay.ts';
 import { orderFromQuery, type Deposit, type DepositOrder } from './deposit.ts';
 import { X402_NETWORKS, decodeHeader, demoRequirements, encodeHeader, freightQuote, type X402 } from './x402.ts';
 
@@ -107,8 +108,9 @@ export async function handleCheckout(
     if (m === 'GET' && path === '/webhooks/recent') {
       const merchant = url.searchParams.get('merchant');
       if (!merchant || !isAddress(merchant)) throw new BadRequest('merchant must be an address');
-      const items = await w.recent(getAddress(merchant));
-      return reply(200, { merchant: getAddress(merchant), storage: w.storage, note: storageNote(w), items, deliveries: items }), true;
+      const stored = await w.recent(getAddress(merchant));
+      const { items, replayed } = await recentWithReplay(getAddress(merchant), stored, w.secretFor(merchant));
+      return reply(200, { merchant: getAddress(merchant), storage: w.storage, note: storageNote(w), replayed, replayNote: 'Events not in this instance\'s delivery log are rebuilt from Whitechain and signed with the merchant\'s secret (status "signed").', items, deliveries: items }), true;
     }
     if (m === 'POST' && path === '/webhooks/test') {
       const b = (await readJson(req)) as { merchant?: unknown } | null;

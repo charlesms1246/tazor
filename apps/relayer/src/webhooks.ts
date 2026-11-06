@@ -148,6 +148,8 @@ export function createWebhooks(o: {
     merchants: () => Object.keys(o.endpoints).length,
     storage: store.kind,
     recent: (merchant: string) => store.list(getAddress(merchant).toLowerCase()),
+    /** The secret this merchant's events are signed with (its endpoint's, else the demo secret), if any. */
+    secretFor: (merchant: string) => o.endpoints[merchant.toLowerCase()]?.secret ?? o.demoSecret,
   };
 }
 export type Webhooks = ReturnType<typeof createWebhooks>;
