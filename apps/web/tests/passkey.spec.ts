@@ -11,7 +11,7 @@ test('passkey signatures verify on the Whitechain P-256 precompile', async ({ pa
     options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true },
   });
 
-  await page.goto('/developers/');
+  await page.goto('/docs/passkey-check/');
   await page.getByTestId('create').click();
   const x = (await page.getByTestId('x').textContent()) as Hex;
   const y = (await page.getByTestId('y').textContent()) as Hex;
