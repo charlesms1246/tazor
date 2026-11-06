@@ -1,0 +1,118 @@
+{
+  "at": "2026-11-06T14:21:53Z",
+  "dryRun": false,
+  "name": "sandbox.taz0r.eth",
+  "deployer": "0xce4389ACb79463062c362fACB8CB04513fA3D8D8",
+  "relayerConfig": {
+    "SANDBOX_ACCOUNT": "0xE6eE20A68d9053d8Bc3F8bb99Dc255c1de5b7116",
+    "SANDBOX_REGISTRY": "0xaa0F1d232e0464dCCBeB2D6470387e507e818840",
+    "SANDBOX_SUPPLIER": "0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6",
+    "MIRROR_OPERATOR": "0x112a0f92C5A5e993b05E8ed1DFb2d2EC9338BB44",
+    "SANDBOX_OPERATOR": "0xc63718c6449af15Bee301FDC22a3084D297BAb3B",
+    "SANDBOX_ADMIN_ACCOUNT": "0x98632A8B3364F1E27F8D6F0c9Dea86d6B8117d0c",
+    "SANDBOX_RAVI_ACCOUNT": "0x0689A8a6BE28ffC10762e003969f094bc3A996b3",
+    "SANDBOX_SUPPLIER_SIGNER_ACCOUNT": "0x958Be2cbD1F171a7d29EB80d75e633eE135fB3B6",
+    "SANDBOX_FINANCIER": "0x9FE27b7a91e7B7eEA8AD46155282b451b5eE16f0",
+    "SANDBOX_FINANCIER_ACCOUNT": "0x77924b8EC786D547754cf47123B1706162DDa01a",
+    "SANDBOX_MANDATE_ID": "0x673b3d714b5a0ec7359e0f7f6513031317a21ea5520e9b0f0eacf15b5f9723d4",
+    "SANDBOX_CLAIM_ID": "29994305890160799064562750594702642296243117310426787175449127047543479316328"
+  },
+  "signers": {
+    "adminEoa": "0x02FbD14c6d0f0EA3B5d5b4533342dFdD7ADA21b7",
+    "raviEoa": "0xa3aF78A6fc0cA3B641c7A5A78FEC44A757A26ea9",
+    "supplierSignerEoa": "0x6B4E065d08D2cC7723635c6df0CC5268C706cD93"
+  },
+  "limits": {
+    "perPayment": "1 USDT",
+    "monthly": "10 USDT",
+    "agentMonthly": "1 USDT",
+    "twoApproversAbove": "0.5 USDT",
+    "payeeDelaySeconds": 60,
+    "exitDelaySeconds": 120
+  },
+  "mirror": {
+    "address": "0x9822650A99bD33F29E383345F570dAE1e4E00928",
+    "operatorContract": "0x112a0f92C5A5e993b05E8ed1DFb2d2EC9338BB44",
+    "dailyCap": 40
+  },
+  "txs": [
+    {
+      "step": 3,
+      "chain": "sepolia",
+      "label": "grant admin roles (bits 64 68; missing mask 0x100000000000000000)",
+      "hash": "0xd78f8de10793a4447ebe56efa3b1c10ceda9a1cd22b16b435b9864eba78d8381"
+    },
+    {
+      "step": 3,
+      "chain": "sepolia",
+      "label": "grant supplier-signer roles (bits 64 68; missing mask 0x100000000000000000)",
+      "hash": "0x3ef1cab048dff403c35dfec0c01ae38102c6529e0687c3c27d4e6b31fc8521bb"
+    },
+    {
+      "step": 4,
+      "chain": "whitechain",
+      "label": "registerSoul supplier-signer-EOA (mirror, simulated) via MirrorOperator",
+      "hash": "0x6d69edf247ccbbb398394e289c1beeaf5229a49d1b8093bccdc747e70740e61a"
+    },
+    {
+      "step": 4,
+      "chain": "whitechain",
+      "label": "setAttribute IsVerified supplier-signer-EOA (mirror, simulated) via MirrorOperator",
+      "hash": "0xb4896b1eaae3f009f50219f629c189ad565865b7c28ee5de235e4b6dec185bd1"
+    },
+    {
+      "step": 4,
+      "chain": "whitechain",
+      "label": "registerSoul financier-EOA (mirror, simulated) via MirrorOperator",
+      "hash": "0xe3e0c8560dd49ea8105b7836cd33346abc82f2e1a4b0573d941037d86a104f33"
+    },
+    {
+      "step": 4,
+      "chain": "whitechain",
+      "label": "setAttribute IsVerified financier-EOA (mirror, simulated) via MirrorOperator",
+      "hash": "0x7bc4f582e966d9bffacdee6ae5a1c3404e16fe45afd485e359afc04d72c7860a"
+    },
+    {
+      "step": 8,
+      "chain": "whitechain",
+      "label": "syncRoles 0x98632A8B3364F1E27F8D6F0c9Dea86d6B8117d0c (local proof)",
+      "hash": "0xe082ee4d4d249ae405ffd2b0e8b89fadf7a881da0a59fd6cf316650dc70c2518"
+    },
+    {
+      "step": 8,
+      "chain": "whitechain",
+      "label": "syncRoles 0x958Be2cbD1F171a7d29EB80d75e633eE135fB3B6 (local proof)",
+      "hash": "0x2526f8270e873693bf8e82810f14357fab5ad055b5c4d2044b9711eebc7df076"
+    },
+    {
+      "step": 9,
+      "chain": "whitechain",
+      "label": "addPayee Sandbox Supplier (for the sandbox)",
+      "hash": "0x06f02d406cc1d2f183b966f5e044a38e4ab070855197f234f65d743b45c66ffe"
+    },
+    {
+      "step": 9,
+      "chain": "whitechain",
+      "label": "addPayee sandbox (for Sandbox Supplier: credit notes)",
+      "hash": "0x2af916321587d6a6c915b18f463aeaefca88f6e3dafa8fb3cfc86f4a92e99bf2"
+    },
+    {
+      "step": 10,
+      "chain": "whitechain",
+      "label": "createMandate 0.5 USDT / 30 days",
+      "hash": "0xd4f1f8c5ed042f5ac2c9e6780ce60afd4b7745601f5b17f9baecf6e1c5d168b6"
+    },
+    {
+      "step": 10,
+      "chain": "whitechain",
+      "label": "commit claim 0.4 USDT (holder = supplier signer)",
+      "hash": "0x79174de691815cc49404764f7b5912e86c97548317f6b1226b99856dff7d8d81"
+    },
+    {
+      "step": 10,
+      "chain": "whitechain",
+      "label": "list claim at 0.38 USDT (supplier signer)",
+      "hash": "0x09b0e2f4851a070fad4307a3f774fe8970af76a0090aae37c5efe0d96b3b740b"
+    }
+  ]
+}
