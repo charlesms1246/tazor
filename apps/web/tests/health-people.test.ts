@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Address } from 'viem';
 import { checkHealth } from '../lib/health.ts';
-import { approverFlags, labelOf, roleList, roleNames, rolesFor, uniqueAddresses, whitechainStatus, type ApproverView } from '../lib/people.ts';
+import { SYNC_GRACE_SECONDS, agoText, approverFlags, cacheAgeSeconds, labelOf, roleList, roleNames, rolesFor, uniqueAddresses, whitechainStatus, type ApproverView } from '../lib/people.ts';
 import { ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR_ADMIN } from '../lib/policies.ts';
 
 type Reply = (method: string, params: unknown[], url: string) => unknown;
@@ -63,7 +63,10 @@ test('roles, labels and statuses', () => {
   assert.equal(labelOf('0x000000000000000000000000000000000000dEaD'), '0x0000…dEaD');
   assert.equal(whitechainStatus(view({ revoked: true, cached: ROLE_APPROVER, ens: ROLE_APPROVER })), 'revoked');
   assert.equal(whitechainStatus(view({ cached: ROLE_APPROVER, ens: ROLE_APPROVER })), 'in-sync');
-  assert.equal(whitechainStatus(view({ cached: 0n, ens: ROLE_APPROVER })), 'syncing');
+  assert.equal(whitechainStatus(view({ cached: ROLE_APPROVER, cachedAt: 12_076_300n, ens: 0n }), 12_076_303n), 'syncing');
+  assert.equal(whitechainStatus(view({ cached: ROLE_APPROVER, cachedAt: 12_074_541n, ens: 0n }), 12_076_303n), 'out-of-sync');
+  assert.equal(whitechainStatus(view({ cached: 0n, cachedAt: 12_076_300n, ens: ROLE_APPROVER }), null), 'out-of-sync');
+  assert.equal(whitechainStatus(view({ cached: 0n, cachedAt: 0n, ens: ROLE_APPROVER }), 12_076_303n), 'out-of-sync');
   assert.equal(whitechainStatus(view({ revoked: null })), 'unknown');
   assert.deepEqual(rolesFor(view({ admin: true, ens: ROLE_APPROVER })), ['Approver', 'Admin']);
   assert.deepEqual(rolesFor(view({ cached: ROLE_AGENT })), ['Agent']);
@@ -74,4 +77,16 @@ test('approver flags match the approvers panel wording', () => {
   assert.deepEqual(approverFlags(view({ revoked: true, ens: ROLE_APPROVER, cached: ROLE_APPROVER })), ['Revoked on Whitechain but still listed on ENS (mirror pending)']);
   assert.deepEqual(approverFlags(view({ ens: ROLE_APPROVER, cached: 0n })), ['ENS role changed, cache stale (sync pending)']);
   assert.deepEqual(approverFlags(view({ ens: ROLE_APPROVER, cached: ROLE_APPROVER })), []);
+});
+
+test('cache age and relative time', () => {
+  assert.equal(cacheAgeSeconds(12_074_541n, 12_076_303n), 1762 * 12);
+  assert.equal(cacheAgeSeconds(0n, 12_076_303n), null);
+  assert.equal(cacheAgeSeconds(12_076_303n, null), null);
+  assert.equal(cacheAgeSeconds(10n, 5n), null);
+  assert.equal(SYNC_GRACE_SECONDS, 600);
+  assert.equal(agoText(30), '30 s ago');
+  assert.equal(agoText(600), '~10 min ago');
+  assert.equal(agoText(1762 * 12), '~6 h ago');
+  assert.equal(agoText(3 * 86400), '~3 d ago');
 });

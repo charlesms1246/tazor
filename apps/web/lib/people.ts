@@ -9,8 +9,20 @@ import { verifiedSoulOf } from './soul.ts';
 export type Person = {
   address: Address; label: string; roles: string[];
   soul: 'verified' | 'unverified' | 'unknown';
-  whitechain: 'in-sync' | 'syncing' | 'revoked' | 'unknown';
+  whitechain: 'in-sync' | 'syncing' | 'out-of-sync' | 'revoked' | 'unknown';
+  /** L1 block of this person's role-cache entry (0 or undefined: never synced). */
+  cachedAt?: number;
+  /** Approximate age of that cache entry, from Whitechain's L1Block view of Ethereum. */
+  cacheAgeSec?: number;
 };
+
+/** Ethereum (Sepolia) block time used to turn L1 block distance into seconds. */
+export const L1_BLOCK_SECONDS = 12;
+/** A role mismatch younger than this is treated as a sync in flight. */
+export const SYNC_GRACE_SECONDS = 600;
+
+export const cacheAgeSeconds = (cachedAt: bigint | null, l1Now: bigint | null): number | null =>
+  cachedAt !== null && cachedAt > 0n && l1Now !== null && l1Now >= cachedAt ? Number(l1Now - cachedAt) * L1_BLOCK_SECONDS : null;
 
 /** What Whitechain and ENS say about one approver of one company. */
 export type ApproverView = {
@@ -58,12 +70,31 @@ export function approverFlags(r: ApproverView): string[] {
   return flags;
 }
 
-export function whitechainStatus(r: ApproverView): Person['whitechain'] {
+/**
+ * Whitechain's view of one approver. A mismatch between ENS and the role cache only counts as "syncing" when the
+ * cache entry is younger than SYNC_GRACE_SECONDS; an older or undated mismatch is "out-of-sync" (someone must run syncRoles).
+ */
+export function whitechainStatus(r: ApproverView, l1Now: bigint | null = null): Person['whitechain'] {
   if (r.revoked) return 'revoked';
-  if (r.ens !== null && r.cached !== null) return r.ens === r.cached ? 'in-sync' : 'syncing';
+  if (r.ens !== null && r.cached !== null) {
+    if (r.ens === r.cached) return 'in-sync';
+    const age = cacheAgeSeconds(r.cachedAt, l1Now);
+    return age !== null && age <= SYNC_GRACE_SECONDS ? 'syncing' : 'out-of-sync';
+  }
   if (r.revoked === false && r.cached !== null) return 'in-sync';
   return 'unknown';
 }
+
+/** Rough "N min/h/d ago" for a number of seconds. */
+export function agoText(sec: number): string {
+  if (sec < 90) return `${Math.max(1, Math.round(sec))} s ago`;
+  if (sec < 90 * 60) return `~${Math.round(sec / 60)} min ago`;
+  if (sec < 36 * 3600) return `~${Math.round(sec / 3600)} h ago`;
+  return `~${Math.round(sec / 86400)} d ago`;
+}
+
+/** Whitechain's current view of the Ethereum block number (L1Block), or null if unreadable. */
+export const l1BlockNumber = (): Promise<bigint | null> => call<bigint>(L1_BLOCK, 'number').catch(() => null);
 
 export function rolesFor(r: ApproverView): string[] {
   const bits = r.ens ?? r.cached ?? 0n;
@@ -116,7 +147,7 @@ export async function companyRegistry(account: Address): Promise<{ registry: Add
 export async function loadPeople(account: Address): Promise<Person[]> {
   const admins = await adminSigners(account).catch(() => [] as Address[]);
   const all = uniqueAddresses([...admins, ...(DEMO_PEOPLE[account.toLowerCase()] ?? [])]);
-  const reg = await companyRegistry(account);
+  const [reg, l1Now] = await Promise.all([companyRegistry(account), l1BlockNumber()]);
   const views: ApproverView[] = reg
     ? await readApprovers(account, reg.registry, reg.revocationList, all, admins)
     : all.map((approver) => ({ approver, admin: admins.some((a) => a.toLowerCase() === approver.toLowerCase()), revoked: null, cached: null, cachedAt: null, ens: null }));
@@ -125,6 +156,10 @@ export async function loadPeople(account: Address): Promise<Person[]> {
     if (config.wbSoulMirror) {
       soul = await verifiedSoulOf(config.wbSoulMirror, v.approver).then((id) => (id === null ? 'unverified' : 'verified'), () => 'unknown' as const);
     }
-    return { address: v.approver, label: labelOf(v.approver), roles: rolesFor(v), soul, whitechain: whitechainStatus(v) };
+    const age = cacheAgeSeconds(v.cachedAt, l1Now);
+    return {
+      address: v.approver, label: labelOf(v.approver), roles: rolesFor(v), soul, whitechain: whitechainStatus(v, l1Now),
+      ...(v.cachedAt !== null ? { cachedAt: Number(v.cachedAt) } : {}), ...(age !== null ? { cacheAgeSec: age } : {}),
+    };
   }));
 }
