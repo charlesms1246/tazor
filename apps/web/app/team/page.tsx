@@ -14,6 +14,7 @@ import {
 } from '@/lib/revoke.ts';
 import { ethCall, getReceipt, rpc } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
+import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
 const REVOKE_VALIDITY_S = 600n;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -76,22 +77,34 @@ function RemovePerson() {
   };
 
   return (
-    <section>
-      <h2>Remove a person</h2>
-      <p>Takes effect on Whitechain in about a second: their approvals stop working for this company everywhere.</p>
-      <p><label>Company account <input data-testid="revoke-account" value={account} onChange={(e) => setAccount(e.target.value.trim())} size={44} placeholder="0x…" /></label></p>
-      <p><label>Person (approver account) <input data-testid="revoke-target" value={target} onChange={(e) => setTarget(e.target.value.trim())} size={44} placeholder="0x…" /></label></p>
-      <button data-testid="revoke" onClick={onRemove} disabled={busy}>Remove with Face ID</button>
-      {digest && <p>Signed digest (matches the contract): <code data-testid="revoke-digest">{digest}</code></p>}
-      {error && <p data-testid="revoke-error" style={{ color: 'crimson' }}>{error}</p>}
-      {tx && (
-        <p data-testid="revoke-tx">
-          Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.hash}</a>{' '}
-          {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
-          {tx.revoked && <strong data-testid="revoked"> · Revoked</strong>}
-        </p>
-      )}
-    </section>
+    <Card title="Remove a person" subtitle="Stops their approvals for this company on Whitechain in about a second, everywhere they sign.">
+      <div className="fields">
+        <div className="fields-2">
+          <Field label="Company account">
+            <input className="input mono" data-testid="revoke-account" value={account} onChange={(e) => setAccount(e.target.value.trim())} placeholder="0x…" />
+          </Field>
+          <Field label="Person (approver account)">
+            <input className="input mono" data-testid="revoke-target" value={target} onChange={(e) => setTarget(e.target.value.trim())} placeholder="0x…" />
+          </Field>
+        </div>
+        <div className="row">
+          <button className="btn btn-danger" data-testid="revoke" onClick={onRemove} disabled={busy}>Remove with Face ID</button>
+          <span className="small faint">They can no longer approve payments for this company. Re-adding them needs a new approver account.</span>
+        </div>
+        {digest && <p className="small muted">Signed digest (matches the contract): <code className="break" data-testid="revoke-digest">{digest}</code></p>}
+        {error && <Notice tone="negative"><span data-testid="revoke-error">{error}</span></Notice>}
+        {tx && (
+          <p className="row" data-testid="revoke-tx">
+            <span className="muted">Transaction</span>
+            <Addr value={tx.hash} href={`${config.explorer}/tx/${tx.hash}`} />
+            {tx.seconds === undefined
+              ? <Pill>pending</Pill>
+              : <Pill tone={tx.status === 'success' ? 'positive' : 'negative'}>{tx.status} in {tx.seconds.toFixed(1)} s</Pill>}
+            {tx.revoked && <Pill tone="positive"><span data-testid="revoked"> · Revoked</span></Pill>}
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -160,40 +173,40 @@ function BackupSigner() {
   };
 
   return (
-    <section>
-      <h2>Add a backup signer</h2>
-      <p>
-        A backup signer is an ordinary wallet address that can approve for you if you lose your passkey devices. It is
-        added to your approver account as a second signer; either one alone can approve. The transaction is sponsored
-        (no WBT needed) within your WB Soul&apos;s daily quota.
-      </p>
-      <label>
-        Backup wallet address{' '}
-        <input data-testid="eoa" value={eoa} onChange={(e) => setEoa(e.target.value.trim())} size={44} placeholder="0x…" />
-      </label>
-      {eoa && !valid && <p style={{ color: 'crimson' }}>Not a valid address.</p>}
-      {valid && <p>Backup signer id: <code data-testid="backup-signer">{backupSigner(eoa)}</code></p>}
-      <button data-testid="add-backup" onClick={onAdd} disabled={busy || !valid}>Add with Face ID</button>
-      {step && <p data-testid="backup-step">{step}</p>}
-      {error && <p data-testid="backup-error" style={{ color: 'crimson' }}>{error}</p>}
-      {tx && (
-        <p data-testid="backup-tx">
-          Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.hash}</a>{' '}
-          {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
-          {tx.added && <strong data-testid="backup-added"> · Backup signer added</strong>}
-          {tx.seconds !== undefined && tx.added === false && <strong style={{ color: 'crimson' }}> · not added (the operation reverted inside the account)</strong>}
-        </p>
-      )}
-    </section>
+    <Card title="Add a backup signer" subtitle="An ordinary wallet that can approve for you if you lose your passkey devices. Either one alone can approve.">
+      <div className="fields">
+        <Field label="Backup wallet address" hint="Sponsored within your WB Soul's daily quota, so no WBT is needed.">
+          <input className="input mono" data-testid="eoa" value={eoa} onChange={(e) => setEoa(e.target.value.trim())} placeholder="0x…" />
+        </Field>
+        {eoa && !valid && <Notice tone="negative">Not a valid address.</Notice>}
+        {valid && <p className="small muted">Backup signer id: <code className="break" data-testid="backup-signer">{backupSigner(eoa)}</code></p>}
+        <div className="row">
+          <button className="btn btn-primary" data-testid="add-backup" onClick={onAdd} disabled={busy || !valid}>Add with Face ID</button>
+          {step && <span className="small muted" data-testid="backup-step">{step}</span>}
+        </div>
+        {error && <Notice tone="negative"><span data-testid="backup-error">{error}</span></Notice>}
+        {tx && (
+          <p className="row" data-testid="backup-tx">
+            <span className="muted">Transaction</span>
+            <a className="mono" href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{`${tx.hash.slice(0, 10)}…${tx.hash.slice(-6)}`}</a>
+            {tx.seconds === undefined
+              ? <Pill>pending</Pill>
+              : <Pill tone={tx.status === 'success' ? 'positive' : 'negative'}>{tx.status} in {tx.seconds.toFixed(1)} s</Pill>}
+            {tx.added && <Pill tone="positive"><span data-testid="backup-added"> · Backup signer added</span></Pill>}
+            {tx.seconds !== undefined && tx.added === false && <Pill tone="negative">not added: the operation reverted inside the account</Pill>}
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }
 
 export default function TeamPage() {
   return (
-    <main>
-      <h1>Team</h1>
-      <RemovePerson />
+    <div className="page">
+      <PageHeader title="Team" subtitle="Who can approve for your company, and how to recover if a device is lost." />
       <BackupSigner />
-    </main>
+      <RemovePerson />
+    </div>
   );
 }
