@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AddressAlias} from "../src/libraries/AddressAlias.sol";
 import {PolicyHook} from "../src/modules/PolicyHook.sol";
 import {PaymentModule} from "../src/modules/PaymentModule.sol";
+import {MandateModule} from "../src/modules/MandateModule.sol";
 import {ApproverAccountFactory} from "../src/account/ApproverAccountFactory.sol";
 import {TazorAccountFactory} from "../src/account/TazorAccountFactory.sol";
 import {EnsGate} from "../src/l1/EnsGate.sol";
@@ -47,6 +48,7 @@ abstract contract TazorDeployLib is Script {
         address approverAccountFactory;
         address tazorAccountFactory;
         address paymentModule;
+        address mandateModule;
         address ensGate;
         address ensGateAlias;
     }
@@ -93,6 +95,10 @@ abstract contract TazorDeployLib is Script {
         );
     }
 
+    function _mandateModuleInit(address paymentModule) internal pure returns (bytes memory) {
+        return abi.encodePacked(type(MandateModule).creationCode, abi.encode(paymentModule));
+    }
+
     function _ensGateInit(address paymentModule, uint64 l2GasLimit) internal pure returns (bytes memory) {
         return abi.encodePacked(
             type(EnsGate).creationCode, abi.encode(OPTIMISM_PORTAL, TAZ0R_REGISTRY, paymentModule, l2GasLimit)
@@ -111,6 +117,7 @@ abstract contract TazorDeployLib is Script {
         a.ensGate = CREATEX.computeCreate3Address(_ensGateGuardedSalt(p.deployer));
         a.ensGateAlias = AddressAlias.applyL1ToL2Alias(a.ensGate);
         a.paymentModule = _create2("PaymentModule", _paymentModuleInit(p.roleCache, a.ensGateAlias));
+        a.mandateModule = _create2("MandateModule", _mandateModuleInit(a.paymentModule));
     }
 
     function _envParams(address deployer) internal view returns (Params memory) {

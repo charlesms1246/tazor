@@ -17,6 +17,7 @@ contract Predict is TazorDeployLib {
         console2.log("ApproverAccountFactory", a.approverAccountFactory);
         console2.log("TazorAccountFactory   ", a.tazorAccountFactory);
         console2.log("PaymentModule         ", a.paymentModule);
+        console2.log("MandateModule         ", a.mandateModule);
         console2.log("EnsGate (Sepolia)     ", a.ensGate);
         console2.log("EnsGate L2 alias      ", a.ensGateAlias);
     }

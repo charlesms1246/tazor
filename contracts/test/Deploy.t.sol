@@ -7,6 +7,8 @@ import {ApproverAccountFactory} from "../src/account/ApproverAccountFactory.sol"
 import {TazorAccountFactory} from "../src/account/TazorAccountFactory.sol";
 import {TazorAccount} from "../src/account/TazorAccount.sol";
 import {PaymentModule} from "../src/modules/PaymentModule.sol";
+import {MandateModule} from "../src/modules/MandateModule.sol";
+import {MODULE_TYPE_EXECUTOR} from "@openzeppelin/contracts/interfaces/draft-IERC7579.sol";
 import {EnsGate} from "../src/l1/EnsGate.sol";
 import {TazorDeployLib} from "../script/TazorDeployLib.sol";
 import {DeployWhitechain} from "../script/DeployWhitechain.s.sol";
@@ -85,6 +87,8 @@ contract DeployTest is Test {
         assertEq(pm.isVerifiedAttribute(), 0xd88fa142B67F561C5f2Cbf803bF5AE906a8f1e41);
         assertEq(TazorAccountFactory(wc.tazorAccountFactory).policyHook(), wc.policyHook);
         assertTrue(wc.policyHook.code.length != 0 && wc.approverAccountFactory.code.length != 0);
+        assertEq(address(MandateModule(wc.mandateModule).paymentModule()), wc.paymentModule);
+        assertEq(address(MandateModule(wc.mandateModule).usdt()), 0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7);
 
         vm.selectFork(sepolia);
         assertEq(gate.paymentModule(), address(pm));
@@ -160,7 +164,9 @@ contract DeployTest is Test {
             twoApproverThreshold: 5e6,
             salt: keccak256("acme")
         });
-        address account = cc.create(pk, TazorAccountFactory(wc.tazorAccountFactory), PaymentModule(wc.paymentModule), c);
+        address account = cc.create(
+            pk, TazorAccountFactory(wc.tazorAccountFactory), PaymentModule(wc.paymentModule), MandateModule(address(0)), c
+        );
 
         TazorAccount company = TazorAccount(payable(account));
         assertEq(company.threshold(), 2);
@@ -169,16 +175,42 @@ contract DeployTest is Test {
         PaymentModule.Config memory cfg = PaymentModule(wc.paymentModule).configOf(account);
         assertEq(cfg.registry, address(0xE45));
         assertEq(cfg.twoApproverThreshold, 5e6);
-        assertEq(cc.create(pk, TazorAccountFactory(wc.tazorAccountFactory), PaymentModule(wc.paymentModule), c), account);
+        assertEq(
+            cc.create(
+                pk, TazorAccountFactory(wc.tazorAccountFactory), PaymentModule(wc.paymentModule), MandateModule(address(0)), c
+            ),
+            account
+        );
+        assertFalse(company.isModuleInstalled(MODULE_TYPE_EXECUTOR, wc.mandateModule, ""));
+
+        // with EXECUTORS=payment,mandate
+        c.salt = keccak256("acme-mandate");
+        address withMandate = cc.create(
+            pk,
+            TazorAccountFactory(wc.tazorAccountFactory),
+            PaymentModule(wc.paymentModule),
+            MandateModule(wc.mandateModule),
+            c
+        );
+        assertTrue(TazorAccount(payable(withMandate)).isModuleInstalled(MODULE_TYPE_EXECUTOR, wc.paymentModule, ""));
+        assertTrue(TazorAccount(payable(withMandate)).isModuleInstalled(MODULE_TYPE_EXECUTOR, wc.mandateModule, ""));
+        assertEq(PaymentModule(wc.paymentModule).registryOf(withMandate), address(0xE45));
     }
 
-    /// Merges into a copy (under the gitignored cache dir) of the current deployments file and checks every pre-existing key is unchanged.
+    /// Merges into a copy (under the gitignored cache dir) of the current deployments file, minus the keys this
+    /// script owns (those differ for the test deployer), and checks every other key is unchanged.
     function test_deploymentsMergeKeepsExistingKeys() public {
-        string memory original = vm.readFile(string.concat(vm.projectRoot(), "/deployments/1874.json"));
+        string memory current = vm.readFile(string.concat(vm.projectRoot(), "/deployments/1874.json"));
         string memory dir = string.concat(vm.projectRoot(), "/cache/deploy-test");
         vm.createDir(dir, true);
         string memory file = string.concat(dir, "/1874.json");
-        vm.writeFile(file, original);
+        vm.writeFile(file, "{}");
+        string[] memory keys = vm.parseJsonKeys(current, "$");
+        for (uint256 i; i < keys.length; i++) {
+            if (_scriptOwned(keys[i])) continue;
+            _copyKey(current, file, keys[i]);
+        }
+        string memory original = vm.readFile(file);
 
         TazorDeployLib.Params memory p = _params();
         if (vm.keyExistsJson(original, ".RoleCache")) p.roleCache = vm.parseJsonAddress(original, ".RoleCache");
@@ -188,12 +220,13 @@ contract DeployTest is Test {
         TazorDeployLib.Addresses memory a = dw.deploy(pk, p);
 
         string memory merged = vm.readFile(file);
-        string[] memory keys = vm.parseJsonKeys(original, "$");
+        keys = vm.parseJsonKeys(original, "$");
         for (uint256 i; i < keys.length; i++) {
             string memory k = string.concat(".", keys[i]);
             assertEq(vm.parseJson(merged, k), vm.parseJson(original, k), keys[i]);
         }
         assertEq(vm.parseJsonAddress(merged, ".PaymentModule"), a.paymentModule);
+        assertEq(vm.parseJsonAddress(merged, ".MandateModule"), a.mandateModule);
         assertEq(vm.parseJsonAddress(merged, ".EnsGateAlias"), a.ensGateAlias);
         assertEq(vm.parseJsonAddress(merged, ".TazorAccountFactory"), a.tazorAccountFactory);
         assertEq(vm.parseJsonAddress(merged, ".RoleCache"), p.roleCache);
@@ -204,5 +237,27 @@ contract DeployTest is Test {
         vm.expectRevert("deployments key differs: PolicyHook");
         dw.deploy(pk, p);
         vm.removeFile(file);
+    }
+
+    function _scriptOwned(string memory key) internal pure returns (bool) {
+        bytes32 k = keccak256(bytes(key));
+        return k == keccak256("PolicyHook") || k == keccak256("ApproverAccountFactory")
+            || k == keccak256("WebAuthnVerifier") || k == keccak256("TazorAccountFactory")
+            || k == keccak256("PaymentModule") || k == keccak256("RevocationList") || k == keccak256("MandateModule")
+            || k == keccak256("EnsGateAlias");
+    }
+
+    /// Copies a flat value (address, number or string) from `json` into `file`.
+    function _copyKey(string memory json, string memory file, string memory key) internal {
+        string memory k = string.concat(".", key);
+        try vm.parseJsonAddress(json, k) returns (address a) {
+            vm.writeJson(string.concat('"', vm.toString(a), '"'), file, k);
+            return;
+        } catch {}
+        try vm.parseJsonUint(json, k) returns (uint256 u) {
+            vm.writeJson(vm.toString(u), file, k);
+            return;
+        } catch {}
+        vm.writeJson(string.concat('"', vm.parseJsonString(json, k), '"'), file, k);
     }
 }
