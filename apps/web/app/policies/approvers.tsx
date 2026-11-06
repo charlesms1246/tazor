@@ -5,6 +5,7 @@ import { getAddress, isAddress, type Address } from 'viem';
 import { L1_BLOCK, adminSigners, approverFlags, readApprovers, roleNames, uniqueAddresses, type ApproverView } from '@/lib/people.ts';
 import { rpc } from '@/lib/rpc.ts';
 import { Card, Field, Notice, Pill } from '../_ui/index.tsx';
+import { NameChip } from '../_readable/index.tsx';
 
 const KEY = (account: Address) => `tazor.approvers.${account.toLowerCase()}`;
 const loadKnown = (account: Address): Address[] => { try { return JSON.parse(localStorage.getItem(KEY(account)) ?? '[]'); } catch { return []; } };
@@ -47,7 +48,7 @@ export function ApproversPanel({ account, registry, revocationList }: { account:
   return (
     <Card
       title="Approvers"
-      subtitle={<>Whitechain vs ENS. Admins come from the account&apos;s signers; ENS roles are read live from Ethereum Sepolia (registry <span className="mono break">{registry}</span>).</>}
+      subtitle={<>Whitechain vs ENS. Admins come from the account&apos;s signers; ENS roles are read live from Ethereum Sepolia (registry <NameChip address={registry} link={false} />).</>}
       actions={<button className="btn btn-sm" data-testid="approvers-refresh" onClick={() => void load()}>Refresh</button>}
       flush
     >
@@ -58,7 +59,7 @@ export function ApproversPanel({ account, registry, revocationList }: { account:
             const flags = approverFlags(r);
             return (
               <tr key={r.approver} data-testid={`approver-${r.approver.toLowerCase()}`}>
-                <td><span className="mono break">{r.approver}</span>{r.admin && <span className="cell-sub"> (admin signer)</span>}</td>
+                <td><NameChip address={r.approver} />{r.admin && <span className="cell-sub"> (admin signer)</span>}</td>
                 <td>{r.revoked === null ? <Pill>unknown</Pill> : r.revoked ? <Pill tone="negative">revoked</Pill> : <Pill tone="positive">active</Pill>}</td>
                 <td>{r.cached === null ? <span className="faint">unknown</span> : <>{roleNames(r.cached)}<span className="cell-sub">{r.cachedAt ? ` (L1 block ${r.cachedAt}${l1 !== null ? `, ${l1 - r.cachedAt} blocks old` : ''})` : ' (never synced)'}</span></>}</td>
                 <td>{r.ens === null ? <span className="faint">unknown</span> : roleNames(r.ens)}</td>

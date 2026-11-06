@@ -7,6 +7,7 @@ import { eventsFor } from '@/lib/events.ts';
 import { agoText, roleList, type Person } from '@/lib/people.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { Addr, Pill } from '../_ui/index.tsx';
+import { TechDetails } from '../_readable/index.tsx';
 import { Timeline } from '../_ui/timeline.tsx';
 import { BackupSigner } from './backup.tsx';
 import { RemovePerson } from './remove.tsx';
@@ -48,7 +49,7 @@ export function PersonDrawer({ person, account, ens, registry, onClose, sync }: 
         <div className="drawer-head">
           <div>
             <h2>{person.label}</h2>
-            <div style={{ marginTop: 4 }}><Addr value={person.address} href={`${config.explorer}/address/${person.address}`} full /></div>
+            <div style={{ marginTop: 4 }} data-testid="person-address" data-value={person.address}><Addr value={person.address} href={`${config.explorer}/address/${person.address}`} /></div>
           </div>
           <button ref={closeRef} className="btn btn-sm btn-ghost" data-testid="drawer-close" onClick={onClose} aria-label="Close">Close</button>
         </div>
@@ -62,18 +63,24 @@ export function PersonDrawer({ person, account, ens, registry, onClose, sync }: 
             <div className="well">
               <div className="small faint">ENS (source of truth)</div>
               <div className="row" style={{ marginTop: 6 }}>{ensRoles.length ? ensRoles.join(', ') : 'none'}</div>
-              <div className="mono small break" style={{ marginTop: 6 }} data-testid="person-ens-bitmap">{bitmap(person.ensBits)}</div>
               <div className="small faint" style={{ marginTop: 6 }}>Read live from Ethereum Sepolia</div>
             </div>
             <div className="well">
               <div className="small faint">Whitechain role cache</div>
               <div className="row" style={{ marginTop: 6 }}>{cacheRoles.length ? cacheRoles.join(', ') : 'none'}</div>
-              <div className="mono small break" style={{ marginTop: 6 }} data-testid="person-cache-bitmap">{bitmap(person.cacheBits)}</div>
               <div className="small faint" style={{ marginTop: 6 }}>
                 {person.cachedAt ? <>L1 block {person.cachedAt.toLocaleString('en-US')}{person.cacheAgeSec !== undefined && <> · {agoText(person.cacheAgeSec)}</>}</> : 'Never synced'}
               </div>
             </div>
           </div>
+
+          <TechDetails>
+            <dl className="kv">
+              <dt>Address</dt><dd><code className="break small">{person.address}</code></dd>
+              <dt>ENS role bitmap</dt><dd className="mono small" data-testid="person-ens-bitmap">{bitmap(person.ensBits)}</dd>
+              <dt>Whitechain cache bitmap</dt><dd className="mono small" data-testid="person-cache-bitmap">{bitmap(person.cacheBits)}</dd>
+            </dl>
+          </TechDetails>
 
           <section className="drawer-section">
             <h3>Role sync</h3>

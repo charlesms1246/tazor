@@ -16,13 +16,18 @@ import { mergeApprovals, parseApprovals, serializeApproval, type Approval } from
 import { ethCall } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { sendOnWhitechain } from '@/lib/wallet-wc.ts';
-import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Card, CopyButton, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { NameChip, TechDetails } from '../_readable/index.tsx';
+import { dayText, shortRef, usdtText } from '@/lib/readable.ts';
 import { Timeline } from '../_ui/timeline.tsx';
 import { recordEvent } from '@/lib/events.ts';
 import { usdt2dp } from '@/lib/export.ts';
 
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
-const Amount = ({ v }: { v: bigint }) => <><span className="num">{formatUnits(v, 6)}</span> <span className="faint">USDT</span></>;
+const usdt = usdtText;
+const Amount = ({ v }: { v: bigint }) => <><span className="num">{usdtText(v).replace(' USDT', '')}</span> <span className="faint">USDT</span></>;
+/** "Claim on INV-20261106-AB12 · 0.40 USDT due 13 Nov · #a1b2c3" */
+const claimTitle = (invoice: string | null, amount: bigint, due: bigint, id: bigint) =>
+  `Claim on ${invoice ?? 'this invoice'} · ${usdt(amount)} due ${dayText(due)} · ${shortRef(id)}`;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const ZERO = '0x0000000000000000000000000000000000000000';
 
@@ -35,14 +40,15 @@ function Txs({ txs, id, onSent }: { txs: Tx[]; id: string; onSent?: (t: Tx, hash
     <div className="stack" data-testid={`${id}-out`}>
       {txs.map((t, i) => (
         <div key={i} className="well stack">
-          <div>
-            <p className="small muted"><span style={{ fontWeight: 500, color: 'var(--text)' }}>{t.label}</span>: to <span className="mono break">{t.to}</span> on Whitechain Sepolia</p>
+          <p className="small"><span style={{ fontWeight: 500 }}>{t.label}</span>: ready to send on Whitechain Sepolia</p>
+          <TechDetails>
+            <p className="small muted">To <span className="mono break">{t.to}</span>:</p>
             <code className="break small" data-testid={`${id}-calldata-${i}`}>{t.data}</code>
-          </div>
+          </TechDetails>
           <div className="row">
             <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: t.to, data: t.data })).catch(() => undefined)}>Copy calldata</button>
             <button className="btn btn-sm" onClick={() => sendOnWhitechain(t.to, t.data).then((h) => { setHashes({ ...hashes, [i]: h }); onSent?.(t, h); }, (e) => setErr(msg(e)))}>Send with your wallet</button>
-            {hashes[i] && <Addr value={hashes[i]} href={`${config.explorer}/tx/${hashes[i]}`} />}
+            {hashes[i] && <a href={`${config.explorer}/tx/${hashes[i]}`} target="_blank" rel="noreferrer" data-value={hashes[i]}>View transaction ↗</a>}
           </div>
         </div>
       ))}
@@ -53,6 +59,7 @@ function Txs({ txs, id, onSent }: { txs: Tx[]; id: string; onSent?: (t: Tx, hash
 
 function Commit({ fm }: { fm: Address }) {
   const [link, setLink] = useState('');
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [f, setF] = useState({ invoiceHash: '', account: '', holder: '', amount: '', due: '' });
   const [prepared, setPrepared] = useState<{ fi: FinancedInvoice; digest: Hex } | null>(null);
   const [mine, setMine] = useState<Approval | null>(null);
@@ -70,6 +77,7 @@ function Commit({ fm }: { fm: Address }) {
 
   const onLink = run(async () => {
     const inv = await decodeInvoiceLink(link);
+    setInvoiceId(inv.id);
     setF({
       ...f, invoiceHash: invoiceHash(inv), account: inv.buyerAccount, holder: inv.supplierAccount,
       amount: formatUnits(inv.amount, 6), due: new Date(inv.dueDate * 1000).toISOString().slice(0, 16),
@@ -87,7 +95,7 @@ function Commit({ fm }: { fm: Address }) {
     };
     const local = financedDigest(fi, { chainId: config.chainId, verifyingContract: fm });
     const onchain = decodeFinancedDigest(await ethCall(fm, encodeFinancedDigest(fi)));
-    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: contract digest ${onchain} differs from ${local}.`);
+    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error('Refusing to sign: the contract describes a different claim than this page.');
     setPrepared({ fi, digest: local });
     setMine(null); setOut(null);
   });
@@ -138,10 +146,20 @@ function Commit({ fm }: { fm: Address }) {
         <div><button className={`btn${primary === 'prepare' ? ' btn-primary' : ''}`} data-testid="fin-prepare" onClick={onPrepare} disabled={busy}>Prepare</button></div>
         {prepared && (
           <div className="well stack">
-            <p className="small muted">Claim id <code className="break" data-testid="fin-claim-id">{claimId(prepared.digest).toString()}</code></p>
-            <p className="small muted">Digest matches the contract: <code className="break" data-testid="fin-digest">{prepared.digest}</code></p>
+            <p className="small muted" data-testid="fin-summary" data-value={claimId(prepared.digest).toString()}>
+              ✓ The contract agrees: {claimTitle(invoiceId, prepared.fi.amount, prepared.fi.dueDate, claimId(prepared.digest))}, paid to <NameChip address={prepared.fi.holder} link={false} />.
+            </p>
             <div><button className={`btn${primary === 'approve' ? ' btn-primary' : ''}`} data-testid="fin-approve" onClick={onApprove} disabled={busy}>Approve with passkey</button></div>
-            {mine && <p className="small">Your approval: <code className="break">{serializeApproval(mine)}</code></p>}
+            {mine && <p className="small row" style={{ gap: 6 }}>Your approval is ready. If a second approver is needed, send them your approval: <CopyButton value={serializeApproval(mine)} label="Copy approval" /></p>}
+            <TechDetails>
+              <dl className="kv">
+                <dt>Claim id</dt><dd><code className="break small" data-testid="fin-claim-id">{claimId(prepared.digest).toString()}</code></dd>
+                <dt>Digest</dt><dd><code className="break small" data-testid="fin-digest">{prepared.digest}</code></dd>
+                <dt>Invoice hash</dt><dd><code className="break small">{prepared.fi.invoiceHash}</code></dd>
+                <dt>Nonce</dt><dd className="mono">{prepared.fi.nonce.toString()}</dd>
+              </dl>
+              {mine && <><p className="small muted">Your approval (JSON)</p><code className="break small">{serializeApproval(mine)}</code></>}
+            </TechDetails>
             <Field label="Approvals from other approvers" hint="Paste the JSON a second approver sends you, if needed.">
               <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
             </Field>
@@ -174,14 +192,13 @@ function Claim({ fm }: { fm: Address }) {
     } catch (e) { setView(null); setError(msg(e)); }
   };
   const due = view ? Number(view.due) * 1000 <= Date.now() : false;
-  const short = (v: bigint) => { const t = v.toString(); return t.length > 10 ? `${t.slice(0, 6)}…${t.slice(-4)}` : t; };
   const onSent = (t: Tx, hash: Hex) => {
     if (!view) return;
     const subject = `claim:${view.id.toString()}`;
     if (t.label.startsWith('buy')) {
-      recordEvent({ subject, kind: 'financed', at: Date.now(), title: `Invoice claim #${short(view.id)} bought by a financier for ${usdt2dp(view.price)} USDT`, tx: hash, chain: 'whitechain' });
+      recordEvent({ subject, kind: 'financed', at: Date.now(), title: `Invoice claim ${shortRef(view.id)} bought by a financier for ${usdt2dp(view.price)} USDT`, tx: hash, chain: 'whitechain' });
     } else if (t.label.startsWith('settle')) {
-      recordEvent({ subject, kind: 'settled', at: Date.now(), title: `Invoice claim #${short(view.id)} settled: ${usdt2dp(view.amount)} USDT paid to the holder`, tx: hash, chain: 'whitechain' });
+      recordEvent({ subject, kind: 'settled', at: Date.now(), title: `Invoice claim ${shortRef(view.id)} settled: ${usdt2dp(view.amount)} USDT paid to the holder`, tx: hash, chain: 'whitechain' });
     }
   };
 
@@ -198,10 +215,11 @@ function Claim({ fm }: { fm: Address }) {
           ? <div className="empty" data-testid="claim-none">No open claim with this id (never committed, or already settled).</div>
           : (
             <dl className="kv" data-testid="claim">
-              <dt>Holder</dt><dd className="mono" data-testid="claim-owner">{view.owner}</dd>
-              <dt>Payer account</dt><dd className="mono">{view.account}</dd>
+              <dt>Claim</dt><dd>{claimTitle(null, view.amount, view.due, view.id)}</dd>
+              <dt>Holder</dt><dd>{view.owner ? <NameChip address={view.owner} testId="claim-owner" /> : <span className="faint" data-testid="claim-owner">none</span>}</dd>
+              <dt>Payer</dt><dd><NameChip address={view.account} /></dd>
               <dt>Face value</dt><dd data-testid="claim-amount"><Amount v={view.amount} /></dd>
-              <dt>Due</dt><dd className="num">{new Date(Number(view.due) * 1000).toISOString()} {due && <Pill tone="warning">due</Pill>}</dd>
+              <dt>Due</dt><dd className="num">{dayText(view.due)} {due && <Pill tone="warning">due</Pill>}</dd>
               <dt>Listed at</dt><dd data-testid="claim-price">{view.price === 0n ? <span className="faint">not listed</span> : <Amount v={view.price} />}</dd>
             </dl>
           ))}

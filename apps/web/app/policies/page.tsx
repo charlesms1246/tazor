@@ -16,6 +16,8 @@ import { sendOnWhitechain } from '@/lib/wallet-wc.ts';
 import { decodeFunctionResult, encodeFunctionData, parseAbi } from 'viem';
 import { ApproversPanel } from './approvers.tsx';
 import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { NameChip, TechDetails, nameFor } from '../_readable/index.tsx';
+import { shortAddress, usdtText } from '@/lib/readable.ts';
 
 const registryAbi = parseAbi(['function registryOf(address account) view returns (address)']);
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
@@ -29,7 +31,7 @@ async function v1Registry(account: Address): Promise<Address | null> {
   }
 }
 
-const Amount = ({ v }: { v: bigint }) => <><span className="num">{formatUnits(v, 6)}</span> <span className="faint">USDT</span></>;
+const Amount = ({ v }: { v: bigint }) => <><span className="num">{usdtText(v).replace(' USDT', '')}</span> <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const nowS = () => BigInt(Math.floor(Date.now() / 1000));
 const PAYEES_KEY = (account: Address) => `tazor.v2.payees.${account.toLowerCase()}`;
@@ -52,16 +54,17 @@ function Calldata({ p, id }: { p: Prepared; id: string }) {
   const [err, setErr] = useState('');
   return (
     <div className="well stack" data-testid={`${id}-out`}>
-      {p.digest && <p className="small muted">Signed digest (matches the contract): <code className="break" data-testid={`${id}-digest`}>{p.digest}</code></p>}
-      <div>
-        <p className="small muted">To <span className="mono break">{p.to}</span> on Whitechain Sepolia. Anyone can send it.</p>
+      <p className="small">{p.digest ? '✓ Signed, and the contract agrees with this change. ' : ''}Ready to send on Whitechain Sepolia; anyone can send it.</p>
+      <TechDetails>
+        {p.digest && <p className="small muted">Signed digest: <code className="break" data-testid={`${id}-digest`}>{p.digest}</code></p>}
+        <p className="small muted">To <span className="mono break">{p.to}</span>:</p>
         <code className="break small" data-testid={`${id}-calldata`}>{p.data}</code>
-      </div>
+      </TechDetails>
       <div className="row">
         <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: p.to, data: p.data })).catch(() => undefined)}>Copy calldata</button>
         <button className="btn btn-sm" onClick={() => sendOnWhitechain(p.to, p.data).then(setHash, (e) => setErr(msg(e)))}>Send with your wallet</button>
       </div>
-      {hash && <p className="small">Sent: <a className="mono break" href={`${config.explorer}/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a></p>}
+      {hash && <p className="small">Sent: <a href={`${config.explorer}/tx/${hash}`} target="_blank" rel="noreferrer" data-value={hash}>View transaction ↗</a></p>}
       {err && <Notice tone="negative">{err}</Notice>}
     </div>
   );
@@ -73,7 +76,7 @@ async function signPolicy(pm: Address, m: PolicyMessage): Promise<Prepared> {
   if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
   const local = policyDigest(m, { chainId: config.chainId, verifyingContract: pm });
   const onchain = decodeTypedDigest(await ethCall(pm, encodeTypedDigest(policyStructHash(m))));
-  if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: contract digest ${onchain} differs from ${local}.`);
+  if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error('Refusing to sign: the contract describes a different change than this page.');
   const sig = await signDigestWithPasskey(key.credentialId, local, key);
   return { to: pm, data: encodePolicyCall(m, key.approverAccount, sig), digest: local };
 }
@@ -161,7 +164,7 @@ export default function PoliciesPage() {
           </Field>
           {loadError && <Notice tone="negative"><span data-testid="load-error">{loadError}</span></Notice>}
           {v1 && (
-            <Notice tone="info"><span data-testid="v1-account">v1 company (PaymentModule <span className="mono break">{config.paymentModule}</span>): limits and payee rules are v2 features; showing approvers only.</span></Notice>
+            <Notice tone="info"><span data-testid="v1-account" data-value={config.paymentModule}>Older (v1) company: limits and payee rules need a v2 company, so only approvers are shown.</span></Notice>
           )}
         </div>
       </Card>
@@ -172,7 +175,7 @@ export default function PoliciesPage() {
         <>
           <Card title="Limits and rules" subtitle="Checked on every payment from this account.">
             <dl className="kv" data-testid="config">
-              <dt>ENS registry</dt><dd className="mono">{cfg.registry}</dd>
+              <dt>ENS registry</dt><dd><NameChip address={cfg.registry} link={false} /></dd>
               <dt>Two approvers above</dt><dd data-testid="cfg-two"><Amount v={cfg.twoApproverThreshold} /></dd>
               <dt>Per-payment limit</dt><dd data-testid="cfg-per-payment"><Amount v={cfg.perPaymentLimit} /></dd>
               <dt>30-day limit</dt>
@@ -181,7 +184,7 @@ export default function PoliciesPage() {
               <dt>Fresh ENS proof above</dt><dd data-testid="cfg-fresh"><Amount v={cfg.freshThreshold} /> <span className="muted">(roles cached within {cfg.maxCacheAge} L1 blocks)</span></dd>
               <dt>Agent 30-day cap</dt>
               <dd data-testid="cfg-agent"><Amount v={cfg.agentMonthlyCap} />{win && <span className="muted"> (available now: <span data-testid="win-agent"><Amount v={win[1]} /></span>)</span>}</dd>
-              <dt>Exit accounts</dt><dd data-testid="cfg-exits"><span className="mono">{cfg.exitAccounts.join(', ') || 'none'}</span> <span className="muted">(delay {cfg.exitDelay} s)</span></dd>
+              <dt>Exit accounts</dt><dd data-testid="cfg-exits" data-value={cfg.exitAccounts.join(',')}>{cfg.exitAccounts.length ? cfg.exitAccounts.map((a) => <NameChip key={a} address={a} />) : 'none'} <span className="muted">(delay {cfg.exitDelay} s)</span></dd>
             </dl>
           </Card>
 
@@ -195,7 +198,7 @@ export default function PoliciesPage() {
                       const from = Number(p.addedAt) + cfg.payeeDelay;
                       return (
                         <tr key={p.payee}>
-                          <td className="mono break">{p.payee}</td>
+                          <td><NameChip address={p.payee} /></td>
                           <td>{p.addedAt === 0n ? <Pill>not added</Pill> : now >= from ? <Pill tone="positive">allowed</Pill> : <Pill tone="warning">{`allowed in ${from - now} s`}</Pill>}</td>
                         </tr>
                       );
@@ -263,13 +266,13 @@ export default function PoliciesPage() {
           <Card title="Time-locked exit" subtitle={`Moves the whole USDT balance to one of the company's own exit accounts after ${cfg.exitDelay} s. Any valid approver can cancel it before then.`}>
             <div className="fields">
               {hasExit ? (
-                <Notice tone="warning"><span data-testid="exit-status">Exit pending to <span className="mono break">{exit![0]}</span>: {now >= Number(exit![1])
+                <Notice tone="warning"><span data-testid="exit-status">Exit pending to <NameChip address={exit![0]} />: {now >= Number(exit![1])
                   ? 'executable now'
                   : <>executable in <span className="num" data-testid="exit-countdown">{Number(exit![1]) - now}</span> s</>}</span></Notice>
               ) : <p className="muted" data-testid="exit-status">No exit pending.</p>}
               <Field label="Exit account">
-                <select className="select mono" data-testid="exit-index" value={exitIndex} onChange={(e) => setExitIndex(Number(e.target.value))}>
-                  {cfg.exitAccounts.map((a, i) => <option key={a} value={i}>{a}</option>)}
+                <select className="select" data-testid="exit-index" value={exitIndex} onChange={(e) => setExitIndex(Number(e.target.value))}>
+                  {cfg.exitAccounts.map((a, i) => <option key={a} value={i} data-value={a}>{nameFor(a) ?? shortAddress(a)}</option>)}
                 </select>
               </Field>
               <div className="row">
