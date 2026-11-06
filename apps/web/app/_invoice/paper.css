@@ -1,0 +1,121 @@
+.invoice-paper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  aspect-ratio: 1 / 1.414;
+  padding: 48px 44px 36px;
+  background: #ffffff;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(8, 10, 40, 0.06), 0 12px 32px rgba(8, 10, 40, 0.08);
+  overflow: hidden;
+}
+.invoice-paper .ip-mono { font-family: var(--mono); font-size: 11.5px; }
+.invoice-paper .ip-faint { color: var(--muted); opacity: 0.75; }
+.invoice-paper .ip-label { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.invoice-paper .ip-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ip-stamp {
+  position: absolute; top: 26px; right: 22px;
+  padding: 4px 12px;
+  border: 3px solid currentColor; border-radius: 6px;
+  font-size: 18px; font-weight: 800; letter-spacing: 0.14em;
+  transform: rotate(12deg);
+  pointer-events: none;
+}
+.ip-stamp-draft { color: var(--muted); opacity: 0.7; }
+.ip-stamp-sent { color: var(--wc-blue); }
+.ip-stamp-paid { color: var(--positive); border-color: var(--wc-mint); }
+
+.ip-head { display: flex; justify-content: space-between; gap: 24px; padding-right: 96px; }
+.ip-brand { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ip-logo { max-width: 160px; max-height: 56px; object-fit: contain; object-position: left center; }
+.ip-monogram {
+  width: 48px; height: 48px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--wc-navy); color: var(--wc-lime);
+  font-weight: 700; font-size: 18px; letter-spacing: 0.02em;
+}
+.ip-supplier { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.ip-title { text-align: right; flex-shrink: 0; }
+.ip-word { font-size: 26px; font-weight: 800; letter-spacing: 0.18em; color: var(--wc-navy); }
+.ip-meta { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 8px 0 0; justify-content: end; }
+.ip-meta dt { color: var(--muted); }
+.ip-meta dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 500; }
+
+.ip-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.ip-party { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ip-party-name { font-weight: 600; }
+
+.ip-lines { width: 100%; border-collapse: collapse; }
+.ip-lines th { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: left; padding: 0 0 8px; border-bottom: 2px solid var(--wc-navy); }
+.ip-lines th.ip-n { text-align: right; }
+.ip-lines td { padding: 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.ip-lines th + th, .ip-lines td + td { padding-left: 16px; }
+
+.ip-sums { display: flex; flex-direction: column; gap: 6px; margin-left: auto; width: min(100%, 300px); }
+.ip-sum { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); }
+.ip-due { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-top: 6px; padding-top: 10px; border-top: 2px solid var(--wc-navy); font-weight: 600; }
+.ip-due .ip-n { font-size: 22px; font-weight: 700; }
+.ip-unit { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+.ip-pay { display: flex; gap: 20px; align-items: flex-end; margin-top: auto; }
+.ip-qr-wrap { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.ip-qr { width: 132px; height: 132px; display: block; }
+.ip-qr-bg { fill: #ffffff; }
+.ip-qr-fg { fill: var(--wc-navy); }
+.ip-qr-box {
+  width: 132px; height: 132px; display: grid; place-items: center; text-align: center;
+  padding: 12px; border: 1.5px dashed var(--border); border-radius: 8px; font-size: 11.5px;
+}
+.ip-pay-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ip-link { color: var(--muted); font-size: 9.5px; line-height: 1.35; overflow-wrap: anywhere; max-height: 5.4em; overflow: hidden; }
+.ip-paid { color: var(--positive); font-weight: 600; }
+.ip-paid a { color: inherit; }
+
+.ip-foot { display: flex; flex-wrap: wrap; gap: 8px 20px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--text); font-size: 12px; }
+.ip-foot .ip-label { margin-right: 4px; }
+.ip-foot-note { margin-left: auto; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .invoice-paper { aspect-ratio: auto; padding: 28px 20px 24px; gap: 22px; }
+  .ip-head { flex-direction: column; padding-right: 72px; }
+  .ip-title { text-align: left; }
+  .ip-meta { justify-content: start; }
+  .ip-stamp { top: 18px; right: 14px; font-size: 14px; }
+  .ip-parties { grid-template-columns: 1fr; gap: 12px; }
+  .ip-pay { flex-direction: column; align-items: flex-start; }
+  .ip-foot-note { margin-left: 0; }
+}
+
+/* page layouts that hold the sheet */
+.inv-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; align-items: start; }
+.pay-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.paper-sticky { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; }
+.paper-toggle { display: none; }
+.tech-details > summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
+.tech-details[open] > summary { margin-bottom: 12px; }
+@media (max-width: 900px) {
+  .inv-split, .pay-split { grid-template-columns: minmax(0, 1fr); }
+  .paper-sticky { position: static; }
+  .paper-toggle { display: flex; }
+  .paper-col[data-open="false"] { display: none; }
+}
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body *:not(:has(.invoice-paper)):not(.invoice-paper):not(.invoice-paper *) { display: none !important; }
+  *:has(.invoice-paper) {
+    display: block !important; position: static !important; margin: 0 !important; padding: 0 !important;
+    border: 0 !important; box-shadow: none !important; background: none !important;
+    width: auto !important; max-width: none !important; min-height: 0 !important; height: auto !important; overflow: visible !important;
+  }
+  .invoice-paper { box-shadow: none; border: 0; border-radius: 0; aspect-ratio: auto; min-height: 270mm; padding: 0; break-inside: avoid; }
+  .invoice-paper a { color: inherit; text-decoration: none; }
+}
