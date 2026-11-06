@@ -6,7 +6,7 @@
 .start-arrow { align-self: center; font-size: 20px; color: var(--faint); }
 .start-wallet-actions { gap: 8px; }
 .start-err { color: var(--negative); margin: -4px 0 0; }
-.start-link-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.start-link-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .start-share { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 12px; }
 .start-share .ip-qr { width: 132px; height: 132px; }
 .start-code { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }

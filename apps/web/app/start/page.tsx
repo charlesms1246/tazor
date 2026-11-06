@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getAddress, isAddress } from 'viem';
-import { buildPaylink, MAX_PAYLINK_USDT } from '@/lib/paylink.ts';
+import { buildPaylink, dueMs, isDueDate, MAX_PAYLINK_USDT } from '@/lib/paylink.ts';
+import { dueIn } from '@/lib/reminders.ts';
+import { ReminderButton } from '../_invoice/reminder.tsx';
 import {
   amountError, buttonSnippet, createDemoWallet, dashboardHref, DEMO_WEBHOOK_SECRET, loadDemoWallet, loadStart, newWebhookSecret, refError,
   reportsHref, saveStart, shipError, START_DEFAULTS, webhookConfig, webhookError, type StartForm,
@@ -37,8 +39,9 @@ export default function StartPage() {
   const name = f.name.trim() || 'Your business';
 
   const link = useMemo(() => (walletOk && !errs.amount && !errs.ref && origin
-    ? buildPaylink({ merchant: getAddress(wallet), amount: f.amount.trim(), ref: f.ref.trim(), name: f.name.trim() || undefined, ship: errs.ship ? undefined : f.shipAbove.trim() }, origin)
-    : ''), [walletOk, wallet, f.amount, f.ref, f.name, f.shipAbove, errs.amount, errs.ref, errs.ship, origin]);
+    ? buildPaylink({ merchant: getAddress(wallet), amount: f.amount.trim(), ref: f.ref.trim(), name: f.name.trim() || undefined, ship: errs.ship ? undefined : f.shipAbove.trim(), due: isDueDate(f.due) ? f.due : undefined }, origin)
+    : ''), [walletOk, wallet, f.amount, f.ref, f.name, f.shipAbove, f.due, errs.amount, errs.ref, errs.ship, origin]);
+  const due = isDueDate(f.due) ? dueIn(dueMs(f.due)) : null;
   const snippet = walletOk && origin
     ? buttonSnippet({ origin, merchant: wallet, shipAbove: errs.ship ? '100' : f.shipAbove.trim(), amount: errs.amount ? '10.00' : f.amount.trim(), ref: errs.ref ? 'ORDER-1001' : f.ref.trim(), demoWallet: true })
     : '';
@@ -102,6 +105,9 @@ export default function StartPage() {
           <div className="fields start-link-fields">
             <Field label="Amount (USDT)"><input className="input num" inputMode="decimal" data-testid="start-amount" value={f.amount} onChange={set('amount')} /></Field>
             <Field label="Order number"><input className="input" data-testid="start-ref" value={f.ref} onChange={set('ref')} maxLength={64} /></Field>
+            <Field label="Due date (optional)" hint="Shown to the customer; you can remind them when it gets close.">
+              <input className="input" type="date" data-testid="start-due" value={f.due} onChange={set('due')} />
+            </Field>
           </div>
           {(errs.amount || errs.ref) && <p className="small start-err" data-testid="start-link-error">{errs.amount ?? errs.ref}</p>}
           {link && (
@@ -109,10 +115,13 @@ export default function StartPage() {
               <Qr link={link} testId="start-qr" />
               <div className="stack" style={{ gap: 8 }}>
                 <b>{name}: {f.amount.trim()} USDT for order {f.ref.trim()}</b>
+                {due && <span className={`small due-${due.tone}`} data-testid="start-due-label">{due.text}</span>}
                 <div className="row">
                   <button type="button" className="btn btn-primary" data-testid="start-copy-link" data-link={link} onClick={() => copy(link, 'Payment link')}>Copy payment link</button>
                   <a className="btn" href={link} target="_blank" rel="noreferrer" data-testid="start-open-link">Open</a>
                 </div>
+                <ReminderButton remindKey={`paylink:${wallet}:${f.ref.trim()}`} from={name} what={`order ${f.ref.trim()}`} amount={f.amount.trim()}
+                  dueMs={isDueDate(f.due) ? dueMs(f.due) : null} link={link} />
                 <span className="small muted">Each order number gets its own receipt. Use a new one for every sale.</span>
               </div>
             </div>

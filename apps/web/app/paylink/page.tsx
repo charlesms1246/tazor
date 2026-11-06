@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { checkoutAddress, readyToShip } from '@/lib/checkout.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
-import { parsePaylink, receiptHref, shortAddress, type Paylink } from '@/lib/paylink.ts';
+import { dueMs, parsePaylink, receiptHref, shortAddress, type Paylink } from '@/lib/paylink.ts';
+import { dueIn } from '@/lib/reminders.ts';
 import './paylink.css';
 
 type Paid = { orderId: string; explorerUrl: string; method: string };
@@ -82,6 +83,13 @@ export default function PaylinkPage() {
             <p className="pl-amount" data-testid="pl-amount">{link.amount}<span>USDT</span></p>
             <dl className="pl-kv">
               <dt>Order</dt><dd data-testid="pl-ref">{link.ref}</dd>
+              {link.due && (() => {
+                const d = dueIn(dueMs(link.due));
+                const date = new Date(dueMs(link.due)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                return <><dt>Due</dt><dd data-testid="pl-due" data-tone={d.tone}>
+                  {d.tone === 'overdue' ? <><b className="pl-overdue">Overdue</b> · was due {date}</> : <>{date}<span className="pl-due-sub"> · {d.days === 0 ? 'today' : `in ${d.days} day${d.days === 1 ? '' : 's'}`}</span></>}
+                </dd></>;
+              })()}
               <dt>Paid to</dt><dd className="mono" data-testid="pl-merchant" data-value={link.merchant} title={link.merchant}>{shortAddress(link.merchant)}</dd>
               <dt>Network</dt><dd>Whitechain (USDT, no gas needed)</dd>
             </dl>

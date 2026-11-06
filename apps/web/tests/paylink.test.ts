@@ -8,7 +8,7 @@ const M = '0x6b4e065d08d2cc7723635c6df0cc5268c706cd93';
 
 test('paylink: parses m, a, ref, n, ship, d; defaults; round-trips through buildPaylink', () => {
   const r = parsePaylink(`?m=${M}&a=12.50&ref=INV-42&n=Chai%20%26%20Co&ship=50&d=60`);
-  assert.deepEqual(r, { ok: true, link: { merchant: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93', amount: '12.50', ref: 'INV-42', name: 'Chai & Co', shipAbove: '50', deadlineMinutes: 60 } });
+  assert.deepEqual(r, { ok: true, link: { merchant: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93', amount: '12.50', ref: 'INV-42', name: 'Chai & Co', shipAbove: '50', deadlineMinutes: 60, due: null } });
   const d = parsePaylink(`m=${M}&a=1&ref=A1`);
   assert.deepEqual(d.ok && [d.link.name, d.link.shipAbove, d.link.deadlineMinutes], ['This business', '100', 30]);
   const url = buildPaylink({ merchant: M, amount: '0.25', ref: 'Order #7 / table 3', name: 'Bluejay Cafe', ship: '100', deadlineMinutes: 45 }, 'https://taz0r.eth.limo');
@@ -38,4 +38,16 @@ test('public/tazor-pay.js is the same bundle as the merchant demo (run scripts/s
   const pub = readFileSync(join(here, 'public', 'tazor-pay.js'));
   const demo = readFileSync(join(here, '..', '..', 'examples', 'merchant-demo', 'tazor-pay.js'));
   assert.ok(pub.equals(demo), 'public/tazor-pay.js differs from examples/merchant-demo/tazor-pay.js');
+});
+
+test('paylink: an optional due date round-trips; invalid dates are dropped', async () => {
+  const { buildPaylink: build, parsePaylink: parse, isDueDate } = await import('../lib/paylink.ts');
+  const url = build({ merchant: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93', amount: '5', ref: 'A-1', due: '2026-11-20' }, 'https://x.example');
+  assert.ok(url.endsWith('&due=2026-11-20'));
+  const r = parse(new URL(url).search);
+  assert.equal(r.ok && r.link.due, '2026-11-20');
+  for (const bad of ['2026-02-30', '20-11-2026', 'tomorrow', '']) assert.equal(isDueDate(bad), false, bad);
+  const p = parse('?m=0x6B4E065d08D2cC7723635c6df0CC5268C706cD93&a=1&ref=x&due=2026-02-30');
+  assert.equal(p.ok && p.link.due, null);
+  assert.ok(!build({ merchant: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93', amount: '5', ref: 'A-1', due: 'soon' }, 'https://x.example').includes('due='));
 });

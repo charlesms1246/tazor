@@ -11,8 +11,8 @@ const WALLET_KEY = 'tazor.start.demo-wallet.v1';
 /** The shared demo relayer signs events for merchants without their own endpoint with this public test secret. */
 export const DEMO_WEBHOOK_SECRET = 'whsec_tazor_demo_test';
 
-export type StartForm = { name: string; wallet: string; shipAbove: string; webhook: string; amount: string; ref: string };
-export const START_DEFAULTS: StartForm = { name: '', wallet: '', shipAbove: '100', webhook: '', amount: '10.00', ref: 'ORDER-1001' };
+export type StartForm = { name: string; wallet: string; shipAbove: string; webhook: string; amount: string; ref: string; due: string };
+export const START_DEFAULTS: StartForm = { name: '', wallet: '', shipAbove: '100', webhook: '', amount: '10.00', ref: 'ORDER-1001', due: '' };
 
 const store = () => (typeof localStorage === 'undefined' ? null : localStorage);
 export function loadStart(): StartForm {

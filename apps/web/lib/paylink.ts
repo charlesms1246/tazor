@@ -11,6 +11,8 @@ export const DEFAULT_DEADLINE_MIN = 30;
 
 export type Paylink = {
   merchant: Address; amount: string; ref: string; name: string; shipAbove: string; deadlineMinutes: number;
+  /** The date the business asks to be paid by (YYYY-MM-DD), or null. Shown to the customer; the order itself does not expire on it. */
+  due: string | null;
 };
 export type PaylinkParse = { ok: true; link: Paylink } | { ok: false; error: string };
 
@@ -34,15 +36,23 @@ export function parsePaylink(search: string): PaylinkParse {
   const shipAbove = AMOUNT.test(ship) ? ship : DEFAULT_SHIP_ABOVE;
   const d = Number(clean(q.get('d')));
   const deadlineMinutes = Number.isInteger(d) && d >= 5 && d <= 1440 ? d : DEFAULT_DEADLINE_MIN;
-  return { ok: true, link: { merchant: getAddress(m), amount: a.replace(/^0+(?=\d)/, ''), ref, name, shipAbove, deadlineMinutes } };
+  const dueRaw = clean(q.get('due'));
+  const due = isDueDate(dueRaw) ? dueRaw : null;
+  return { ok: true, link: { merchant: getAddress(m), amount: a.replace(/^0+(?=\d)/, ''), ref, name, shipAbove, deadlineMinutes, due } };
 }
 
 /** The URL to share (WhatsApp, SMS, a QR on the counter); `origin` defaults to the current site. */
-export function buildPaylink(l: { merchant: string; amount: string; ref: string; name?: string; ship?: string; deadlineMinutes?: number }, origin = globalThis.location?.origin ?? ''): string {
+/** A due date as YYYY-MM-DD that is a real calendar day. */
+export const isDueDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+/** The due date as local-midnight ms (for "Due in N days"). */
+export const dueMs = (due: string) => { const [y, m, d] = due.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
+
+export function buildPaylink(l: { merchant: string; amount: string; ref: string; name?: string; ship?: string; deadlineMinutes?: number; due?: string }, origin = globalThis.location?.origin ?? ''): string {
   const q = new URLSearchParams({ m: l.merchant, a: l.amount, ref: l.ref });
   if (l.name) q.set('n', l.name);
   if (l.ship) q.set('ship', l.ship);
   if (l.deadlineMinutes) q.set('d', String(l.deadlineMinutes));
+  if (l.due && isDueDate(l.due)) q.set('due', l.due);
   return `${origin}/paylink/?${q.toString()}`;
 }
 

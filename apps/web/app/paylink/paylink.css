@@ -18,3 +18,5 @@
 .pl-error { border-radius: 14px; padding: 16px; background: var(--negative-bg, #fde8e8); color: var(--negative, #a3262a); font-size: 15px; line-height: 1.45; }
 .pl-foot { text-align: center; font-size: 12px; color: var(--muted, #5b6075); }
 .pl-foot a { color: inherit; }
+.pl-overdue { color: var(--negative); }
+.pl-due-sub { color: var(--muted); }
