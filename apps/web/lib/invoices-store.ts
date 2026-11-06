@@ -188,3 +188,48 @@ export function supplierAccountWarning(f: InvoiceForm, company: Party): string |
     ? `This is ${company.name}'s account; check the supplier account matches the payee's company.`
     : null;
 }
+
+// ---- "Fill with sample data": a realistic Bluejay → Acme invoice, small enough for the demo account to pay often
+
+const SAMPLE_LINES: [string, number][] = [
+  ['Road freight Mumbai → Pune, 20 ft container', 0.42],
+  ['Port handling, JNPT', 0.18],
+  ['Customs documentation', 0.12],
+  ['Cargo insurance (0.3 % of value)', 0.07],
+  ['Last-mile delivery, Pune MIDC', 0.21],
+  ['Warehouse storage, 3 days', 0.15],
+];
+
+/** A sample invoice from `supplier` to `buyer`: 2–3 freight lines totalling 0.5–1.5 USDT, GST 18 %, due in 14 days. */
+export function sampleInvoice(
+  supplier: { name: string; account: string }, buyer: { account: string }, now = new Date(), rand: () => number = Math.random,
+): { form: InvoiceForm; taxRate: string; taxLabel: string } {
+  const pool = [...SAMPLE_LINES];
+  const n = 2 + Math.floor(rand() * 2);
+  const lines: LineForm[] = [];
+  for (let i = 0; i < n; i++) {
+    const [description, price] = pool.splice(Math.floor(rand() * pool.length), 1)[0];
+    lines.push({ description, quantity: i === 0 ? String(1 + Math.floor(rand() * 2)) : '1', unitPrice: price.toFixed(2) });
+  }
+  // keep the subtotal inside 0.5–1.5 USDT
+  while (formTotal({ lines } as InvoiceForm) < 500_000n) lines[0] = { ...lines[0], quantity: String(Number(lines[0].quantity) + 1) };
+  while (formTotal({ lines } as InvoiceForm) > 1_500_000n && Number(lines[0].quantity) > 1) lines[0] = { ...lines[0], quantity: String(Number(lines[0].quantity) - 1) };
+  const due = new Date(now.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const po = `PO-${now.getUTCFullYear()}-${String(1000 + Math.floor(rand() * 9000))}`;
+  return {
+    form: { customer: buyer.account, payee: supplier.account, supplierName: supplier.name, supplierAccount: supplier.account, lines, dueDate: due, memo: po },
+    taxRate: '18', taxLabel: 'GST',
+  };
+}
+
+/** Unpaid invoices created on this device that can form one payment run: the buyer with the most of them, up to `max` links. */
+export function runCandidates(list: StoredInvoice[], payments: PaymentRecord[], max = 50): { buyer: Address; links: string[] } | null {
+  const byBuyer = new Map<string, StoredInvoice[]>();
+  for (const s of list) {
+    if (invoiceStatus(s.invoice, payments) === 'paid') continue;
+    const k = s.invoice.buyerAccount.toLowerCase();
+    byBuyer.set(k, [...(byBuyer.get(k) ?? []), s]);
+  }
+  const best = [...byBuyer.values()].sort((a, b) => b.length - a.length)[0];
+  return best ? { buyer: best[0].invoice.buyerAccount, links: best.slice(0, max).map((s) => s.link) } : null;
+}

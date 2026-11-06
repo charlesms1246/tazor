@@ -5,5 +5,9 @@
   .tz-touch .copy { position: relative; }
   .tz-touch .copy::after { content: ""; position: absolute; inset: -12px; }
   .tz-touch .row { row-gap: 8px; }
-  .tz-touch .inv-link-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  
 }
+
+/* the created link is shown on one line everywhere; Copy link and Open carry it */
+.inv-link-text { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.digest-line { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -38,7 +38,7 @@ const open = async (page: Page) => page.goto((await encodeInvoiceLink(invoice, '
 test('buyer sees the WhiteBIT badge when a supplier admin is a verified soul', async ({ page }) => {
   await mock(page, '0x0000000000000000000000000000000000000001');
   await open(page);
-  await expect(page.getByTestId('supplier-verified')).toHaveText('✓ Verified by WhiteBIT (simulated on testnet)');
+  await expect(page.getByTestId('supplier-verified')).toHaveText('✓ Verified by WhiteBIT · simulated');
 });
 
 test('buyer sees "Not verified" when no admin is verified', async ({ page }) => {

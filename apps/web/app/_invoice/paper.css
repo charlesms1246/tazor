@@ -75,7 +75,7 @@
   padding: 12px; border: 1.5px dashed var(--border); border-radius: 8px; font-size: 11.5px;
 }
 .ip-pay-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.ip-link { color: var(--muted); font-size: 9.5px; line-height: 1.35; overflow-wrap: anywhere; max-height: 5.4em; overflow: hidden; }
+.ip-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ip-paid { color: var(--positive); font-weight: 600; }
 .ip-paid a { color: inherit; }
 
@@ -83,7 +83,9 @@
 .ip-foot .ip-label { margin-right: 4px; }
 .ip-foot-note { margin-left: auto; color: var(--muted); }
 
-@media (max-width: 900px) {
+/* the sheet adapts to its own width (page column, drawer or phone), not the viewport */
+.paper-shell { container: paper / inline-size; min-width: 0; }
+@container paper (max-width: 600px) {
   .invoice-paper { aspect-ratio: auto; padding: 28px 20px 24px; gap: 22px; }
   .ip-head { flex-direction: column; padding-right: 72px; }
   .ip-title { text-align: left; }
@@ -96,7 +98,17 @@
 
 /* page layouts that hold the sheet */
 .inv-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; align-items: start; }
-.pay-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.pay-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 24px; align-items: start; }
+.inv-split > *, .pay-split > * { min-width: 0; }
+/* narrower content areas: one column; on /pay the approve card comes first so it stays above the fold */
+@media (max-width: 1200px) {
+  .inv-split { grid-template-columns: minmax(0, 1fr); }
+  .inv-split .paper-sticky { position: static; }
+}
+@media (max-width: 1100px) {
+  .pay-split { grid-template-columns: minmax(0, 1fr); }
+  .pay-split .pay-actions { order: -1; position: static; }
+}
 .paper-sticky { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; }
 .paper-toggle { display: none; }
 .tech-details > summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
@@ -107,6 +119,9 @@
   .paper-toggle { display: flex; }
   .paper-col[data-open="false"] { display: none; }
 }
+
+/* sample data */
+.sample-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px dashed var(--control); border-radius: var(--radius-inner); background: var(--raised); }
 
 /* QR scanner */
 .scan-modal {
@@ -158,8 +173,58 @@
   }
   .invoice-paper { box-shadow: none; border: 0; border-radius: 0; aspect-ratio: auto; min-height: 270mm; padding: 0; break-inside: avoid; }
   .invoice-paper a { color: inherit; text-decoration: none; }
+  .ip-actions { display: none !important; }
   .drawer-overlay, .drawer-head { display: none !important; }
   .paper-mini .invoice-paper { font-size: 13px; padding: 0; gap: 28px; }
   .paper-mini .ip-word { font-size: 26px; }
   .paper-mini .ip-qr, .paper-mini .ip-qr-box { width: 132px; height: 132px; }
+}
+
+/* /pay: guided steps and the success panel */
+.pay-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.pay-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border-radius: var(--radius-inner); border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-weight: 500; }
+.pay-step-n { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 999px; border: 2px solid var(--control); font-size: 13px; font-weight: 700; }
+.pay-step-label { min-width: 0; overflow-wrap: anywhere; line-height: 18px; }
+.pay-step[data-state="active"] { color: var(--text); border-color: var(--wc-blue); box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12); }
+.pay-step[data-state="active"] .pay-step-n { border-color: var(--wc-blue); color: var(--wc-blue); }
+.pay-step[data-state="done"] { color: var(--text); }
+.pay-step[data-state="done"] .pay-step-n { border-color: var(--positive); background: var(--positive); color: #ffffff; }
+.pay-step[data-state="error"] { color: var(--negative); border-color: #f2c4c0; }
+.pay-step[data-state="error"] .pay-step-n { border-color: var(--negative); background: var(--negative); color: #ffffff; }
+.pay-success {
+  display: flex; align-items: center; gap: 20px; padding: 20px var(--card-pad); border-radius: var(--radius-card);
+  background: var(--pill-positive-bg); border: 1px solid #b4ecd7;
+}
+.pay-success h2 { margin: 0 0 4px; font-size: 20px; line-height: 28px; }
+.pay-success p { margin: 0 0 12px; }
+.pay-success-body { min-width: 0; }
+.pay-success-check {
+  display: grid; place-items: center; flex: none; width: 64px; height: 64px; border-radius: 999px;
+  background: var(--positive); color: #ffffff; font-size: 34px; font-weight: 700;
+  animation: pay-pop 420ms cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.error-detail { display: block; margin-top: 4px; opacity: 0.8; overflow-wrap: anywhere; }
+@keyframes pay-pop { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pay-success-check { animation: none; } }
+@media (max-width: 900px) {
+  .pay-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pay-success { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; }
+  .pay-success-check { width: 52px; height: 52px; font-size: 28px; }
+}
+@media print { .pay-steps, .pay-success, .toasts { display: none !important; } }
+
+/* /pay: long labels wrap inside the narrow column; the contract digest stays on one line */
+.pill-wrap .pill { white-space: normal; height: auto; min-height: 22px; line-height: 16px; padding-top: 3px; padding-bottom: 3px; }
+.pay-actions .kv { grid-template-columns: minmax(64px, auto) minmax(0, 1fr); }
+.colleagues > summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
+.colleagues[open] > summary { margin-bottom: 8px; }
+.pay-more { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* invoice list tabs: a 2x2 grid on phones, never a sideways scroll */
+@media (max-width: 600px) {
+  .list-bar { padding: 0 16px; }
+  .list-bar .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; width: 100%; overflow: visible; }
+  .list-bar .tab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; white-space: normal; text-align: left; min-width: 0; }
+  .list-bar .tab .tab-count, .list-bar .tab .tab-sum { margin-left: 0; }
+  .list-search { width: 100%; }
 }

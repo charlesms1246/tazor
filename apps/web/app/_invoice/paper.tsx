@@ -8,6 +8,7 @@ import { config } from '@/lib/config.ts';
 import type { Invoice } from '@/lib/invoice.ts';
 import { splitTax, type TaxInfo } from '@/lib/invoices-store.ts';
 import './paper.css';
+import { toast } from './toast.tsx';
 
 export type PaperLine = { description: string; quantity: bigint | null; unitPrice: bigint | null };
 export type PaperInvoice = {
@@ -94,6 +95,7 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
   const supplier = p.supplierName.trim();
 
   return (
+    <div className="paper-shell">
     <article className="invoice-paper" data-testid="invoice-paper" data-status={status}>
       <div className={`ip-stamp ip-stamp-${status}`} data-testid="paper-stamp">{status.toUpperCase()}</div>
 
@@ -152,7 +154,15 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
           {status === 'paid' && (
             <div className="ip-paid">Paid{txHash && <> · <a className="ip-mono" href={`${config.explorer}/tx/${txHash}`} target="_blank" rel="noreferrer">{short(txHash)}</a></>}</div>
           )}
-          {link && <div className="ip-link ip-mono" data-testid="paper-link">{link}</div>}
+          {link && (
+            <div className="ip-actions">
+              <button
+                type="button" className="btn btn-sm" data-testid="paper-copy-link" data-link={link}
+                onClick={() => navigator.clipboard?.writeText(link).then(() => toast('Payment link copied'), () => toast('Could not copy; open the link instead', 'error'))}
+              >Copy payment link</button>
+              <a className="btn btn-sm btn-ghost" data-testid="paper-open-link" href={link} target="_blank" rel="noreferrer">Open</a>
+            </div>
+          )}
         </div>
       </section>
 
@@ -163,6 +173,7 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
         <div className="ip-foot-note">Approve with a passkey · settles in seconds</div>
       </footer>
     </article>
+    </div>
   );
 }
 

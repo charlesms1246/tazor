@@ -42,6 +42,31 @@ test('/pay/ for a v2 company signs for PaymentModuleV2 (domain v2) and builds pa
 
   await page.getByTestId('calldata').click();
   expect(decodeFunctionData({ abi: paymentModuleV2Abi, data: (await page.getByTestId('calldata-out').textContent()) as `0x${string}` }).functionName).toBe('payOne');
+
+  // Pay goes to the relayer's /pay, which routes a v2 company's payOne to PaymentModuleV2
+  const TX = `0x${'cd'.repeat(32)}`;
+  let relayed: { account?: string; auth?: { nonce?: string } } = {};
+  await page.route('http://relayer.test/pay', async (route) => {
+    relayed = route.request().postDataJSON();
+    await route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ txHash: TX, paymentModule: PM2, deployTxs: [] }) });
+  });
+  await page.route('https://rpc.testnet.whitechain.io/', async (route) => {
+    const { id, method } = route.request().postDataJSON();
+    const ok = (result: unknown) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id, result }) });
+    if (method === 'eth_getTransactionReceipt') return ok({ status: '0x1', blockNumber: '0x10', transactionHash: TX, logs: [] });
+    if (method === 'eth_getBlockByNumber') return ok({ number: '0x10', timestamp: '0x6a000000' });
+    return route.fallback();
+  });
+  await expect(page.getByTestId('pay-step-2')).toHaveAttribute('data-state', 'done');
   await page.getByTestId('pay').click();
-  await expect(page.getByTestId('error')).toContainText('v1 payments only');
+  await expect(page.getByTestId('tx')).toContainText(TX);
+  expect(getAddress(relayed.account!)).toBe(ACCOUNT);
+  expect(BigInt(relayed.auth!.nonce!)).toBe(nonce);
+  await expect(page.getByTestId('pay-success-amount')).toHaveText('Paid 1 USDT to Bluejay');
+  await expect(page.getByTestId('pay-success-time')).toContainText(/Settled on Whitechain in \d+\.\d s/);
+  await expect(page.getByTestId('pay-success-tx')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${TX}`);
+  for (const n of [1, 2, 3, 4]) await expect(page.getByTestId(`pay-step-${n}`)).toHaveAttribute('data-state', 'done');
+  await expect(page.getByTestId('paper-stamp')).toHaveText('PAID');
+  await expect(page.getByTestId('toast').filter({ hasText: 'Paid 1 USDT to Bluejay' })).toBeVisible();
+  await expect(page.getByTestId('pay-back')).toHaveAttribute('href', '/invoices/');
 });

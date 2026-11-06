@@ -67,7 +67,11 @@ test('/invoices/: after create the QR is drawn and the stamp says SENT; a row re
   await expect(paper.locator('svg[data-testid="paper-qr"]')).toBeVisible();
   await expect(paper.getByTestId('paper-qr-placeholder')).toHaveCount(0);
   await expect(paper.getByTestId('paper-number')).toHaveText(/^INV-\d{8}-[0-9A-F]{4}$/);
-  await expect(paper.getByTestId('paper-link')).toHaveText(await page.getByTestId('inv-link').textContent() ?? '');
+  // the paper shows the QR and a Copy payment link button (not the long link); the button carries the same link
+  const created = (await page.getByTestId('inv-link').textContent()) ?? '';
+  await expect(paper.getByTestId('paper-copy-link')).toHaveAttribute('data-link', created);
+  await expect(paper.getByTestId('paper-open-link')).toHaveAttribute('href', created);
+  await expect(paper).not.toContainText('/pay/#v1.');
   await expect(page.getByTestId('inv-pdf')).toBeVisible();
 
   await page.reload();

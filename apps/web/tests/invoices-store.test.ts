@@ -174,3 +174,43 @@ test('supplier account follows the payee until edited; prefill sets both; warnin
   assert.match(supplierAccountWarning(odd, acme) ?? '', /^This is Acme Industries's account; check the supplier account matches the payee's company\.$/);
   assert.equal(supplierAccountWarning({ ...odd, supplierAccount: bluejay.account }, acme), null);
 });
+
+test('sampleInvoice: Bluejay → Acme, 2–3 lines, 0.5–1.5 USDT before GST 18 %, due in 14 days, and buildInvoice accepts it', async () => {
+  const { sampleInvoice, withTax, formTotal } = await import('../lib/invoices-store.ts');
+  const bluejay = { name: 'Bluejay Logistics', account: '0xc1dce946D192e344251972470237F1471C93876c' };
+  const acme = { account: '0xb99A12652BEe98429ae31EA0529A0b63f1073721' };
+  let seed = 1;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  for (let i = 0; i < 200; i++) {
+    const s = sampleInvoice(bluejay, acme, new Date(Date.UTC(2026, 10, 6)), rand);
+    assert.ok(s.form.lines.length >= 2 && s.form.lines.length <= 3);
+    const sub = formTotal(s.form);
+    assert.ok(sub >= 500_000n && sub <= 1_500_000n, `subtotal ${sub}`);
+    assert.equal(s.form.payee, bluejay.account);
+    assert.equal(s.form.supplierAccount, bluejay.account);
+    assert.equal(s.form.customer, acme.account);
+    assert.equal(s.form.dueDate, '2026-11-20');
+    assert.match(s.form.memo, /^PO-2026-\d{4}$/);
+    assert.deepEqual([s.taxRate, s.taxLabel], ['18', 'GST']);
+    assert.equal(new Set(s.form.lines.map((l) => l.description)).size, s.form.lines.length, 'no repeated line');
+    const r = buildInvoice(withTax(s.form, s.taxRate, s.taxLabel), 'INV-S');
+    assert.ok('invoice' in r, 'error' in r ? r.error : '');
+    assert.equal(r.invoice.lines.at(-1)!.description, 'GST 18%');
+  }
+});
+
+test('runCandidates: unpaid invoices of the buyer with the most of them, capped', async () => {
+  const { runCandidates } = await import('../lib/invoices-store.ts');
+  const mk = (id: string, customer: string) => {
+    const r = buildInvoice({ ...form, customer }, id);
+    assert.ok('invoice' in r);
+    return { invoice: r.invoice, link: `http://x/pay/#v1.${id}`, createdAt: 1 };
+  };
+  const A = '0xea5a4be313e05eb254900b6adbb7d655c55242f6', B = '0xb99a12652bee98429ae31ea0529a0b63f1073721';
+  const list = [mk('A1', A), mk('B1', B), mk('B2', B), mk('B3', B), mk('B4', B), mk('A2', A)];
+  const paid = [{ invoice: list[2].invoice, txHash: '0x1', blockTimestamp: 1 }];
+  // B2 is paid, so it is left out; B still has three unpaid against A's two
+  assert.deepEqual(runCandidates(list, paid as never), { buyer: list[1].invoice.buyerAccount, links: ['http://x/pay/#v1.B1', 'http://x/pay/#v1.B3', 'http://x/pay/#v1.B4'] });
+  assert.deepEqual(runCandidates(list, [], 2)!.links, ['http://x/pay/#v1.B1', 'http://x/pay/#v1.B2']);
+  assert.equal(runCandidates([], []), null);
+});
