@@ -152,7 +152,7 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
         </div>
         <div className="ip-pay-text">
           {status === 'paid' && (
-            <div className="ip-paid">Paid{txHash && <> · <a className="ip-mono" href={`${config.explorer}/tx/${txHash}`} target="_blank" rel="noreferrer">{short(txHash)}</a></>}</div>
+            <div className="ip-paid">Paid{txHash && <> · <a href={`${config.explorer}/tx/${txHash}`} target="_blank" rel="noreferrer" data-tx={txHash}>View transaction</a></>}</div>
           )}
           {link && (
             <div className="ip-actions">

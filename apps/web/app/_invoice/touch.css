@@ -11,3 +11,9 @@
 /* the created link is shown on one line everywhere; Copy link and Open carry it */
 .inv-link-text { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .digest-line { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.approval-names { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.approval-names li { color: var(--positive); }
+.approval-names b { color: var(--text); font-weight: 600; }
+.tech-details > summary, .error-detail > summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
+.tech-details[open] > summary { margin-bottom: 12px; }
+.error-detail { overflow-wrap: anywhere; }
