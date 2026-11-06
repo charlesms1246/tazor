@@ -2,6 +2,8 @@ import { TIMINGS } from '@/lib/timings.ts';
 import { DocPage } from '../_doc.tsx';
 
 const HOW: Record<string, string> = {
+  'Customer pays at checkout (no gas, no WBT)': 'From the customer’s signature to the confirmed payment on Whitechain, through the hosted relayer, from a fresh wallet holding no WBT (scripts/hosted-checkout-live.ts).',
+  'Refund part of a payment': 'From the merchant’s refund signature to the confirmed refund on Whitechain (scripts/checkout-live.ts).',
   'Pay an approved invoice': 'One approved invoice paid through the relayer, end to end, on Whitechain Sepolia.',
   'Pay with our servers down (Ethereum fallback)': 'From the EnsGate transaction on Ethereum Sepolia to the payment landing on Whitechain, with the relayer bypassed.',
   'Set up a direct debit (mandate)': 'Creating a mandate is a single Whitechain transaction; the link is its first collection.',

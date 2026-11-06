@@ -11,7 +11,15 @@ const sep = (tx: string) => `https://sepolia.etherscan.io/tx/${tx}`;
 
 export const TIMINGS: Timing[] = [
   {
-    action: 'Pay an approved invoice', bank: 'SEPA Instant: up to 10 s', tazor: '3.6 s', status: 'measured',
+    action: 'Customer pays at checkout (no gas, no WBT)', bank: 'Card: authorised in seconds, but the merchant is paid 1–3 days later', tazor: '4.0 s, settled to the merchant', status: 'measured',
+    proof: [{ label: 'payment', url: wc('0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa') }],
+  },
+  {
+    action: 'Refund part of a payment', bank: 'Card refund: 5–10 business days to reach the customer', tazor: '3.5 s, back in the customer’s wallet', status: 'measured',
+    proof: [{ label: 'refund', url: wc('0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19') }],
+  },
+  {
+    action: 'Pay an approved invoice', bank: 'SWIFT: 1–3 business days', tazor: '3.6 s', status: 'measured',
     proof: [{ label: 'payment', url: wc('0xbceeaa443a3e17a19037a677a459a88dcd11a7e17b01ebd431118c997ce84f21') }],
   },
   {
