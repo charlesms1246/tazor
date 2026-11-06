@@ -1,0 +1,68 @@
+{
+  "startedAt": "2026-11-06T08:55:08Z",
+  "company": "acme v1 + acme-p2",
+  "salt": "extras",
+  "relayer": "http://localhost:8787",
+  "txs": [
+    {
+      "step": 1,
+      "label": "payRun 2x",
+      "chain": "whitechain",
+      "hash": "0xa02d3aed842845a6bddff9869214ca366bfcf5c28413853cd66323a78c63f58d"
+    },
+    {
+      "step": 2,
+      "label": "fund acme-p2 0.5 USDT",
+      "chain": "whitechain",
+      "hash": "0x16137a6cc4a80e3534841fb06d9094a26ca0a5f4ac2bbfbf4cdc535d83501192"
+    },
+    {
+      "step": 2,
+      "label": "payRun 2x",
+      "chain": "whitechain",
+      "hash": "0x2673ffbd1561126a2e21abf26aa8236be6cce89f715beed031eaf01edcdd3f0a"
+    },
+    {
+      "step": 3,
+      "label": "handleOps (sponsored addSigners)",
+      "chain": "whitechain",
+      "hash": "0x5fba9ac4d91ae4c299e3bd197976fa585cca6c502ecb85488efc70e4048a5d3c"
+    },
+    {
+      "step": 4,
+      "label": "deploy soul-less approver",
+      "chain": "whitechain",
+      "hash": "0x7efab4d7d4bb45c5860edd2081bf9a17f8183feeba0d8dca0943aa6041d2002a"
+    },
+    {
+      "step": 5,
+      "label": "registerSoul (counterfactual)",
+      "chain": "whitechain",
+      "hash": "0x5a9fba4d7bc1918771afec4bf89631334a01f7da98087aabdc846c3a92506769"
+    },
+    {
+      "step": 5,
+      "label": "IsVerified (counterfactual)",
+      "chain": "whitechain",
+      "hash": "0x27ba0c63012de492a47f18e2aa1fff72dae59025a880a8ca96840686d9433c3e"
+    },
+    {
+      "step": 5,
+      "label": "provisionalGrant (Priya -> counterfactual)",
+      "chain": "whitechain",
+      "hash": "0x6474578a701004803375ec00bb60f38fc3a9bfc0fba5eba9653a6fd517977a4d"
+    },
+    {
+      "step": 5,
+      "label": "approver deploy (6492)",
+      "chain": "whitechain",
+      "hash": "0x467b392b1676340a584b0dfa1a44def8d2b5352b7cf33c650b1a804fa771d3a1"
+    },
+    {
+      "step": 5,
+      "label": "payRun 1x",
+      "chain": "whitechain",
+      "hash": "0x6402d161951a2a130d4a81f0d11aceffc9298957a887dac8c8c5ff5b6e229ce8"
+    }
+  ]
+}
