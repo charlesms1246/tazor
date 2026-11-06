@@ -2,6 +2,8 @@
 # Read-only check of every live Tazor claim. Needs: cast (Foundry), jq, curl, bc.
 # Env: WC_RPC (Whitechain Sepolia), SEPOLIA_RPC (archive-capable Ethereum Sepolia).
 # Exits non-zero if any check fails. Sends no transactions.
+# Section 7 checks the v2 demo transactions recorded by scripts/demo-v2.sh in scripts/demo-v2/last-run.json
+# (override with DEMO_RUN_JSON); it is skipped with a note if that file does not exist.
 set -u
 setopt pipefail
 
@@ -66,7 +68,7 @@ expect "Ethereum Sepolia chain id" $(cast chain-id -r $SEPOLIA_RPC) 11155111
 
 # ---------------------------------------------------------------------------
 section "1. Code and source verification"
-for key in ${(f)"$(jq -r 'to_entries[] | select(.key != "chainId" and .key != "EnsGateAlias") | .key' $WC_JSON)"}; do
+for key in ${(f)"$(jq -r 'to_entries[] | select(.key != "chainId" and (.key | endswith("Alias") | not)) | .key' $WC_JSON)"}; do
   a=$(addr $WC_JSON .$key)
   code=$(cast code $a -r $WC_RPC 2>/dev/null)
   if [[ ${#code} -le 2 ]]; then fail "1874 $key $a: no code"; continue; fi
@@ -84,7 +86,7 @@ for key in ${(f)"$(jq -r 'to_entries[] | select(.key != "chainId" and .key != "E
     fi
   fi
 done
-for key in ${(f)"$(jq -r 'paths(scalars) | map(tostring) | join(".")' $L1_JSON | grep -v -e '^chainId$' -e '^PaymentModuleL2$')"}; do
+for key in ${(f)"$(jq -r 'paths(scalars) | map(tostring) | join(".")' $L1_JSON | grep -v -e '^chainId$' -e 'L2$')"}; do
   a=$(addr $L1_JSON .$key)
   code=$(cast code $a -r $SEPOLIA_RPC 2>/dev/null)
   [[ ${#code} -gt 2 ]] && pass "11155111 $key $a: code $(( (${#code} - 2) / 2 )) bytes" || fail "11155111 $key $a: no code"
@@ -231,6 +233,92 @@ expect "ETHRegistry.getSubregistry(\"taz0r\")" $(call $ETH_REGISTRY "getSubregis
 expect "ETHRegistry.findOwner(\"taz0r\")" $(call $ETH_REGISTRY "findOwner(string)(address)" taz0r -r $SEPOLIA_RPC) $TAZ0R_OWNER
 expect "taz0r.eth subregistry \"acme\"" $(call $TAZ0R_REGISTRY "getSubregistry(string)(address)" acme -r $SEPOLIA_RPC) $ACME_REGISTRY
 expect "taz0r.eth subregistry \"bluejay\"" $(call $TAZ0R_REGISTRY "getSubregistry(string)(address)" bluejay -r $SEPOLIA_RPC) $BLUEJAY_REGISTRY
+
+# ---------------------------------------------------------------------------
+section "6. v2 stack"
+PM2=$(addr $WC_JSON .PaymentModuleV2)
+MM2=$(addr $WC_JSON .MandateModuleV2)
+RL2=$(addr $WC_JSON .RevocationListV2)
+FM=$(addr $WC_JSON .FinancingModule)
+A7702=$(addr $WC_JSON .Approver7702)
+GATE2=$(addr $L1_JSON .EnsGateV2)
+CREATOR=$(addr $L1_JSON .CompanyCreator)
+for pair in PaymentModuleV2:$PM2 MandateModuleV2:$MM2 RevocationListV2:$RL2 FinancingModule:$FM Approver7702:$A7702; do
+  name=${pair%%:*} a=${pair#*:}
+  [[ -n $a ]] || { fail "1874 $name missing from deployments"; continue; }
+  code=$(cast code $a -r $WC_RPC 2>/dev/null)
+  v=$(curl -fsS "$BLOCKSCOUT/smart-contracts/$a" 2>/dev/null | jq -r '.is_verified // false')
+  [[ ${#code} -gt 2 && $v == true ]] && pass "v2 $name $a: code + Blockscout verified" || fail "v2 $name $a: code ${#code} chars, verified=$v"
+done
+for pair in EnsGateV2:$GATE2 CompanyCreator:$CREATOR; do
+  name=${pair%%:*} a=${pair#*:}
+  [[ -n $a ]] || { fail "11155111 $name missing from deployments"; continue; }
+  code=$(cast code $a -r $SEPOLIA_RPC 2>/dev/null)
+  m=$(curl -fsS "$SOURCIFY/contract/11155111/$a" 2>/dev/null | jq -r '.match // "none"')
+  [[ ${#code} -gt 2 && $m == exact_match ]] && pass "v2 $name $a: code + Sourcify $m" || fail "v2 $name $a: code ${#code} chars, Sourcify $m"
+done
+
+GATE2_ALIAS=$(alias_l1_to_l2 $GATE2)
+expect "PaymentModuleV2.ensGateAlias() == alias(EnsGateV2 $GATE2)" $(call $PM2 "ensGateAlias()(address)" -r $WC_RPC) $GATE2_ALIAS
+expect "deployments EnsGateV2Alias == alias(EnsGateV2)" $(addr $WC_JSON .EnsGateV2Alias) $GATE2_ALIAS
+expect "EnsGateV2.paymentModule() == PaymentModuleV2" $(call $GATE2 "paymentModule()(address)" -r $SEPOLIA_RPC) $PM2
+expect "EnsGateV2.l2GasLimit()" $(call $GATE2 "l2GasLimit()(uint64)" -r $SEPOLIA_RPC) 400000
+expect "11155111 PaymentModuleV2L2 == 1874 PaymentModuleV2" $(addr $L1_JSON .PaymentModuleV2L2) $PM2
+expect "MandateModuleV2.paymentModule() == PaymentModuleV2" $(call $MM2 "paymentModule()(address)" -r $WC_RPC) $PM2
+expect "FinancingModule.paymentModule() == PaymentModuleV2" $(call $FM "paymentModule()(address)" -r $WC_RPC) $PM2
+expect "PaymentModuleV2.revocationList() == RevocationListV2" $(call $PM2 "revocationList()(address)" -r $WC_RPC) $RL2
+expect "PaymentModuleV2.roleCache() == RoleCache" $(call $PM2 "roleCache()(address)" -r $WC_RPC) $RC
+expect "PaymentModuleV2 EIP-712 domain version" "$(cast call $PM2 "eip712Domain()(bytes1,string,string,uint256,address,bytes32,uint256[])" -r $WC_RPC | sed -n 3p | tr -d '"')" 2
+
+# one-transaction company creation (CompanyCreator, Sepolia)
+r=$(receipt $SEPOLIA_RPC 0x1950e3e1e8ab5ab1de88f4943a3a436eb1065d211bf1e3250cc6b710b2ab8b34)
+if [[ -z $r ]]; then fail "CompanyCreator createCompany tx: receipt not found"; else
+  expect "CompanyCreator createCompany tx status" $(print -r -- $r | jq -r .status) 0x1
+  expect "CompanyCreator createCompany tx to" $(print -r -- $r | jq -r .to) $CREATOR
+fi
+MERIDIAN=0xC10e8e41149E784e36108084938D6C23908e6c17
+expect "taz0r.eth subregistry \"meridian\"" $(call $TAZ0R_REGISTRY "getSubregistry(string)(address)" meridian -r $SEPOLIA_RPC) $MERIDIAN
+expect "CompanyCreator kept no roles on meridian (roles(0, CompanyCreator))" $(call $MERIDIAN "roles(uint256,address)(uint256)" 0 $CREATOR -r $SEPOLIA_RPC) 0
+
+# EIP-7702 approver (Meera)
+MEERA=0x03C291d446b870e0B8F128681937a9eCEDa97763
+expect "Meera code == 0xef0100 ++ Approver7702" $(cast code $MEERA -r $WC_RPC) 0xef0100${(L)A7702#0x}
+t=$(cast tx 0x2bceff13d9809c76ff2c2a16a2963e02ece0ac89fa95deabc68b8d489dcd4aae --json -r $WC_RPC 2>/dev/null)
+if [[ -z $t ]]; then fail "7702 delegation tx not found"; else
+  expect "7702 delegation tx type" $(print -r -- $t | jq -r .type) 0x4
+  expect "7702 delegation tx status" $(receipt $WC_RPC 0x2bceff13d9809c76ff2c2a16a2963e02ece0ac89fa95deabc68b8d489dcd4aae | jq -r .status) 0x1
+fi
+
+# revocation mirrored to ENS (Sepolia) and recorded on Whitechain
+r=$(receipt $SEPOLIA_RPC 0x184fe4afe72691fd38ea4e94f268d16218ab91eff268a8d80a8d4baf17027249)
+if [[ -z $r ]]; then fail "ENS revocation tx: receipt not found"; else
+  expect "ENS revocation tx status" $(print -r -- $r | jq -r .status) 0x1
+  expect "ENS revocation tx to == acme registry" $(print -r -- $r | jq -r .to) $ACME_REGISTRY
+fi
+expect "acme roles(0, Ravi) on Sepolia" $(call $ACME_REGISTRY "roles(uint256,address)(uint256)" 0 $RAVI -r $SEPOLIA_RPC) 0
+expect "RevocationList v1 isRevoked(acme v1, Ravi)" $(call $RL "isRevoked(address,address)(bool)" $ACME_ACCOUNT $RAVI -r $WC_RPC) true
+
+# ---------------------------------------------------------------------------
+section "7. v2 demo transactions (scripts/demo-v2/last-run.json)"
+# Hook: scripts/demo-v2.sh records {step, label, chain, hash} for every tx it sends.
+verify_demo_run() {
+  local f=$1 n=0 chain hash step label rpc st
+  print -r -- "      run: $(jq -r '"started \(.startedAt) company \(.company) salt \(.salt)"' $f)"
+  for line in ${(f)"$(jq -r '.txs[] | "\(.step)|\(.chain)|\(.hash)|\(.label)"' $f)"}; do
+    step=${line%%|*}; line=${line#*|}; chain=${line%%|*}; line=${line#*|}; hash=${line%%|*}; label=${line#*|}
+    [[ $chain == sepolia ]] && rpc=$SEPOLIA_RPC || rpc=$WC_RPC
+    st=$(receipt $rpc $hash | jq -r '.status // "missing"')
+    expect "demo step $step $label ($chain $hash) status" $st 0x1
+    n=$((n + 1))
+  done
+  (( n > 0 )) || fail "no transactions recorded in $f"
+}
+DEMO_RUN_JSON=${DEMO_RUN_JSON:-$ROOT/scripts/demo-v2/last-run.json}
+if [[ -f $DEMO_RUN_JSON ]]; then
+  verify_demo_run $DEMO_RUN_JSON
+else
+  print -r -- "      SKIP: $DEMO_RUN_JSON not found (written by scripts/demo-v2.sh)"
+fi
 
 print
 print -r -- "$passes passed, $fails failed"
