@@ -21,6 +21,9 @@ import { loadPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { Timeline } from '../_ui/timeline.tsx';
 import '../_invoice/touch.css';
+import { loadInvoices, runCandidates } from '@/lib/invoices-store.ts';
+import { loadPayments } from '@/lib/storage.ts';
+import { partyName } from '@/lib/story.ts';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -30,6 +33,13 @@ type Run = { account: Address; module: Address; v2: boolean; invoices: Invoice[]
 
 export default function RunsPage() {
   const [links, setLinks] = useState('');
+  const [fillNote, setFillNote] = useState('');
+  const onFillDevice = () => {
+    const c = runCandidates(loadInvoices(), loadPayments());
+    if (!c) return setFillNote('No unpaid invoices on this device yet: create some on the Invoices page, or paste links.');
+    setLinks(c.links.join('\n'));
+    setFillNote(`${c.links.length} unpaid invoice${c.links.length === 1 ? '' : 's'} for ${partyName(c.buyer)} from this device.${c.links.length < 2 ? ' A run needs at least two.' : ''}`);
+  };
   const [run, setRun] = useState<Run | null>(null);
   const [rows, setRows] = useState<{ line: number; error: string }[]>([]);
   const [mine, setMine] = useState<Approval | null>(null);
@@ -158,6 +168,10 @@ export default function RunsPage() {
             <textarea data-testid="run-links" className="textarea mono" value={links} onChange={(e) => setLinks(e.target.value)} rows={6} placeholder="https://…/pay/#v1.…" />
           </Field>
           <div className="row">
+            <button type="button" data-testid="run-fill-device" className="btn btn-sm" onClick={onFillDevice}>Use unpaid invoices from this device</button>
+            {fillNote && <span className="small muted" data-testid="run-fill-note">{fillNote}</span>}
+          </div>
+          <div className="row">
             <button data-testid="run-prepare" className={run ? 'btn' : 'btn btn-primary'} onClick={onPrepare} disabled={busy}>Check run</button>
           </div>
           {rows.length > 0 && (
@@ -187,9 +201,9 @@ export default function RunsPage() {
 
           <Card title="Approve and pay" subtitle={<>{run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} <Addr value={run.module} href={`${config.explorer}/address/${run.module}`} /></>}>
             <div className="stack">
-              <Notice tone="positive" testId="run-guard-ok"><span>The contract run digest matches these invoices: <span className="mono break">{run.digest}</span></span></Notice>
+              <Notice tone="positive" testId="run-guard-ok"><span style={{ minWidth: 0 }}>The contract computes the same run digest for these invoices.<span className="mono small digest-line" title={run.digest}>{run.digest}</span></span></Notice>
               <div className="row">
-                <button data-testid="run-approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy}>Approve run with Face ID</button>
+                <button data-testid="run-approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy}>Approve run with passkey</button>
                 {mine && <Pill tone="positive">Approved on this device</Pill>}
               </div>
               {mine && (

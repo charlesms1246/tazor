@@ -7,7 +7,7 @@ import { invoiceHash } from '@/lib/invoice.ts';
 import { encodeInvoiceLink } from '@/lib/invoice-link.ts';
 import {
   buildInvoice, draftTax, formTotal, invoiceStatus, lineTotal, loadInvoices, loadLogo, LOGO_MAX_BYTES, LOGO_TYPES, newInvoiceId,
-  applyFormEdit, parseRate, parseUsdt, prefillForm, saveInvoice, saveLogo, supplierAccountWarning, withTax, type InvoiceForm, type LineForm, type StoredInvoice,
+  applyFormEdit, parseRate, parseUsdt, prefillForm, sampleInvoice, saveInvoice, saveLogo, supplierAccountWarning, withTax, type InvoiceForm, type LineForm, type StoredInvoice,
 } from '@/lib/invoices-store.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
@@ -19,6 +19,7 @@ import { COMPANIES, companyByAccount, useCompany } from '@/lib/company.ts';
 import { recordEvent } from '@/lib/events.ts';
 import { INVOICE_STEPS, partyName, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
+import { toast, Toasts } from '../_invoice/toast.tsx';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -49,6 +50,22 @@ export default function InvoicesPage() {
   const [query, setQuery] = useState('');
   const company = useCompany();
   const touched = useRef(new Set<keyof InvoiceForm>());
+  const [sampleNote, setSampleNote] = useState('');
+
+  // the demo always goes Bluejay (supplier) → Acme (buyer): acting as Acme switches the supplier to Bluejay
+  const onFillSample = () => {
+    const supplier = COMPANIES.find((c) => c.id === 'bluejay')!;
+    const buyer = COMPANIES.find((c) => c.id === 'acme')!;
+    const s = sampleInvoice(supplier, buyer);
+    for (const k of Object.keys(s.form) as (keyof InvoiceForm)[]) touched.current.add(k);
+    setForm(s.form);
+    setTaxRate(s.taxRate);
+    setTaxLabel(s.taxLabel);
+    setError(''); setDirty(true);
+    setSampleNote(company.id === 'bluejay'
+      ? `Sample invoice from ${supplier.name} to ${buyer.name}. Create the payment link, then open it to pay as ${buyer.name}.`
+      : `You're acting as ${company.name}, so the sample bills ${buyer.name} from ${supplier.name} (the supplier was switched). Create the payment link, then open it to approve as ${buyer.name}.`);
+  };
   const drawerHistory = useSubjectHistory(viewing ? subjectOf(viewing.invoice) : null, viewing?.invoice.buyerAccount);
   const chain = useHistory(company.account);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -76,7 +93,9 @@ export default function InvoicesPage() {
     setForm(next); setError(''); setDirty(true);
   };
   const supplierWarning = supplierAccountWarning(form, company);
-  const billToOptions = COMPANIES.filter((c) => c.id !== company.id);
+  // anyone but the invoice's supplier (normally the selected company; Bluejay after "Fill with sample data" as Acme)
+  const supplierCo = companyByAccount(form.supplierAccount.trim() || form.payee.trim()) ?? company;
+  const billToOptions = COMPANIES.filter((c) => c.id !== supplierCo.id);
   const billTo = billToOptions.find((c) => c.account.toLowerCase() === form.customer.trim().toLowerCase())?.account ?? '';
   const setLine = (n: number, patch: Partial<LineForm>) => set({ lines: form.lines.map((l, i) => (i === n ? { ...l, ...patch } : l)) });
   const tax = draftTax(form, taxRate, taxLabel);
@@ -153,6 +172,7 @@ export default function InvoicesPage() {
       recordEvent({ subject, kind: 'created', at: stored.createdAt * 1000, title: `${r.invoice.id} created by ${r.invoice.supplierName}`, actor: r.invoice.supplierName, detail: `${formatUnits(r.invoice.amount, 6)} USDT` });
       recordEvent({ subject, kind: 'sent', at: Date.now(), title: `${r.invoice.id} sent to ${to}`, detail: 'payment link generated' });
       setCreated(stored);
+      toast(`Payment link for ${r.invoice.id} created`);
       setViewing(null);
       setDirty(false);
       setList(loadInvoices());
@@ -165,12 +185,17 @@ export default function InvoicesPage() {
 
   return (
     <div className="page tz-touch">
+      <Toasts />
       <PageHeader title="Invoices" subtitle="Create a payment link; your customer approves it with a passkey and pays in USDT on Whitechain." />
 
       <div className="inv-split">
         <div data-tour="invoice-form">
         <Card title="Create invoice" subtitle={<>You are invoicing as <b>{company.name}</b>. The link carries the invoice encrypted; only someone with the link can read it.</>}>
           <div className="stack">
+            <div className="sample-bar">
+              <button type="button" className="btn btn-sm" data-testid="inv-fill-sample" onClick={onFillSample}>Fill with sample data</button>
+              {sampleNote && <span className="small muted" data-testid="inv-sample-hint">{sampleNote}</span>}
+            </div>
             <Field label="Bill to">
               <select data-testid="inv-billto" className="select" value={billTo} onChange={(e) => set({ customer: e.target.value })}>
                 {billToOptions.map((c) => <option key={c.id} value={c.account}>{c.name} ({c.ens})</option>)}
@@ -268,7 +293,7 @@ export default function InvoicesPage() {
                   <span>Invoice {created.invoice.id} is ready. Send this link to your customer:</span>
                   <span className="mono break inv-link-text" data-testid="inv-link" title={created.link}>{created.link}</span>
                   <span className="row">
-                    <CopyButton value={created.link} label="Copy link" />
+                    <span onClickCapture={() => toast('Link copied')}><CopyButton value={created.link} label="Copy link" /></span>
                     <a className="btn btn-sm" data-testid="inv-open" href={created.link} target="_blank" rel="noreferrer">Open</a>
                     <button type="button" className="btn btn-sm" data-testid="inv-pdf" onClick={() => { setViewing(null); setDirty(false); setPreview(true); setTimeout(printInvoice, 50); }}>Download PDF</button>
                   </span>
@@ -330,7 +355,7 @@ export default function InvoicesPage() {
                         <td>
                           <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
                             <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => openDrawer(s)}>View</button>
-                            <CopyButton value={s.link} label="Copy link" />
+                            <span onClickCapture={() => toast('Link copied')}><CopyButton value={s.link} label="Copy link" /></span>
                             <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
                           </span>
                         </td>
@@ -357,7 +382,7 @@ export default function InvoicesPage() {
             </div>
             <div className="drawer-body">
               <div className="row" style={{ gap: 8 }}>
-                <CopyButton value={viewing.link} label="Copy link" />
+                <span onClickCapture={() => toast('Link copied')}><CopyButton value={viewing.link} label="Copy link" /></span>
                 <a className="btn btn-sm" data-testid="inv-drawer-open" href={viewing.link} target="_blank" rel="noreferrer">Open</a>
                 <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
               </div>

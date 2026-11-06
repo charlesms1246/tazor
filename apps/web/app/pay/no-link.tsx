@@ -62,7 +62,7 @@ export function NoLink() {
             {[
               ['Open the link', 'The invoice is decrypted in your browser; nothing is sent to a server.'],
               ['Check the supplier and amount', 'The supplier shows as verified if its admin holds a WB Soul (simulated on testnet).'],
-              ['Approve with Face ID', 'Your passkey signs exactly the invoice shown, after the page checks it against the contract.'],
+              ['Approve with your passkey', 'Face ID, fingerprint or device PIN unlocks your passkey; it signs exactly the invoice shown, after the page checks it against the contract.'],
               ['Paid on Whitechain', 'The relayer submits it in seconds; if the relayer is down, send it via Ethereum instead.'],
             ].map(([title, sub], i) => (
               <div className="step" key={title}>

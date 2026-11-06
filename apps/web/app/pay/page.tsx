@@ -20,7 +20,7 @@ import {
 import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
-import { NoLink } from './no-link.tsx';
+import { Redirect } from '../_redirect/redirect.tsx';
 import { InvoicePaper, issuedFromId, paperFromInvoice } from '../_invoice/paper.tsx';
 import { HistoryTimeline } from '../_invoice/history.tsx';
 import { useSubjectHistory } from '@/lib/chain-history.ts';
@@ -28,6 +28,11 @@ import { eventsFor, recordEvent, type TimelineEvent } from '@/lib/events.ts';
 import { loadInbox, upsertInbox } from '@/lib/inbox.ts';
 import { INVOICE_STEPS, inboxForInvoice, recordOpened, shortAddr, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
+import { printInvoice } from '../_invoice/paper.tsx';
+import { toast, Toasts } from '../_invoice/toast.tsx';
+import { friendlyError } from '@/lib/friendly-errors.ts';
+import { elapsed } from '@/lib/events.ts';
+import { partyName } from '@/lib/story.ts';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -171,8 +176,16 @@ export default function PayPage() {
     return () => clearInterval(t);
   }, [l1, state, v2]);
 
+  // a toast when this session's payment lands (not for invoices that were already paid when opened)
+  useEffect(() => {
+    if (typeof state !== 'object') return;
+    if (tx?.status === 'success' || l1?.l2Tx) toast(`Paid ${formatUnits(state.invoice.amount, 6)} USDT to ${state.invoice.supplierName}`);
+    else if (tx?.status === 'reverted') toast('The payment reverted on Whitechain', 'error');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx?.status, l1?.l2Tx]);
+
   if (state === 'loading') return <div className="page"><PageHeader title="Invoice" subtitle="Decrypting invoice…" /></div>;
-  if (state === 'none') return <NoLink />;
+  if (state === 'none') return <Redirect to="/approvals/" label="Open Approvals" note="Paying starts from Approvals: paste or scan the payment link there." />;
   if (state === 'invalid') {
     return (
       <div className="page">
@@ -214,7 +227,6 @@ export default function PayPage() {
 
   const onPay = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
-    if (v2) throw new Error('The relayer submits v1 payments only; for this v2 company use "Copy calldata" (PaymentModuleV2) or "Send via Ethereum".');
     const relayerUrl = getRelayerUrl();
     if (!relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata" or "Send via Ethereum".');
     const started = Date.now();
@@ -227,7 +239,7 @@ export default function PayPage() {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
     setTx({ hash: body.txHash, started });
-    story('submitted', `${i.id} submitted via the relayer`, { detail: `${approvals.length} approval${approvals.length === 1 ? '' : 's'}`, tx: body.txHash, chain: 'whitechain' });
+    story('submitted', `${i.id} submitted via the relayer${body.paymentModule ? ` to ${v2 ? 'PaymentModuleV2' : 'PaymentModule'}` : ''}`, { detail: `${approvals.length} approval${approvals.length === 1 ? '' : 's'}`, tx: body.txHash, chain: 'whitechain' });
   });
 
   const gate = v2 ? configV2.ensGateV2 : config.sepolia.ensGate;
@@ -278,6 +290,20 @@ export default function PayPage() {
   const explorer = (a: string) => `${config.explorer}/address/${a}`;
   const chainPaid = history.events.find((e) => e.kind === 'paid' && e.tx)?.tx as Hex | undefined;
   const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore ?? chainPaid ?? null;
+  const settledIn = tx?.status === 'success' && tx.seconds !== undefined ? tx.seconds
+    : l1?.l2Tx && l1.seconds !== undefined ? l1.seconds : elapsed(history.events, 'submitted', 'paid');
+  const amountText = formatUnits(i.amount, 6);
+
+  // the guided steps, driven by the existing states
+  type StepState = 'todo' | 'active' | 'done' | 'error';
+  const s1: StepState = paidTx ? 'done' : guard.status === 'refused' ? 'error' : guard.status === 'checking' || supplier === 'checking' ? 'active' : 'done';
+  const approved = !!mine || (approvals?.length ?? 0) > 0;
+  const s2: StepState = paidTx || approved ? 'done' : s1 === 'done' ? 'active' : 'todo';
+  const submitting = (!!tx && tx.status === undefined) || (!!l1?.hash && !l1.l2Tx) || (!!l1?.started && !l1.l2Tx);
+  const s3: StepState = paidTx ? 'done' : tx?.status === 'reverted' ? 'error' : submitting ? 'active' : approved ? 'active' : 'todo';
+  const s4: StepState = paidTx ? 'done' : 'todo';
+  const steps: [string, StepState][] = [['Check supplier', s1], ['Approve with passkey', s2], [submitting ? 'Submitting…' : 'Submit payment', s3], ['Paid', s4]];
+  const friendly = error ? friendlyError(error, { company: partyName(i.buyerAccount), supplier: i.supplierName }) : null;
 
   return (
     <div className="page tz-touch">
@@ -285,7 +311,32 @@ export default function PayPage() {
         title={`Invoice ${i.id}`}
         subtitle={<>From {i.supplierName}. Check what you are paying, then approve it with your passkey.</>}
       />
-      {v2 && <Notice tone="info" testId="v2-account"><span>v2 company: signed for PaymentModuleV2 <span className="mono break">{configV2.paymentModule}</span> (EIP-712 domain version 2).</span></Notice>}
+      <Toasts />
+      <ol className="pay-steps" data-testid="pay-steps" aria-label="Payment progress">
+        {steps.map(([label, st], n) => (
+          <li key={n} className="pay-step" data-state={st} data-testid={`pay-step-${n + 1}`} aria-current={st === 'active' ? 'step' : undefined}>
+            <span className="pay-step-n" aria-hidden="true">{st === 'done' ? '✓' : st === 'error' ? '!' : n + 1}</span>
+            <span className="pay-step-label">{label}</span>
+          </li>
+        ))}
+      </ol>
+      {paidTx && (
+        <section className="pay-success" data-testid="pay-success" aria-live="polite">
+          <span className="pay-success-check" aria-hidden="true">✓</span>
+          <div className="pay-success-body">
+            <h2 data-testid="pay-success-amount">Paid {amountText} USDT to {i.supplierName}</h2>
+            <p className="muted" data-testid="pay-success-time">
+              {settledIn !== null ? `Settled on Whitechain in ${settledIn.toFixed(1)} s` : 'Settled on Whitechain'}
+              {' · '}<a href={`${config.explorer}/tx/${paidTx}`} target="_blank" rel="noreferrer" data-testid="pay-success-tx">View transaction</a>
+            </p>
+            <div className="row">
+              <button type="button" className="btn btn-primary" data-testid="pay-receipt" onClick={printInvoice}>Download receipt</button>
+              <a className="btn" href="/invoices/" data-testid="pay-back">Back to invoices</a>
+            </div>
+          </div>
+        </section>
+      )}
+      {v2 && <p className="small muted" data-testid="v2-account" style={{ margin: 0 }}>This company uses PaymentModuleV2 (spending limits and payee rules apply) · <span className="mono break">{configV2.paymentModule}</span></p>}
 
       <div className="pay-split">
         <div className="stack">
@@ -293,8 +344,8 @@ export default function PayPage() {
           <p className="small muted">Decrypted from the link on this device; nothing was sent to a server.</p>
         </div>
 
-        <div className="stack paper-sticky">
-          <Card title="Approve and pay" subtitle="Approvers sign the invoice digest; anyone can submit the payment.">
+        <div className="stack paper-sticky pay-actions">
+          <Card title="Approve and pay" subtitle="Your passkey signs exactly this invoice; then anyone can submit the payment.">
             <div className="stack">
               <dl className="kv">
                 <dt>From</dt>
@@ -302,10 +353,10 @@ export default function PayPage() {
                   <span className="stack" style={{ gap: 4 }}>
                     <span>{i.supplierName}</span>
                     <Addr value={i.supplierAccount} href={explorer(i.supplierAccount)} />
-                    <span>
+                    <span className="pill-wrap">
                       {supplier === 'checking' ? <Pill testId="supplier-checking">checking…</Pill>
                         : typeof supplier === 'object' && supplier.verified
-                          ? <span title={`admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT (simulated on testnet)</Pill></span>
+                          ? <span title={`Verified by WhiteBIT (simulated on testnet). Admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT · simulated</Pill></span>
                           : <Pill testId="supplier-unverified">Not verified</Pill>}
                     </span>
                   </span>
@@ -315,36 +366,56 @@ export default function PayPage() {
               </dl>
               {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
               {guard.status === 'refused' && <Notice tone="negative" testId="guard-refused">Refusing to sign: {guard.reason}</Notice>}
-              {guard.status === 'ok' && <Notice tone="positive" testId="guard-ok"><span>The contract digest matches this invoice: <span className="mono break">{guard.digest}</span></span></Notice>}
-              <div className="row">
-                <button data-testid="approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with Face ID</button>
-              </div>
-              {mine && (
-                <div className="well">
-                  <p className="small muted">Your approval (send this to the second approver if needed)</p>
-                  <code data-testid="my-approval" className="mono break">{serializeApproval(mine)}</code>
-                </div>
+              {guard.status === 'ok' && (
+                <Notice tone="positive" testId="guard-ok">
+                  <span style={{ minWidth: 0 }}>The contract computes the same digest for this invoice.<span className="mono small digest-line" title={guard.digest}>{guard.digest}</span></span>
+                </Notice>
               )}
-              <Field label="Approvals from other approvers (JSON)">
-                <textarea data-testid="pasted" className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={4} />
-              </Field>
-              {approvals === null && <Notice tone="negative">Pasted approvals are not valid JSON {'{approver, signature}'}.</Notice>}
-              <p className="muted">Approvals collected: <span className="num" data-testid="approval-count">{approvals?.length ?? 0}</span></p>
               <div className="row">
-                <button data-testid="pay" className={mine ? 'btn btn-primary' : 'btn'} onClick={onPay} disabled={busy || !approvals?.length}>Pay</button>
-                <button data-testid="calldata" className="btn" onClick={onCopyCalldata} disabled={busy || !approvals?.length}>Copy calldata</button>
-                {v2 && <button data-testid="pay-as-agent" className="btn" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button>}
+                <button data-testid="approve" className={mine || paidTx ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with passkey</button>
+                <button data-testid="pay" className={mine && !paidTx ? 'btn btn-primary' : 'btn'} onClick={onPay} disabled={busy || !approvals?.length}>Pay</button>
+                <span className="small muted">Approvals: <span className="num" data-testid="approval-count">{approvals?.length ?? 0}</span></span>
               </div>
-              {error && <Notice tone="negative" testId="error">{error}</Notice>}
+              <p className="small muted" style={{ margin: 0 }}>Face ID, fingerprint or your device PIN unlocks the passkey. Nothing leaves this device except the signature.</p>
+              {error && (
+                <Notice tone="negative" testId="error">
+                  {friendly ? (
+                    <span className="stack" style={{ gap: 4, minWidth: 0 }}>
+                      <b data-testid="error-title">{friendly.title}</b>
+                      <span>{friendly.fix}{friendly.href && <> <a href={friendly.href}>Open</a></>}</span>
+                      <span className="small error-detail">Details: {error}</span>
+                    </span>
+                  ) : <span style={{ minWidth: 0 }} className="break">{error}</span>}
+                </Notice>
+              )}
               {tx && (
-                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx"><span>
+                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx"><span style={{ minWidth: 0 }}>
                   Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="mono break">{tx.hash}</a>{' '}
                   {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
                   {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
                 </span></Notice>
               )}
+              <details className="colleagues" open={!!pasted.trim() || !!mine || undefined} data-testid="colleagues">
+                <summary>Need a second approver?</summary>
+                <div className="stack">
+                  {mine && (
+                    <div className="well">
+                      <p className="small muted">Your approval: send it to the second approver</p>
+                      <code data-testid="my-approval" className="mono break">{serializeApproval(mine)}</code>
+                    </div>
+                  )}
+                  <Field label="Have approvals from colleagues? Paste them here (JSON)">
+                    <textarea data-testid="pasted" className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
+                  </Field>
+                  {approvals === null && <Notice tone="negative">Pasted approvals are not valid JSON {'{approver, signature}'}.</Notice>}
+                </div>
+              </details>
+              <div className="pay-more">
+                <button data-testid="calldata" className="btn btn-sm btn-ghost" onClick={onCopyCalldata} disabled={busy || !approvals?.length}>Copy calldata</button>
+                {v2 && <button data-testid="pay-as-agent" className="btn btn-sm btn-ghost" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button>}
+              </div>
               {(calldata || l1) && pendingDeploys.map((u) => (
-                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first"><span>Not deployed yet: first send to the ApproverAccountFactory <span className="mono">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></span></Notice>
+                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first"><span style={{ minWidth: 0 }}>Not deployed yet: first send to the ApproverAccountFactory <span className="mono break">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></span></Notice>
               ))}
               {calldata && <p className="small muted">Calldata ready: see Technical details below.</p>}
             </div>
