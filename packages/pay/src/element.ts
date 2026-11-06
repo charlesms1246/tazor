@@ -1,6 +1,7 @@
 // <tazor-pay-button>: a framework-free custom element that creates a Tazor payment link, opens it, and waits for payment.
 import { createInvoiceLink, DEFAULT_EXPLORER, watchPayment, type InvoiceInput, type InvoiceLink, type LineInput, type Payment } from './core.ts';
-import { CHECKOUT, EXPLORER, orderId, orderRef, payOrder, walletSigner, watchOrder, type Eip1193, type Order, type Stage } from './checkout.ts';
+import { accountSigner, CHECKOUT, EXPLORER, orderId, orderRef, payOrder, RELAYER_URL, walletSigner, watchOrder, type Eip1193, type Order, type Signer, type Stage } from './checkout.ts';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { addressQrSvg, depositOrder, watchDeposit, type DepositOrder, type DepositStatus } from './deposit.ts';
 
 export const ATTRIBUTES = [
@@ -10,6 +11,7 @@ export const ATTRIBUTES = [
   'mode', 'merchant', 'order-ref', 'deadline', 'relayer', 'checkout',
   // offer "Pay from WhiteBIT or any exchange" (plain USDT transfer to a per-order address); "false" hides it
   'deposit',
+  'demo-wallet',
 ] as const;
 
 export type WalletPaidDetail = { orderId: `0x${string}`; txHash: `0x${string}`; explorerUrl: string; payer: string; amount: string; ref: string };
@@ -165,6 +167,19 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       }
     }
 
+    #demoNote = '';
+    #renderDemo(wrap: Element) {
+      if (!this.#wallet() || this.getAttribute('demo-wallet') !== 'true') return;
+      if (this.#state !== 'paid' && !this.#dep.open) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'alt'; b.setAttribute('part', 'demo-button'); b.dataset.testid = 'tazor-demo-wallet';
+        b.textContent = 'Pay with a demo wallet (no extension)'; b.disabled = this.#state === 'waiting';
+        b.addEventListener('click', () => void this.#payWithWallet(true));
+        wrap.append(b);
+      }
+      if (this.#demoNote) { const n = document.createElement('span'); n.className = 'note'; n.textContent = this.#demoNote; wrap.append(n); }
+    }
+
     #renderDeposit(wrap: Element) {
       if (!this.#wallet() || this.getAttribute('deposit') === 'false' || this.#state === 'paid' && !this.#dep.open) return;
       if (!this.#dep.open) {
@@ -213,19 +228,35 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       wrap.append(box);
     }
 
-    async #payWithWallet() {
+    /** A wallet made inside this page (testnet demos only): no extension, no seed phrase; the sandbox tops it up with test USDT. */
+    async #demoSigner(relayer: string | undefined): Promise<Signer> {
+      const KEY = 'tazor.demo-wallet.v1';
+      let pk = (() => { try { return globalThis.localStorage?.getItem(KEY); } catch { return null; } })() as `0x${string}` | null;
+      if (!pk || !/^0x[0-9a-f]{64}$/i.test(pk)) { pk = generatePrivateKey(); try { globalThis.localStorage?.setItem(KEY, pk); } catch { /* private mode: a one-off wallet */ } }
+      const account = privateKeyToAccount(pk);
+      this.#demoNote = `Demo wallet ${shortAddr(account.address)}: getting test USDT…`; this.#render();
+      const base = (relayer ?? RELAYER_URL).replace(/\/+$/, '');
+      const r = await fetch(`${base}/sandbox/counterparty`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'fund-demo-wallet', address: account.address }) });
+      const j = (await r.json().catch(() => ({}))) as { status?: string; error?: string; reason?: string };
+      if (!r.ok && !/already topped up/.test(j.error ?? j.reason ?? '')) throw new Error(j.reason ?? j.error ?? `the sandbox returned ${r.status}`);
+      this.#demoNote = `Demo wallet ${shortAddr(account.address)} (in this browser, testnet only): signing…`; this.#render();
+      return accountSigner(account);
+    }
+
+    async #payWithWallet(demo = false) {
       if (this.#state === 'paid' || this.#state === 'waiting') return;
       const eth = (globalThis as { ethereum?: Eip1193 }).ethereum;
       try {
-        if (!eth) throw new Error('No browser wallet found. Install one, or pay with a Tazor company account.');
+        if (!demo && !eth) throw new Error('No browser wallet found. Use "Pay with a demo wallet", pay from an exchange, or install a wallet.');
         const order = orderFromAttributes((n) => this.getAttribute(n));
         const checkout = (this.getAttribute('checkout') || CHECKOUT) as `0x${string}`;
         const relayer = this.getAttribute('relayer') || undefined;
         this.#state = 'waiting'; this.#stage = null; this.#render();
-        const wallet = await walletSigner(eth);
+        const wallet = demo ? await this.#demoSigner(relayer) : await walletSigner(eth!);
         const sub = await payOrder({ order, wallet, checkout, relayer });
         const id = sub.id ?? orderId(order, checkout);
         this.#txUrl = sub.explorer || `${this.getAttribute('explorer') ?? EXPLORER}/tx/${sub.txHash}`;
+        if (demo) this.#demoNote = `Paid from the demo wallet ${shortAddr(wallet.address)}: one signature, no extension, no WBT.`;
         this.#state = 'paid'; this.#stage = sub.stage ?? 'pending'; this.#render();
         const detail: WalletPaidDetail = { orderId: id, txHash: sub.txHash, explorerUrl: this.#txUrl, payer: wallet.address, amount: this.getAttribute('amount') ?? '', ref: this.getAttribute('order-ref') ?? '' };
         this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
@@ -288,6 +319,7 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       button.disabled = this.#state === 'paid' || (this.#wallet() && this.#state === 'waiting');
       button.dataset.state = this.#state;
       button.addEventListener('click', () => void this.#open());
+      this.#renderDemo(this.#root.querySelector('.wrap')!);
       this.#renderDeposit(this.#root.querySelector('.wrap')!);
       if (this.#wallet()) {
         if (this.#state === 'idle') status.textContent = `${this.getAttribute('amount') ?? ''} USDT · one signature in your wallet, no gas`;
