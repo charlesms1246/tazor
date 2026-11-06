@@ -1,0 +1,10 @@
+{
+  "ranAt": "2026-11-07T00:3x+05:30",
+  "command": "AGENT_KEY=<fresh key> node --experimental-strip-types examples/agent/agent.ts",
+  "agent": "0xb81d9C3b929fBdb9E34f76CA4C43Ff30fA9171c3",
+  "agentWbt": "0",
+  "resource": "https://tazor-relayer.vercel.app/x402/demo/freight-quote?from=Mumbai&to=Pune",
+  "price": "0.01 USDT",
+  "settlement": "https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea",
+  "capTest": "MAX_USDT=0.005 -> Refused: the price 10000 exceeds the spend cap 5000 (USDT base units)."
+}
