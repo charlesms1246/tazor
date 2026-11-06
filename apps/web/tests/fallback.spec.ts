@@ -102,15 +102,11 @@ test('mandates: tracking the live mandate shows terms and what is available now'
   await expect(page.getByTestId('mandate-row')).toContainText('2 USDT / 30 days');
 });
 
-test('home page shows the bank vs Tazor timing card with proof links', async ({ page }) => {
+test('home page shows the measured payment time, linked to the timing docs', async ({ page }) => {
   await page.goto('/');
-  const card = page.getByTestId('timings');
-  await expect(card).toContainText('3.6 s');
-  await expect(card).toContainText('69 s via Ethereum');
-  await expect(card).toContainText('3.06 s');
-  await expect(card.getByText('measured').first()).toBeVisible();
-  await expect(card).toContainText('100 s');
-  await expect(card.locator('a[href*="0x027e1cfd"]')).toHaveCount(1);
+  const badge = page.getByTestId('speed-badge');
+  await expect(badge).toContainText('3.6 s');
+  await expect(badge).toHaveAttribute('href', '/docs/timings/');
   await expect(page.getByTestId('host')).toHaveText('localhost:4173');
   await expect(page.getByTestId('build')).toHaveText('unversioned');
 });
