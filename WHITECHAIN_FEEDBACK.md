@@ -37,7 +37,7 @@ Notes from building Tazor on Whitechain Sepolia at ETHGlobal Mumbai, November 20
 - **A tested public Sepolia RPC list:** free Sepolia RPCs rate-limit (Tenderly returned "Request exceeds defined limit"), and some refuse `eth_getProof` (publicnode). Our relayer now uses one for sending and another for proofs.
 
 - **USDT's EIP-712 domain isn't discoverable:** the track USDT has no `version()` or `eip712Domain()` (both revert), so to sign EIP-3009 or permit you have to guess the domain. We matched `DOMAIN_SEPARATOR()` by brute force: `{ name: "Tether USD", version: "1", chainId: 1874 }`. One line in the docs, next to the USDT address, would save every Scale team an hour. It's worth noting that the 3009 and permit `bytes`-signature overloads exist and accept ERC-1271 signatures.
-- **What "finalized" means on testnet:** in our measurements `safe` and `finalized` were the same block, about 1,600 blocks (~27 min) behind `latest`. A short table of the soft, safe and finalized timings, and what a merchant should wait for, would help everyone building receipts.
+- **What "finalized" means on testnet:** the lag moves around a lot. At 23:5x IST `safe` and `finalized` were the same block, about 1,600 blocks (~27 min) behind `latest`. At 00:3x IST `safe` was about 900 blocks behind (~15 min) and `finalized` about 2,600 (~44 min). A short table of the typical soft, safe and finalized timings, and what a merchant should wait for, would help everyone building receipts.
 
 ## Answers we got from DevRel during the event (and what we did)
 
