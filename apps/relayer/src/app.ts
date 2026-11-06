@@ -11,6 +11,8 @@ import { preparePayOne } from './pay-counterfactual.ts';
 import { REVOCATION_LIST_V2, pickRevocationList } from './revoke-list.ts';
 import { ENTRY_POINT_V08, RpcError, encodeHandleOps, parseUserOp, paymasterRpc } from './userop.ts';
 import type { MirrorService } from './mirror-service.ts';
+import type { Sandbox } from './sandbox/service.ts';
+import { handleSandbox } from './sandbox/routes.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -58,10 +60,12 @@ export function createHandler(deps: {
   cronSecret?: string;
   /** Whitechain revocation → ENS mirroring (POST /mirror and a pass in GET /watch). */
   mirror?: MirrorService;
+  /** Autopilot sandbox (/sandbox/*); only when every SANDBOX_* variable is set. */
+  sandbox?: Sandbox;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
-    const reply = (status: number, body: unknown) => {
-      res.writeHead(status, { 'content-type': 'application/json', ...CORS }).end(JSON.stringify(body));
+    const reply = (status: number, body: unknown, headers: Record<string, string> = {}) => {
+      res.writeHead(status, { 'content-type': 'application/json', ...CORS, ...headers }).end(JSON.stringify(body));
       console.log(`${req.method} ${req.url} ${status}`);
     };
     try {
@@ -77,8 +81,10 @@ export function createHandler(deps: {
           mandateModule: deps.mandateModule ?? null,
           roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? deps.mirror?.registries ?? [],
           ...(deps.mirror ? await mirrorHealthJson(deps.mirror) : { mirrorEnabled: false, mirrorReason: 'mirror not configured' }),
+          sandbox: { enabled: !!deps.sandbox, account: deps.sandbox?.config.account ?? null, registry: deps.sandbox?.config.registry ?? null },
         });
       }
+      if (deps.sandbox && (await handleSandbox(req, path, deps.sandbox, readJson, reply))) return;
       if (deps.mirror && req.method === 'POST' && path === '/mirror') {
         const body = (await readJson(req)) as { account?: unknown; target?: unknown } | null;
         const { account, target } = body ?? {};

@@ -7,6 +7,9 @@ import { createRoleSync, type Prover } from './sync.ts';
 import { createMirrorService } from './mirror-service.ts';
 import { REVOCATION_LIST_V2 } from './revoke-list.ts';
 import { PAYMENT_MODULE_V2 } from './payrun.ts';
+import { sandboxFromEnv } from './sandbox/config.ts';
+import { createSandboxPorts } from './sandbox/ports.ts';
+import { createSandbox } from './sandbox/service.ts';
 
 export const DEFAULT_SEPOLIA_RPC = 'https://sepolia.gateway.tenderly.co';
 export const DEFAULT_ROLE_CACHE = '0x8AC436e5BB681aE4d576e0131391aE3AACA88BDe';
@@ -64,9 +67,17 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
     sender: l1Sender,
     lookback: env.MIRROR_LOOKBACK ? BigInt(env.MIRROR_LOOKBACK) : undefined,
   });
+  // Autopilot sandbox: on only when every SANDBOX_* address and key is set.
+  const sandboxEnv = sandboxFromEnv(env);
+  const sandbox = sandboxEnv.config
+    ? createSandbox({
+      config: sandboxEnv.config,
+      ports: createSandboxPorts({ config: sandboxEnv.config, whitechain: whitechainSepolia, wcRpc: rpcUrl, sepoliaRpc, relayer: sender, roleSync }),
+    })
+    : undefined;
   const handler = createHandler({
     sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id,
-    roleSync, cronSecret, mirror,
+    roleSync, cronSecret, mirror, sandbox,
   });
-  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror };
+  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror, sandbox };
 }
