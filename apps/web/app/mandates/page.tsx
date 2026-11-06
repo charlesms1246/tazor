@@ -7,22 +7,25 @@ import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import {
   PERIODS, decodeAvailable, decodeMandateDigest, decodeMandateOf, encodeAvailableCall, encodeCreateMandate,
-  encodeMandateDigestCall, encodeMandateOfCall, encodePull, mandateDigest, mandateRelayerBody, type Mandate,
+  encodeMandateDigestCall, encodePull, findMandate, mandateDigest, mandateModuleFor, mandateRelayerBody, type Mandate, type MandateModuleRef,
 } from '@/lib/mandate.ts';
+import { dayText, periodText, shortRef, usdtText } from '@/lib/readable.ts';
+import { NameChip, TechDetails, nameFor } from '../_readable/index.tsx';
 import { mergeApprovals, parseApprovals, serializeApproval, type Approval } from '@/lib/payment.ts';
 import { ethCall } from '@/lib/rpc.ts';
 import { loadMandates, loadPasskey, saveMandate, type StoredMandate } from '@/lib/storage.ts';
-import { Addr, Card, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { HistoryTimeline } from '../_invoice/history.tsx';
 import { useSubjectHistory } from '@/lib/chain-history.ts';
 import { recordEvent } from '@/lib/events.ts';
 import { usdt2dp } from '@/lib/export.ts';
 import { companyByAccount } from '@/lib/company.ts';
 
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
+const usdt = usdtText;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const days = (s: bigint) => `${Number(s) / 86400} days`;
-const partyName = (a: string) => companyByAccount(a)?.ens ?? `${a.slice(0, 6)}…${a.slice(-4)}`;
+const partyName = (a: string) => companyByAccount(a)?.ens ?? nameFor(a) ?? `${a.slice(0, 6)}…${a.slice(-4)}`;
+/** "Mandate to Sandbox Supplier · up to 0.30 USDT / 30 days · #a1b2c3" */
+const mandateTitle = (payee: string, cap: bigint, period: bigint, id: string) => `Mandate to ${partyName(payee)} · up to ${usdt(cap)} / ${periodText(period)} · ${shortRef(id)}`;
 
 async function relay(path: string, body: unknown): Promise<Hex> {
   const relayerUrl = getRelayerUrl();
@@ -35,8 +38,9 @@ async function relay(path: string, body: unknown): Promise<Hex> {
   return json.txHash;
 }
 
-const TxLink = ({ hash }: { hash: Hex }) => <Addr value={hash} href={`${config.explorer}/tx/${hash}`} />;
-const Amount = ({ v }: { v: bigint }) => <><span className="num">{formatUnits(v, 6)}</span> <span className="faint">USDT</span></>;
+/** A transaction as a link; the hash stays in href and data-value. */
+const TxLink = ({ hash }: { hash: Hex }) => <a href={`${config.explorer}/tx/${hash}`} target="_blank" rel="noreferrer" data-value={hash}>View transaction ↗</a>;
+const Amount = ({ v }: { v: bigint }) => <><span className="num">{usdtText(v).replace(' USDT', '')}</span> <span className="faint">USDT</span></>;
 
 function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void }) {
   const [account, setAccount] = useState('');
@@ -44,7 +48,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
   const [cap, setCap] = useState('');
   const [period, setPeriod] = useState<keyof typeof PERIODS>('monthly');
   const [expiry, setExpiry] = useState('');
-  const [m, setM] = useState<{ mandate: Mandate; digest: Hex } | null>(null);
+  const [m, setM] = useState<{ mandate: Mandate; digest: Hex; module: MandateModuleRef } | null>(null);
   const [mine, setMine] = useState<Approval | null>(null);
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState('');
@@ -61,9 +65,11 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
   };
 
   const onPrepare = run(async () => {
-    const mm = config.mandateModule;
-    if (!mm) throw new Error('MandateModule address is not configured.');
     if (!isAddress(account) || !isAddress(payee)) throw new Error('Enter the company account and the payee.');
+    // v2 companies use MandateModuleV2 (its own digest domain); others the v1 module
+    const module = await mandateModuleFor(getAddress(account));
+    if (!module) throw new Error('MandateModule address is not configured.');
+    const mm = module.address;
     const exp = Math.floor(new Date(`${expiry}T23:59:59Z`).getTime() / 1000);
     if (!Number.isFinite(exp) || exp * 1000 <= Date.now()) throw new Error('Pick a future expiry date.');
     const mandate: Mandate = {
@@ -71,10 +77,10 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
       period: PERIODS[period], expiry: BigInt(exp), nonce: BigInt(Date.now()),
     };
     if (mandate.capPerPeriod === 0n) throw new Error('Enter a cap per period.');
-    const local = mandateDigest(mandate, mm, config.chainId);
+    const local = mandateDigest(mandate, mm, config.chainId, module.version);
     const onchain = decodeMandateDigest(await ethCall(mm, encodeMandateDigestCall(mandate)));
-    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: on-chain digest ${onchain} differs from ${local}.`);
-    setM({ mandate, digest: local }); setMine(null); setTx(null); setCalldata('');
+    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error('Refusing to sign: the contract describes a different mandate than this page (see Technical details).');
+    setM({ mandate, digest: local, module }); setMine(null); setTx(null); setCalldata('');
   });
 
   const onApprove = run(async () => {
@@ -93,7 +99,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
       title: `Mandate to ${partyName(m.mandate.payee)} set up: up to ${formatUnits(m.mandate.capPerPeriod, 6)} USDT ${period}`,
       actor: partyName(m.mandate.account), tx: hash, chain: 'whitechain',
     });
-    const stored = { id: m.digest, label: `${usdt(m.mandate.capPerPeriod)} / ${period} to ${m.mandate.payee}` };
+    const stored = { id: m.digest, label: mandateTitle(m.mandate.payee, m.mandate.capPerPeriod, m.mandate.period, m.digest) };
     saveMandate(stored);
     onCreated(stored);
   });
@@ -101,7 +107,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
   const onCalldata = run(async () => {
     if (!m || !approvals?.length) throw new Error('No approvals yet.');
     setCalldata(encodeCreateMandate(m.mandate, approvals));
-    saveMandate({ id: m.digest, label: `${usdt(m.mandate.capPerPeriod)} / ${period} to ${m.mandate.payee}` });
+    saveMandate({ id: m.digest, label: mandateTitle(m.mandate.payee, m.mandate.capPerPeriod, m.mandate.period, m.digest) });
   });
 
   const step = !m ? 'review' : !mine && !approvals?.length ? 'approve' : 'create';
@@ -136,9 +142,11 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
         <div><button className={`btn${step === 'review' ? ' btn-primary' : ''}`} data-testid="m-prepare" onClick={onPrepare} disabled={busy}>Review</button></div>
         {m && (
           <div className="well stack">
-            <p className="small muted" data-testid="m-digest">Contract digest matches: <code className="break">{m.digest}</code></p>
+            <p className="small muted" data-testid="m-digest" data-value={m.digest}>
+              ✓ The contract agrees: {mandateTitle(m.mandate.payee, m.mandate.capPerPeriod, m.mandate.period, m.digest)}, until {dayText(m.mandate.expiry)}.
+            </p>
             <div><button className={`btn${step === 'approve' ? ' btn-primary' : ''}`} data-testid="m-approve" onClick={onApprove} disabled={busy}>Approve with passkey</button></div>
-            {mine && <p className="small">Your approval: <code className="break">{serializeApproval(mine)}</code></p>}
+            {mine && <p className="small row" style={{ gap: 6 }}>Your approval is ready. If the amount needs a second approver, send them your approval: <CopyButton value={serializeApproval(mine)} label="Copy approval" /></p>}
             <Field label="Approvals from other approvers" hint="Paste the JSON a second approver sends you, if the cap needs two.">
               <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
             </Field>
@@ -150,13 +158,24 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
         )}
         {error && <Notice tone="negative"><span data-testid="m-error">{error}</span></Notice>}
         {tx && <Notice tone="positive" testId="m-tx">Mandate created: <TxLink hash={tx} /></Notice>}
-        {calldata && <div className="well"><p className="small muted">Send to MandateModule <span className="mono break">{config.mandateModule}</span> on Whitechain:</p><code className="break small">{calldata}</code></div>}
+        {calldata && <Notice>Transaction data ready: see Technical details below.</Notice>}
+        {m && (
+          <TechDetails open={!!calldata}>
+            <dl className="kv">
+              <dt>Mandate digest (id)</dt><dd><code className="break small">{m.digest}</code> <CopyButton value={m.digest} /></dd>
+              <dt>MandateModule</dt><dd><code className="break small">{m.module.address}</code> (v{m.module.version})</dd>
+              <dt>Nonce</dt><dd className="mono">{m.mandate.nonce.toString()}</dd>
+            </dl>
+            {mine && <><p className="small muted">Your approval (JSON)</p><code className="break small">{serializeApproval(mine)}</code></>}
+            {calldata && <><p className="small muted">Send to MandateModule <span className="mono break">{m.module.address}</span> on Whitechain:</p><code className="break small">{calldata}</code></>}
+          </TechDetails>
+        )}
       </div>
     </Card>
   );
 }
 
-type Row = StoredMandate & { state?: ReturnType<typeof decodeMandateOf>; available?: bigint; error?: string };
+type Row = StoredMandate & { state?: ReturnType<typeof decodeMandateOf>; available?: bigint; module?: MandateModuleRef; error?: string };
 
 /** A mandate's activity: this device's events merged with what the chain shows (created, collected, cancelled). */
 function MandateHistory({ id, account }: { id: string; account: Address | null }) {
@@ -197,10 +216,10 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
     <>
     <tr data-testid="mandate-row">
       <td>
-        {s ? <span className="mono break">{s.payee}</span> : <span className="faint">{row.label}</span>}
-        <span className="cell-sub"><span className="mono" title={row.id}>{row.id.slice(0, 10)}…</span>{s && <> · until {new Date(Number(s.expiry) * 1000).toISOString().slice(0, 10)}</>}</span>
+        {s ? <span>Mandate to <NameChip address={s.payee} /></span> : <span className="faint">{row.label}</span>}
+        <span className="cell-sub"><span title={row.id} data-value={row.id}>{shortRef(row.id)}</span>{s && <> · until {dayText(s.expiry)}</>}</span>
       </td>
-      <td className="num">{s ? <><Amount v={s.cap} /> / {days(BigInt(s.period))}</> : row.error ? <span className="error-text">{row.error}</span> : '…'}</td>
+      <td className="num">{s ? <><Amount v={BigInt(s.cap)} /> / {periodText(BigInt(s.period))}</> : row.error ? <span className="error-text">{row.error}</span> : '…'}</td>
       <td>{s ? (s.cancelled ? <Pill tone="negative">cancelled</Pill> : expired ? <Pill>expired</Pill> : <Pill tone="positive" dot>active</Pill>) : <Pill>loading</Pill>}</td>
       <td className="num" data-testid="available">{row.available !== undefined ? <Amount v={row.available} /> : '…'}</td>
       <td style={{ gridColumn: '1 / -1', minWidth: 260 }}>
@@ -217,7 +236,12 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
             <button className="btn btn-ghost" data-testid="mandate-activity" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide activity' : 'Activity'}</button>
           </div>
           {out.tx && <span className="small">Collected: <TxLink hash={out.tx} /></span>}
-          {out.calldata && <code className="break small">{out.calldata}</code>}
+          {out.calldata && (
+            <TechDetails open>
+              <p className="small muted">Send to MandateModule <span className="mono break">{row.module?.address ?? config.mandateModule}</span> on Whitechain:</p>
+              <code className="break small">{out.calldata}</code>
+            </TechDetails>
+          )}
           {out.error && <Notice tone="negative">{out.error}</Notice>}
         </div>
       </td>
@@ -236,17 +260,15 @@ export default function MandatesPage() {
   const [trackId, setTrackId] = useState('');
 
   const refresh = useCallback(async () => {
-    const mm = config.mandateModule;
     const list: Row[] = loadMandates();
     setRows(list);
-    if (!mm) return;
     setRows(await Promise.all(list.map(async (r) => {
       try {
-        const [state, available] = await Promise.all([
-          ethCall(mm, encodeMandateOfCall(r.id)).then(decodeMandateOf),
-          ethCall(mm, encodeAvailableCall(r.id)).then(decodeAvailable),
-        ]);
-        return { ...r, state, available };
+        // a mandate lives on MandateModuleV2 (v2 companies) or v1: look in both
+        const found = await findMandate(r.id as Hex);
+        if (!found) return { ...r, error: 'Not found on Whitechain yet' };
+        const available = decodeAvailable(await ethCall(found.ref.address, encodeAvailableCall(r.id as Hex)));
+        return { ...r, state: found.state, available, module: found.ref };
       } catch (e) {
         return { ...r, error: msg(e) };
       }
