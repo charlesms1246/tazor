@@ -224,7 +224,7 @@ test('helpers: satisfied, parseState, toResult', () => {
 
 test('the story: unique ids, a why for every step, every userTap waits on a page state', () => {
   assert.equal(new Set(STORY.map((s) => s.id)).size, STORY.length);
-  assert.equal(STORY.filter((s) => s.id !== 'ready').length, 15);
+  assert.equal(STORY.filter((s) => s.id !== 'ready').length, 16, 'including the Checkout chapter');
   for (const s of STORY) {
     assert.ok(s.why.length > 10, s.id);
     for (const a of s.actions) if (a.do === 'userTap') assert.ok(Object.keys(a.until).length > 0, s.id);
@@ -235,7 +235,7 @@ test('the Autopilot never targets acme: no acme accounts or registry in its sour
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const dir = join(import.meta.dirname, '..', 'app', '_autopilot');
-  for (const f of ['story.ts', 'browser.ts', 'engine.ts', 'sandbox-port.ts', 'panel.tsx']) {
+  for (const f of ['story.ts', 'browser.ts', 'engine.ts', 'sandbox-port.ts', 'panel.tsx', 'commerce.ts']) {
     const src = readFileSync(join(dir, f), 'utf8').toLowerCase();
     for (const a of ['0xb99a12652bee98429ae31ea0529a0b63f1073721', '0x18d15b034c645dbbfcb9c68238a14d059f632513', '0x331bdb575a72fb3dd8a6c85b6c043a753340fbf1', '0xea5a4be313e05eb254900b6adbb7d655c55242f6']) {
       assert.ok(!src.includes(a), `${f} mentions ${a}`);

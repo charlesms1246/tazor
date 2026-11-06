@@ -6,7 +6,8 @@
 import { getRelayerUrl } from './relayer-url.ts';
 
 export type SandboxChain = 'whitechain' | 'sepolia';
-export type SandboxAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect' | 'finance-buy' | 'finance-settle';
+export type SandboxAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect' | 'finance-buy' | 'finance-settle'
+  | 'checkout-customer-pay' | 'checkout-merchant-refund' | 'deposit-customer-pay' | 'agent-x402';
 
 export type SandboxStep = {
   name: 'deploy' | 'soul' | 'ens-role' | 'sync';
@@ -100,7 +101,7 @@ export function createSandboxClient(base: () => string = getRelayerUrl, f: typeo
      * credit-note {amount?} · collect {mandate?, amount?} · finance-buy {tokenId?} · finance-settle {tokenId?}.
      * Amounts are USDT decimal strings ≤ "1"; mandate/tokenId default to the setup's.
      */
-    counterparty: (action: SandboxAction, params: Record<string, string | string[]> = {}) =>
+    counterparty: (action: SandboxAction, params: Record<string, unknown> = {}) =>
       call<SandboxActionResult>('POST', '/sandbox/counterparty', { ...params, action }),
     status: () => call<SandboxStatus>('GET', '/sandbox/status', undefined, 20_000),
     /** The relayer's /health sandbox field, or null if unreachable. */

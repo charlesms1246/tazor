@@ -9,6 +9,8 @@ import { loadPasskey } from '../../lib/storage.ts';
 import { createRunner, KEY, parseState, type ApiResult, type Chain, type Ctx, type Deps, type Dom, type RunState, type Runner } from './engine.ts';
 import { fromClient, getSandbox, type CounterpartyAction } from './sandbox-port.ts';
 import { LABELS, STORY } from './story.ts';
+import { commerceApi } from './commerce.ts';
+import { refundOrder, walletSigner } from '../../lib/checkout.ts';
 
 export const AUTOPILOT_EVENT = 'tazor:autopilot';
 const ADDR = /^0x[0-9a-fA-F]{40}$/;
@@ -72,7 +74,23 @@ async function supplierName(): Promise<string> {
   return !isSandboxError(r.body) && r.body.company?.supplierName ? r.body.company.supplierName : 'Sandbox Supplier';
 }
 
-async function api(name: string, args: Record<string, string>): Promise<ApiResult> {
+const commerce = commerceApi({
+  client,
+  relayer: getRelayerUrl,
+  wallet: async () => {
+    const eth = (globalThis as { ethereum?: unknown }).ethereum;
+    return eth ? walletSigner(eth as never) : null;
+  },
+  refund: (a) => refundOrder(a),
+});
+
+async function api(name: string, args: Record<string, string>, c: Ctx = {}): Promise<ApiResult> {
+  if (name === 'wallet-address') return commerce.walletAddress();
+  if (name === 'customer-pays') return commerce.customerPays(c);
+  if (name === 'merchant-refund') return commerce.refund(c);
+  if (name === 'deposit-pays') return commerce.depositPays(c);
+  if (name === 'deposit-status') return commerce.depositStatus(c);
+  if (name === 'agent-pays') return commerce.agentPays();
   if (name === 'preflight') {
     const p = loadPasskey();
     if (!p) return { ok: false, error: 'No passkey on this device yet. Choose "Try it yourself" to create one.' };
@@ -120,7 +138,7 @@ const deps: Omit<Deps, 'onChange'> = {
   dom: browserDom,
   navigate,
   setCompany: (id) => setCompany(id as never),
-  api: (n, a) => api(n, a),
+  api: (n, a, c) => api(n, a, c),
   receipt,
   receiptLogs,
   save: (s) => { try { if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); } catch { /* storage unavailable */ } },
