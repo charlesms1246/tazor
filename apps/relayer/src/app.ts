@@ -136,7 +136,9 @@ export function createHandler(deps: {
         const mirror = deps.mirror ? await deps.mirror.scanOnce() : undefined;
         // subscriptions: charge the due ones (within the gas budget), remind merchants 24 h ahead
         const subscriptions = deps.checkout ? await deps.checkout.scanDue(async () => { await deps.guard?.checkBudget(); }).catch((e) => ({ error: e instanceof Error ? e.message.split('\n')[0] : String(e) })) : undefined;
-        return reply(200, { ...roles, ...(mirror ? { mirror } : {}), ...(subscriptions ? { subscriptions } : {}) });
+        // big payments: order.ready once their block is posted to Ethereum (reads only, no gas)
+        const ready = deps.checkout ? await deps.checkout.scanReady().catch((e) => ({ error: e instanceof Error ? e.message.split('\n')[0] : String(e) })) : undefined;
+        return reply(200, { ...roles, ...(mirror ? { mirror } : {}), ...(subscriptions ? { subscriptions } : {}), ...(ready ? { ready } : {}) });
       }
       if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
         const json = await readJson(req);

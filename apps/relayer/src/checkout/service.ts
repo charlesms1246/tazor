@@ -2,6 +2,7 @@ import { decodeErrorResult, encodeFunctionData, getAddress, isAddressEqual, zero
 import { BadRequest, UINT256_MAX, addr, hex, uint } from '../payment.ts';
 import { SimulationFailed } from '../sender.ts';
 import type { Webhooks } from '../webhooks.ts';
+import { emitReady, shipView } from './ship.ts';
 import { EXPLORER, USDT, checkoutAbi, usdtAbi, type Order, type Plan } from './abi.ts';
 
 /** A state conflict found by the pre-checks (already paid, nonce used, not due…): HTTP 409. */
@@ -70,8 +71,8 @@ export function createCheckout(o: {
     return { txHash, blockNumber: r.blockNumber };
   }
   /** 200 body: {ok, id, txHash, explorer, orderId|subId, …}. */
-  const ok = (txHash: Hex, extra: Record<string, unknown> & { orderId?: Hex; subId?: Hex }) =>
-    ({ ok: true as const, id: extra.orderId ?? extra.subId, txHash, explorer: txUrl(txHash), stage: 'sequencer' as const, ...extra });
+  const ok = <E extends { orderId?: Hex; subId?: Hex }>(txHash: Hex, extra: E) =>
+    ({ ok: true as const, id: (extra.orderId ?? extra.subId) as Hex, txHash, explorer: txUrl(txHash), stage: 'sequencer' as const, ...extra });
   // ids and nonces straight from the contract's own views, so the relayer can never disagree with it
   const view = <T>(fn: string, args: readonly unknown[]) => ch.read<T>(C, checkoutAbi as unknown as Abi, fn, args);
   const emit = (e: Parameters<Webhooks['emit']>[0]) => (o.webhooks ? o.webhooks.emit(e).catch(() => null) : Promise.resolve(null));
@@ -123,8 +124,11 @@ export function createCheckout(o: {
     await unused(payer, await view<Hex>('payNonce', [order]));
     await funded(payer, order.amount);
     const r = await submit(encodeFunctionData({ abi: checkoutAbi, functionName: 'pay', args: [order, payer, validAfter, validBefore, signature] }));
-    await emit({ id: `${id}:paid`, type: 'order.paid', merchant: order.merchant, txHash: r.txHash, data: { orderId: id, merchant: order.merchant, payer, amount: s(order.amount), ref: order.ref } });
-    return ok(r.txHash, { orderId: id });
+    // ready/waitFor from the merchant's rule: small payments ship now (order.ready follows at once), big ones wait for Ethereum
+    const ship = shipView(o.webhooks, order.merchant, order.amount, 'sequencer');
+    await emit({ id: `${id}:paid`, type: 'order.paid', merchant: order.merchant, txHash: r.txHash, data: { orderId: id, merchant: order.merchant, payer, amount: s(order.amount), ref: order.ref, ready: ship.ready, waitFor: ship.waitFor, shipAbove: ship.shipAbove } });
+    await emitReady(o.webhooks, { orderId: id, merchant: order.merchant, amount: order.amount, stage: 'sequencer', txHash: r.txHash });
+    return ok(r.txHash, { orderId: id, ship: { ready: ship.ready, waitFor: ship.waitFor, shipAbove: ship.shipAbove, reason: ship.reason } });
   }
 
   async function refund(raw: unknown) {
@@ -247,6 +251,8 @@ export function createCheckout(o: {
     if (stage && prev?.stage !== stage) {
       await emit({ id: `${id}:${stage}`, type: 'order.finality', merchant: p.merchant, txHash: payLog?.transactionHash ?? null, data: { orderId: id, stage, block: payLog ? s(payLog.blockNumber) : null } });
     }
+    // paid but the log isn't indexed yet: at least sequencer-confirmed
+    const ship = await emitReady(o.webhooks, { orderId: id, merchant: p.merchant, amount: p.amount, stage: stage ?? 'sequencer', txHash: payLog?.transactionHash ?? null });
     return {
       id, orderId: id, status: p.refunded === 0n ? 'paid' : p.refunded >= p.amount ? 'refunded' : 'partially-refunded',
       merchant: p.merchant, payer: p.payer, amount: s(p.amount), refunded: s(p.refunded), paidAt: s(p.paidAt), refunds: Number(p.refunds),
@@ -257,7 +263,22 @@ export function createCheckout(o: {
       },
       refundTxs: refunds.map((l) => ({ tx: l.transactionHash, amount: String(l.args.amount), totalRefunded: String(l.args.totalRefunded), block: s(l.blockNumber) })),
       explorer: payLog ? txUrl(payLog.transactionHash) : null,
+      ship: { ready: ship.ready, waitFor: ship.waitFor, shipAbove: ship.shipAbove, reason: ship.reason },
     };
+  }
+
+  /** Cron: looks at recently paid orders so a big payment's order.ready goes out when its block reaches Ethereum. */
+  async function scanReady(lookback = 20_000n) {
+    const head = (await ch.block('latest')).number;
+    const from = head > lookback ? head - lookback : 0n;
+    const start = o.fromBlock !== undefined && o.fromBlock > from ? o.fromBlock : from;
+    const paid = await ch.logs(C, ev('OrderPaid'), {}, start);
+    const ids = [...new Set(paid.map((l) => l.args.id as Hex))];
+    let ready = 0;
+    for (const id of ids) {
+      try { if ((await order(id)).ship?.ready) ready++; } catch { /* one order failing never stops the pass */ }
+    }
+    return { orders: ids.length, ready };
   }
 
   async function subscriptionView(idRaw: string) {
@@ -304,7 +325,7 @@ export function createCheckout(o: {
     return { subscriptions: ids.length, results };
   }
 
-  return { address: C, pay, refund, subscribe, cancel, charge, order, subscription: subscriptionView, scanDue };
+  return { address: C, pay, refund, subscribe, cancel, charge, order, subscription: subscriptionView, scanDue, scanReady };
 }
 export type Checkout = ReturnType<typeof createCheckout>;
 

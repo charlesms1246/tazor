@@ -75,7 +75,7 @@ test('deposit status: awaiting → underpaid → funded settles on the poll (gua
   assert.equal(st.stage, 'sequencer', 'settled at the head: not yet in a safe block');
   assert.deepEqual(s.sent, ['settle']);
   assert.deepEqual(keys, [['/checkout/deposit/settle', [MERCHANT]]]);
-  assert.deepEqual(hooks, ['order.paid:deposit', 'order.finality:deposit']);
+  assert.deepEqual(hooks, ['order.paid:deposit', 'order.ready:deposit', 'order.finality:deposit']);
   st = await status();
   assert.deepEqual(s.sent, ['settle'], 'paid: polling never settles again');
   s.safe = 200n;

@@ -2,6 +2,7 @@ import { encodeFunctionData, getAddress, type Abi, type AbiEvent, type Address, 
 import { BadRequest, UINT256_MAX, addr, hex, uint } from '../payment.ts';
 import { SimulationFailed } from '../sender.ts';
 import type { Webhooks } from '../webhooks.ts';
+import { emitReady, shipView } from './ship.ts';
 import { EXPLORER, USDT, usdtAbi } from './abi.ts';
 import { depositAbi } from './deposit-abi.ts';
 import { Conflict, MAX_WINDOW_SEC, type CheckoutChain, type Stage } from './service.ts';
@@ -75,8 +76,9 @@ export function createDeposit(o: {
       const txHash = await send(encodeFunctionData({ abi, functionName: 'settle', args: [order] }));
       await emit({
         id: `${id}:paid`, type: 'order.paid', merchant: order.merchant, txHash,
-        data: { orderId: id, source: 'deposit', merchant: order.merchant, refundTo: order.refundTo, amount: order.amount.toString(), received: balance.toString(), ref: order.ref },
+        data: { orderId: id, source: 'deposit', merchant: order.merchant, refundTo: order.refundTo, amount: order.amount.toString(), received: balance.toString(), ref: order.ref, ...(({ ready, waitFor, shipAbove }) => ({ ready, waitFor, shipAbove }))(shipView(o.webhooks, order.merchant, order.amount, 'sequencer')) },
       });
+      await emitReady(o.webhooks, { orderId: id, merchant: order.merchant, amount: order.amount, stage: 'sequencer', txHash, source: 'deposit' });
       return { txHash };
     })().finally(() => settling.delete(id));
     settling.set(id, run);
@@ -133,11 +135,13 @@ export function createDeposit(o: {
         await emit({ id: `${id}:${stage}`, type: 'order.finality', merchant: order.merchant, txHash: payTx, data: { orderId: id, source: 'deposit', stage } });
       }
     }
+    const ship = paid ? await emitReady(o.webhooks, { orderId: id, merchant: order.merchant, amount: order.amount, stage, txHash: payTx, source: 'deposit' }) : shipView(o.webhooks, order.merchant, order.amount, null);
     return {
       id, orderId: id, depositAddress, balance: balance.toString(), amount: order.amount.toString(),
       status: !paid ? (balance >= order.amount ? 'funded' : balance > 0n ? 'underpaid' : 'awaiting-transfer') : p.refunded === 0n ? 'paid' : p.refunded >= p.amount ? 'refunded' : 'partially-refunded',
       paid, paidAt: p.paidAt.toString(), refunded: p.refunded.toString(), deadline: order.deadline.toString(), expired: order.deadline <= nowSec(),
-      payTx, txHash: payTx, explorer: payTx ? txUrl(payTx) : null, stage, ...(settledNow ? { settledNow } : {}), ...(settleError ? { settleError } : {}),
+      payTx, txHash: payTx, explorer: payTx ? txUrl(payTx) : null, stage,
+      ship: { ready: ship.ready, waitFor: ship.waitFor, shipAbove: ship.shipAbove, reason: ship.reason }, ...(settledNow ? { settledNow } : {}), ...(settleError ? { settleError } : {}),
     };
   }
 

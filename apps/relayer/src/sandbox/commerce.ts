@@ -174,7 +174,7 @@ export function createCommerce(o: {
       const now = nowSec();
       const authorization = { from: agent.address, to: o.x402PayTo, value: AGENT_PAYMENT.toString(), validAfter: (now - 60n).toString(), validBefore: (now + 300n).toString(), nonce: toHex(randomBytes(32)) };
       const signature = await sign3009(agent, 'TransferWithAuthorization', { to: o.x402PayTo, value: AGENT_PAYMENT, validAfter: now - 60n, validBefore: now + 300n, nonce: authorization.nonce });
-      const settled = await o.x402.settle({ x402Version: 1, paymentPayload: { x402Version: 1, scheme: 'exact', network: 'whitechain-sepolia', payload: { signature, authorization } }, paymentRequirements: requirements });
+      const settled = await o.x402.settle({ x402Version: 1, paymentPayload: { x402Version: 1, scheme: 'exact', network: 'eip155:1874', payload: { signature, authorization } }, paymentRequirements: requirements });
       if (!settled.success) throw new SandboxRefused(`the facilitator refused the agent's payment: ${settled.errorReason}`);
       return res('agent-x402', 'paid', settled.transaction as Hex, `An AI agent paid ${usdt(AGENT_PAYMENT)} over x402 and got a freight quote (${from} → ${to})`, {
         quote: freightQuote(from, to), txHash: settled.transaction, agent: agent.address, payTo: o.x402PayTo, fundTx, resource,

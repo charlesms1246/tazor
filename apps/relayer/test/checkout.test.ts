@@ -7,7 +7,7 @@ import { createHandler } from '../src/app.ts';
 import { checkoutAbi } from '../src/checkout/abi.ts';
 import { createCheckout, type CheckoutChain } from '../src/checkout/service.ts';
 import { SimulationFailed } from '../src/sender.ts';
-import { createWebhooks } from '../src/webhooks.ts';
+import { createWebhooks, endpointsFromEnv } from '../src/webhooks.ts';
 
 const C: Address = '0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670';
 const MERCHANT: Address = '0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6';
@@ -61,7 +61,7 @@ function fake() {
         const o = a[0] as { merchant: Address; amount: bigint; ref: Hex };
         const id = await chain.read<Hex>(C, abi, 'orderId', [o]);
         s.payments.set(id, { merchant: o.merchant, payer: a[1] as Address, amount: o.amount, refunded: 0n, paidAt: BigInt(NOW), refunds: 0 });
-        s.logs.push({ event: 'OrderPaid', id, blockNumber: s.payBlock || s.head, tx, args: {} });
+        s.logs.push({ event: 'OrderPaid', id, blockNumber: s.payBlock || s.head, tx, args: { id } });
       }
       if (d.functionName === 'refund') {
         const p = s.payments.get(a[0] as string)!;
@@ -111,7 +111,8 @@ test('pay: pre-checks then pay(order, payer, validAfter, validBefore, sig); 200 
   assert.match(r.body.explorer, /^https:\/\/explorer\.testnet\.whitechain\.io\/tx\/0x/);
   assert.equal(t.s.sent[0].fn, 'pay');
   assert.deepEqual(t.s.sent[0].args.slice(1), [PAYER, BigInt(NOW - 10), BigInt(NOW + 600), SIG]);
-  assert.deepEqual(t.hooks, [{ type: 'order.paid', id: `${r.body.orderId}:paid` }]);
+  assert.deepEqual(t.hooks, [{ type: 'order.paid', id: `${r.body.orderId}:paid` }, { type: 'order.ready', id: `${r.body.orderId}:ready` }], '1.5 USDT is under 100: ready at once');
+  assert.deepEqual(r.body.ship, { ready: true, waitFor: 'sequencer', shipAbove: '100', reason: 'Ready to ship: under 100 USDT, confirmation on Whitechain is enough' });
   const again = await t.post('/checkout/pay', payBody);
   assert.deepEqual([again.code, again.body.code], [409, 'already-paid']);
   assert.equal(t.s.sent.length, 1);
@@ -285,4 +286,34 @@ test('GET /watch (Bearer CRON_SECRET) runs the subscription cron: 401 without th
   assert.equal(s.sent.at(-1)!.fn, 'charge');
   assert.equal(budget, 1, 'the gas budget is checked before the charge');
   srv.close();
+});
+
+test('ship policy: a payment at or above the merchant\'s shipAbove waits for Ethereum; order.ready goes out when the receipt (or the cron) sees that stage', async () => {
+  const { s, chain } = fake();
+  s.balance = 500_000_000n;
+  const hooks: { type: string; data: Record<string, unknown> }[] = [];
+  const webhooks = createWebhooks({ endpoints: { [MERCHANT.toLowerCase()]: { secret: 'x', shipAbove: '100' } }, now: () => NOW * 1000 });
+  const emit = webhooks.emit;
+  webhooks.emit = async (e) => { const d = await emit(e); if (d) hooks.push({ type: e.type, data: e.data }); return d; };
+  const c = createCheckout({ address: C, chain, webhooks, now: () => NOW * 1000, fromBlock: 0n });
+  s.payBlock = 950n; s.safe = 940n; s.finalized = 900n;
+  const big = { ...payBody, order: { ...order, amount: '100000000', ref: `0x${'b1'.repeat(32)}` } };
+  const r = await c.pay(big);
+  assert.deepEqual(r.ship, { ready: false, waitFor: 'ethereum', shipAbove: '100', reason: 'Payment received; waiting for Whitechain to post it to Ethereum (big payments only: 100 USDT and above)' });
+  assert.deepEqual(hooks.map((h) => h.type), ['order.paid']);
+  assert.deepEqual([hooks[0].data.ready, hooks[0].data.waitFor, hooks[0].data.shipAbove], [false, 'ethereum', '100']);
+
+  const v = await c.order(r.orderId);
+  assert.equal(v.ship!.ready, false);
+  assert.deepEqual(hooks.map((h) => h.type), ['order.paid', 'order.finality']);
+  s.safe = 960n;   // the block is now posted to Ethereum
+  const cron = await c.scanReady();
+  assert.deepEqual(cron, { orders: 1, ready: 1 });
+  assert.deepEqual(hooks.map((h) => h.type), ['order.paid', 'order.finality', 'order.finality', 'order.ready']);
+  assert.deepEqual([hooks[3].data.stage, hooks[3].data.waitFor], ['ethereum', 'ethereum']);
+  await c.scanReady();
+  assert.equal(hooks.filter((h) => h.type === 'order.ready').length, 1, 'order.ready is sent once');
+
+  assert.deepEqual(endpointsFromEnv(JSON.stringify({ [MERCHANT]: { secret: 's', shipAbove: '25.5' } }))[MERCHANT.toLowerCase()], { secret: 's', shipAbove: '25.5' });
+  assert.deepEqual(webhooks.shipPolicyFor('0x0000000000000000000000000000000000000001'), { waitForEthereumAbove: '100' }, 'default 100 USDT');
 });

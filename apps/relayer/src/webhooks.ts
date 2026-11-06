@@ -3,7 +3,7 @@ import { getAddress, isAddress, type Hex } from 'viem';
 
 export const WEBHOOK_TOLERANCE_SEC = 300;
 export const EVENT_TYPES = [
-  'order.paid', 'order.refunded', 'order.finality',
+  'order.paid', 'order.ready', 'order.refunded', 'order.finality',
   'subscription.created', 'subscription.charged', 'subscription.cancelled', 'subscription.due',
   'x402.settled', 'webhook.test',
 ] as const;
@@ -28,7 +28,7 @@ export function verify(secret: string, rawBody: string, header: string | null | 
 }
 
 /** A merchant's webhook: POSTed to `url`; without a url the event is only signed and recorded (read it from /webhooks/recent). */
-export type Endpoint = { url?: string; secret: string };
+export type Endpoint = { url?: string; secret: string; /** USDT: payments at or above wait for Ethereum before order.ready (default 100). */ shipAbove?: string };
 
 /** The public demo merchant (examples/merchant-demo) and its test secret, public on purpose: its page verifies deliveries in the browser. */
 export const DEMO_MERCHANT = '0xc1dce946d192e344251972470237f1471c93876c';
@@ -43,7 +43,8 @@ export function endpointsFromEnv(json: string | undefined): Record<string, Endpo
     for (const [k, v] of Object.entries(o)) {
       if (!isAddress(k, { strict: false }) || typeof v?.secret !== 'string' || !v.secret) continue;
       if (v.url !== undefined && (typeof v.url !== 'string' || !/^https?:\/\//.test(v.url))) continue;
-      out[k.toLowerCase()] = { ...(typeof v.url === 'string' ? { url: v.url } : {}), secret: v.secret };
+      const shipAbove = (v as { shipAbove?: unknown }).shipAbove;
+      out[k.toLowerCase()] = { ...(typeof v.url === 'string' ? { url: v.url } : {}), secret: v.secret, ...(typeof shipAbove === 'string' && /^\d+(\.\d{1,6})?$/.test(shipAbove) ? { shipAbove } : {}) };
     }
     return out;
   } catch { return {}; }
@@ -142,6 +143,8 @@ export function createWebhooks(o: {
   return {
     emit,
     hasEndpoint: (merchant: string) => !!o.endpoints[merchant.toLowerCase()]?.url,
+    /** The merchant's shipping rule (WEBHOOKS_JSON shipAbove, default 100 USDT). */
+    shipPolicyFor: (merchant: string) => ({ waitForEthereumAbove: o.endpoints[merchant.toLowerCase()]?.shipAbove ?? '100' }),
     merchants: () => Object.keys(o.endpoints).length,
     storage: store.kind,
     recent: (merchant: string) => store.list(getAddress(merchant).toLowerCase()),
