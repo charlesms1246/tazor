@@ -8,7 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test:fork": "node --test --test-concurrency=1 --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts"
+    "test:fork": "node --test --test-concurrency=1 --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts",
+    "test:unit": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning test/records.test.ts",
+    "set-records": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/set-records.ts"
   },
   "dependencies": {
     "viem": "2.57.16"
