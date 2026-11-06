@@ -36,6 +36,7 @@ export default function Page() {
 
   return (
     <main>
+      <nav><a href="/onboard/">Onboard</a> · <a href="/team/">Team</a></nav>
       <h1>Tazor passkey check</h1>
       <p>Signs with a passkey and verifies on Whitechain Sepolia (P-256 precompile 0x…0100).</p>
       <button data-testid="create" onClick={onCreate} disabled={busy}>Create passkey</button>{' '}

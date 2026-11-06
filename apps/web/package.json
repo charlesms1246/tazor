@@ -7,10 +7,12 @@
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "serve": "node scripts/serve.mjs",
-    "test:passkey": "NEXT_TELEMETRY_DISABLED=1 next build && playwright test",
+    "test:passkey": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_PAYMENT_MODULE=0x0000000000000000000000000000000000007000 NEXT_PUBLIC_APPROVER_ACCOUNT_FACTORY=0x0000000000000000000000000000000000007001 next build && playwright test passkey.spec.ts",
     "test:unit": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning tests/*.test.ts",
     "fixture:webauthn": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/webauthn-fixture.ts",
-    "vector:approver": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/approver-vector.ts"
+    "vector:approver": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/approver-vector.ts",
+    "abi:sync": "node scripts/sync-abi.mjs",
+    "test:e2e": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_PAYMENT_MODULE=0x0000000000000000000000000000000000007000 NEXT_PUBLIC_APPROVER_ACCOUNT_FACTORY=0x0000000000000000000000000000000000007001 next build && playwright test"
   },
   "dependencies": {
     "next": "16.4.5",
