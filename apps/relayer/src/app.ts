@@ -3,7 +3,7 @@ import { BadRequest, encodePayOne, parsePayRequest } from './payment.ts';
 import { SimulationFailed, type Sender } from './sender.ts';
 import { parseSigner, type ApproverDeployer } from './approver.ts';
 import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
-import { encodeCreateMandate, encodePull, parseMandateRequest, parsePullRequest } from './mandate.ts';
+import { MANDATE_MODULE_V2, encodeCreateMandate, encodePull, findMandateModule, parseMandateRequest, parsePullRequest, pickByAccount, pickMandateModule } from './mandate.ts';
 import { getAddress, isAddress, type PublicClient } from 'viem';
 import type { RoleSync, ScanSummary, SyncResult } from './sync.ts';
 import { PAYMENT_MODULE_V2, parsePayRunRequest, pickModule, preparePayRun } from './payrun.ts';
@@ -52,7 +52,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 export function createHandler(deps: {
   sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer; revocationList?: `0x${string}`;
-  mandateModule?: `0x${string}`; client?: PublicClient; paymentModuleV2?: `0x${string}`; revocationListV2?: `0x${string}`;
+  mandateModule?: `0x${string}`; mandateModuleV2?: `0x${string}`; client?: PublicClient; paymentModuleV2?: `0x${string}`; revocationListV2?: `0x${string}`;
   paymaster?: `0x${string}`; chainId?: number;
   /** ENS → Whitechain role syncing (POST /sync, GET /watch); absent when no prover or sender is configured. */
   roleSync?: RoleSync;
@@ -111,14 +111,27 @@ export function createHandler(deps: {
       }
       if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
         const json = await readJson(req);
-        const data = req.url === '/mandate' ? encodeCreateMandate(parseMandateRequest(json)) : encodePull(parsePullRequest(json));
-        if (!deps.sender || !deps.mandateModule) return reply(503, { error: 'relayer not configured', to: deps.mandateModule ?? null, data });
-        return reply(200, { txHash: await deps.sender.send(deps.mandateModule, data) });
+        const create = req.url === '/mandate' ? parseMandateRequest(json) : null;
+        const pull = create ? null : parsePullRequest(json);
+        const data = create ? encodeCreateMandate(create) : encodePull(pull!);
+        // v2 companies use MandateModuleV2: by account for /mandate, by where the mandate id lives for /pull
+        const mods = { v1: deps.mandateModule, v2: deps.mandateModuleV2 ?? MANDATE_MODULE_V2, paymentModuleV2: deps.paymentModuleV2 ?? PAYMENT_MODULE_V2 };
+        const to = !deps.client || !mods.v1 ? mods.v1
+          : create ? await pickMandateModule(deps.client, create.mandate.account, { ...mods, v1: mods.v1 })
+          : await findMandateModule(deps.client, pull!.mandateId, { v1: mods.v1, v2: mods.v2 });
+        if (!deps.sender || !to) return reply(503, { error: 'relayer not configured', to: to ?? null, data });
+        return reply(200, { txHash: await deps.sender.send(to, data), mandateModule: to });
       }
       if (req.method === 'POST' && req.url === '/revoke') {
         const json = await readJson(req);
         const data = encodeRevoke(parseRevokeRequest(json));
-        const list = pickRevocationList(json, deps.revocationList, deps.revocationListV2 ?? REVOCATION_LIST_V2);
+        const listV2 = deps.revocationListV2 ?? REVOCATION_LIST_V2;
+        const named = (json as { list?: unknown } | null)?.list;
+        // no explicit list: a v2 company revokes on RevocationListV2 (same rule as the mandate module)
+        const byAccount = (named === undefined || named === null) && deps.client && deps.revocationList
+          ? ((await pickByAccount(deps.client, parseRevokeRequest(json).account, { v1: deps.revocationList, v2: listV2, paymentModuleV2: deps.paymentModuleV2 ?? PAYMENT_MODULE_V2 })))
+          : undefined;
+        const list = byAccount ?? pickRevocationList(json, deps.revocationList, listV2);
         if (!deps.sender || !list) return reply(503, { error: 'relayer not configured', to: list ?? null, data });
         return reply(200, { txHash: await deps.sender.send(list, data) });
       }
@@ -134,7 +147,13 @@ export function createHandler(deps: {
       if (req.method === 'POST' && (req.url === '/pay' || req.url === '/pay/calldata')) {
         const parsed = parsePayRequest(await readJson(req));
         const data = encodePayOne(parsed);
-        if (req.url === '/pay/calldata') return reply(200, { to: deps.paymentModule ?? null, data });
+        if (req.url === '/pay/calldata') {
+          // the module this account actually uses (v2 companies: PaymentModuleV2; same payOne calldata)
+          const to = deps.client && deps.paymentModule
+            ? await pickModule(deps.client, parsed.account, deps.paymentModule, deps.paymentModuleV2 ?? PAYMENT_MODULE_V2).catch(() => deps.paymentModule!)
+            : deps.paymentModule ?? null;
+          return reply(200, { to, data });
+        }
         if (!deps.sender || !deps.paymentModule) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
         if (!deps.client || !deps.approvers) return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
         // a v2 company pays through PaymentModuleV2 (same payOne signature, its own invoice digest and policy checks)

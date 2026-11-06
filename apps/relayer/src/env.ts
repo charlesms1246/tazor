@@ -7,6 +7,7 @@ import { createRoleSync, type Prover } from './sync.ts';
 import { createMirrorService } from './mirror-service.ts';
 import { REVOCATION_LIST_V2 } from './revoke-list.ts';
 import { PAYMENT_MODULE_V2 } from './payrun.ts';
+import { MANDATE_MODULE_V2 } from './mandate.ts';
 import { sandboxFromEnv } from './sandbox/config.ts';
 import { createSandboxPorts } from './sandbox/ports.ts';
 import { createSandbox } from './sandbox/service.ts';
@@ -77,6 +78,7 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
     : undefined;
   const handler = createHandler({
     sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id,
+    mandateModuleV2: getAddress(env.MANDATE_MODULE_V2 || MANDATE_MODULE_V2), paymentModuleV2: getAddress(env.PAYMENT_MODULE_V2 || PAYMENT_MODULE_V2),
     roleSync, cronSecret, mirror, sandbox,
   });
   return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror, sandbox };

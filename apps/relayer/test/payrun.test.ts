@@ -120,8 +120,8 @@ test('/pay for a v2 account sends payOne to PaymentModuleV2 and names it in the 
   const { functionName, args } = decodeFunctionData({ abi, data: sent[0].data });
   assert.equal(functionName, 'payOne');
   assert.equal((args![0] as string).toLowerCase(), V2_ACCOUNT);
-  // /pay/calldata is unchanged: it still names the v1 module
-  assert.equal((await (await post('/pay/calldata', body)).json()).to, V1);
+  // /pay/calldata names the module this account uses (v2 here), with the same payOne calldata
+  assert.equal((await (await post('/pay/calldata', body)).json()).to.toLowerCase(), PAYMENT_MODULE_V2.toLowerCase());
 });
 
 test('/pay for an account configured on neither module is 400 before any send', async () => {
