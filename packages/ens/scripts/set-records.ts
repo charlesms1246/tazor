@@ -1,6 +1,7 @@
 // Sets Tazor's demo ENS records on Ethereum Sepolia: company text records and ENSIP-11 Whitechain addresses,
 // and member subnames with an ETH address and a name text record.
 // Usage: PRIVATE_KEY=0x… node --experimental-strip-types scripts/set-records.ts [--send]
+// COMPANY_PLAN (JSON CompanyPlan, see src/records.ts) replaces the built-in demo companies.
 // Without --send it only prints and simulates the planned calls; a dry run can use SIGNER=0x… instead of a key.
 // Calls whose record already holds the target value (read through the UniversalResolver) are skipped, so re-runs
 // only send what is missing. Before each send it waits until the account has nothing pending on this RPC.
@@ -34,7 +35,9 @@ console.log(`${SEND ? 'SEND' : 'DRY RUN'} on Sepolia via ${RPC} as ${account.add
 
 const plan: Call[] = [];
 const afterRegister: Call[] = [];
-for (const c of DEMO_RECORDS) {
+// COMPANY_PLAN='{"label","texts","whitechainAccount","members"}' sets one other company's records (e.g. the sandbox) instead of the demo set
+const PLANS = process.env.COMPANY_PLAN ? [JSON.parse(process.env.COMPANY_PLAN)] : DEMO_RECORDS;
+for (const c of PLANS) {
   const name = `${c.label}.taz0r.eth`;
   plan.push(...recordCalls(name, c.texts, [[WHITECHAIN_SEPOLIA_COIN_TYPE, c.whitechainAccount]]));
   if (c.members.length === 0) continue;
