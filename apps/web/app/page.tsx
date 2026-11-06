@@ -37,7 +37,7 @@ export default function Page() {
 
   return (
     <main>
-      <nav><a href="/onboard/">Onboard</a> · <a href="/team/">Team</a> · <a href="/export/">Export</a> · <a href="/mandates/">Mandates</a></nav>
+      <nav><a href="/onboard/">Onboard</a> · <a href="/team/">Team</a> · <a href="/export/">Export</a> · <a href="/mandates/">Mandates</a> · <a href="/policies/">Policies</a> · <a href="/financing/">Financing</a> · <a href="/settings/">Settings</a></nav>
       <section data-testid="timings">
         <h2>Typical bank vs Tazor</h2>
         <table>
