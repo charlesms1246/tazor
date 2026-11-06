@@ -1,0 +1,16 @@
+services:
+  relayer:
+    build: ../apps/relayer
+    container_name: tazor-relayer
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      WC_RPC: ${WC_RPC:-https://rpc.testnet.whitechain.io}
+      PAYMENT_MODULE: ${PAYMENT_MODULE:-}
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

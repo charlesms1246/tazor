@@ -4,7 +4,10 @@ export const WHITECHAIN_RPC = 'https://rpc.testnet.whitechain.io';
 
 export type Hex = `0x${string}`;
 export type PasskeyPublicKey = { credentialId: string; x: Hex; y: Hex };
-export type PasskeySignature = { hash: Hex; r: Hex; s: Hex; rawS: Hex; wasHighS: boolean };
+export type PasskeySignature = {
+  hash: Hex; r: Hex; s: Hex; rawS: Hex; wasHighS: boolean;
+  authenticatorData: Hex; clientDataJSON: string; typeIndex: number; challengeIndex: number;
+};
 
 const toHex = (b: Uint8Array): Hex =>
   `0x${Array.from(b, (v) => v.toString(16).padStart(2, '0')).join('')}`;
@@ -76,10 +79,19 @@ export async function signChallenge(credentialId: string, challenge: Uint8Array<
     },
   })) as PublicKeyCredential;
   const res = cred.response as AuthenticatorAssertionResponse;
-  const hash = await webauthnMessageHash(new Uint8Array(res.authenticatorData), new Uint8Array(res.clientDataJSON));
+  const authData = new Uint8Array(res.authenticatorData);
+  const clientData = new Uint8Array(res.clientDataJSON);
+  const hash = await webauthnMessageHash(authData, clientData);
   const { r, s } = parseDerSignature(new Uint8Array(res.signature));
   const low = normalizeLowS(s);
-  return { hash, r: bigToHex32(r), s: bigToHex32(low), rawS: bigToHex32(s), wasHighS: low !== s };
+  const clientDataJSON = new TextDecoder().decode(clientData);
+  const typeIndex = clientDataJSON.indexOf('"type":');
+  const challengeIndex = clientDataJSON.indexOf('"challenge":');
+  if (typeIndex < 0 || challengeIndex < 0) throw new Error('unexpected clientDataJSON');
+  return {
+    hash, r: bigToHex32(r), s: bigToHex32(low), rawS: bigToHex32(s), wasHighS: low !== s,
+    authenticatorData: toHex(authData), clientDataJSON, typeIndex, challengeIndex,
+  };
 }
 
 export async function verifyOnChain(hash: Hex, r: Hex, s: Hex, x: Hex, y: Hex): Promise<Hex> {
