@@ -8,9 +8,11 @@ export * as checkout from './checkout.ts';
 export {
   payOrder, refundOrder, subscribe, cancelSubscription, chargeSubscription, getOrder, watchOrder, readPayment, walletSigner, accountSigner,
   orderId, orderRef, payNonce, refundNonce, subId, subNonce, payTypedData, refundTypedData, subscribeTypedData, cancelTypedData, checkoutAbi,
-  merchantHistory, readSubscription, historyCsv, type HistoryRow,
+  merchantHistory, readSubscription, historyCsv, usdtAmount, type HistoryRow, type HistoryMethod,
+  readyToShip, requiredStage, DEFAULT_SHIP_POLICY, type ShipPolicy, type ShipDecision, type ReadyStage,
   type Order, type Plan, type Signer, type Stage, type OrderStatus,
 } from './checkout.ts';
 export { DEPOSIT_CHECKOUT, depositOrder, depositStatus, watchDeposit, depositRefundTypedData, depositRefundNonce, addressQrSvg, encodeDepositOrder, depositAbi, type DepositOrder, type DepositStatus } from './deposit.ts';
 export { verifyWebhook, signWebhook, parseSignatureHeader, type WebhookEvent, type VerifyResult } from './webhooks.ts';
 export { payFetch, buildPayment, pickRequirement, encodePaymentHeader, decodePaymentHeader, decodePaymentResponse, type PaymentRequirements, type PaymentPayload } from './x402.ts';
+export { demoWallet } from './demo-wallet.ts';
