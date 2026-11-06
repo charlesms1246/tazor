@@ -27,8 +27,9 @@ const mockWhitechain = async (page: Page, o: { paid: boolean | 'deposit'; safe: 
 test('/receipt/: a public receipt read from Whitechain: amount, refund, net, finality stages, QR and copy link', async ({ page }) => {
   await mockExplorer(page);
   await mockWhitechain(page, { paid: true, safe: 12_400_050, finalized: 12_300_000 });
-  await page.goto(`/receipt/?order=${ORDER}`);
+  await page.goto(`/receipt/?order=${ORDER}&ref=BJ-77`);
   await expect(page.getByTestId('receipt-amount')).toHaveText('1.55 USDT');
+  await expect(page.getByTestId('receipt-order')).toHaveText('BJ-77');
   await expect(page.getByTestId('receipt-status')).toHaveText('Partly refunded');
   await expect(page.getByTestId('receipt-refunded')).toHaveText('0.50 USDT in 1 refund');
   await expect(page.getByTestId('receipt-net')).toContainText('1.05 USDT');
@@ -40,6 +41,10 @@ test('/receipt/: a public receipt read from Whitechain: amount, refund, net, fin
   await expect(page.getByTestId('receipt-stage-1')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('receipt-stage-2')).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('receipt-stage-3')).toHaveAttribute('data-state', 'active');
+  await expect(page.getByTestId('receipt-stage-3')).toContainText('usually about 30 min');
+  // refund time comes from the refund block (RPC logs carry no time)
+  await expect(page.getByTestId('receipt-refund-row').locator('td').first()).not.toHaveText('—');
+  await expect(page.getByTestId('receipt-copy-link')).toHaveText('Copy link');
   await expect(page.getByTestId('receipt-qr')).toBeVisible();
   await expect(page.getByText('Read from Whitechain, not from Tazor').first()).toBeVisible();
   await expect(page.locator('body')).not.toContainText(ORDER);
@@ -54,6 +59,8 @@ test('/receipt/: final once the finalized head passes the block; unpaid and malf
   await expect(page.getByTestId('receipt-finality')).toHaveAttribute('data-stage', '3');
   await expect(page.getByTestId('receipt-stage-3')).toHaveAttribute('data-state', 'done');
 
+  await page.goto(`/receipt/?order=${ORDER}&ref=NOT-THIS-ONE`);
+  await expect(page.getByTestId('receipt-order')).not.toHaveText('NOT-THIS-ONE');
   await page.goto('/receipt/?order=0x1234');
   await expect(page.getByTestId('receipt-bad-id')).toContainText('This receipt link is incomplete');
 });
