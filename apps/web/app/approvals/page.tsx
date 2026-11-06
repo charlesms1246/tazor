@@ -8,6 +8,7 @@ import { useCompany } from '@/lib/company.ts';
 import { config } from '@/lib/config.ts';
 import { partyName } from '@/lib/story.ts';
 import { Card, Empty, PageHeader, Pill } from '../_ui/index.tsx';
+import { OpenLinkBar, PaidFromDevice } from './open-link.tsx';
 import './approvals.css';
 import '../_invoice/touch.css';
 
@@ -70,7 +71,9 @@ export default function ApprovalsPage() {
 
   return (
     <div className="page tz-touch">
-      <PageHeader title="Approvals" subtitle="Invoices, payment runs, mandates and role changes waiting for an approver on this device." />
+      <PageHeader title="Approvals" subtitle="Open a payment link, and see invoices, payment runs, mandates and role changes waiting for an approver on this device." />
+
+      <OpenLinkBar />
 
       <div data-tour="approvals">
         <Card flush testId="approvals">
@@ -123,6 +126,8 @@ export default function ApprovalsPage() {
           )}
         </Card>
       </div>
+
+      <PaidFromDevice />
     </div>
   );
 }

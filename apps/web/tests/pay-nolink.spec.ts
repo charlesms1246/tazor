@@ -16,9 +16,10 @@ test.beforeEach(async ({ page }) => {
   }
 });
 
-test('/pay/ without a link: opener, empty history and how it works; not the tampered-link state', async ({ page }) => {
+test('/pay/ without a link redirects to Approvals: opener, empty history and how it works; not the tampered-link state', async ({ page }) => {
   await page.goto('/pay/');
-  await expect(page.locator('h1')).toHaveText('Pay an invoice');
+  await expect(page).toHaveURL(/\/approvals\/$/);
+  await expect(page.locator('h1')).toHaveText('Approvals');
   await expect(page.getByTestId('invalid')).toHaveCount(0);
   await expect(page.getByTestId('paid-empty')).toBeVisible();
   await expect(page.getByText('How paying works')).toBeVisible();
@@ -34,8 +35,8 @@ test('/pay/ without a link: opener, empty history and how it works; not the tamp
   await expect(page.getByTestId('amount')).toHaveText('1.2 USDT');
 });
 
-test('/pay/ without a link lists payments made from this device', async ({ page }) => {
-  await page.goto('/pay/');
+test('Approvals lists payments made from this device', async ({ page }) => {
+  await page.goto('/approvals/');
   await page.evaluate((inv) => {
     localStorage.setItem('tazor.payments.v1', JSON.stringify([{ invoice: inv, txHash: `0x${'ab'.repeat(32)}`, blockTimestamp: 1793900000 }]));
   }, canonicalInvoiceJson(invoice));
