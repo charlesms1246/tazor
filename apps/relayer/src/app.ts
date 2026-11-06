@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { BadRequest, encodePayOne, parsePayRequest } from './payment.ts';
 import { SimulationFailed, type Sender } from './sender.ts';
+import { parseSigner, type ApproverDeployer } from './approver.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -20,7 +21,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new BadRequest('invalid JSON'); }
 }
 
-export function createHandler(deps: { sender?: Sender; paymentModule?: string }) {
+export function createHandler(deps: { sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json', ...CORS }).end(JSON.stringify(body));
@@ -29,13 +30,25 @@ export function createHandler(deps: { sender?: Sender; paymentModule?: string })
     try {
       if (req.method === 'OPTIONS') return void res.writeHead(204, CORS).end();
       if (req.method === 'GET' && req.url === '/health') {
-        return reply(200, { ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null });
+        return reply(200, {
+          ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null,
+          approverAccountFactory: deps.approvers?.factory ?? null,
+        });
+      }
+      if (req.method === 'POST' && req.url === '/approver') {
+        const a = deps.approvers;
+        if (!a) return reply(503, { error: 'approver factory not configured' });
+        const signer = parseSigner(await readJson(req), await a.webAuthnVerifier());
+        const account = await a.predict(signer);
+        if (await a.isDeployed(account)) return reply(200, { account, txHash: null });
+        if (!deps.sender) return reply(503, { error: 'relayer not configured', account });
+        return reply(200, { account, txHash: await deps.sender.send(a.factory, a.createCalldata(signer)) });
       }
       if (req.method === 'POST' && (req.url === '/pay' || req.url === '/pay/calldata')) {
         const data = encodePayOne(parsePayRequest(await readJson(req)));
         if (req.url === '/pay/calldata') return reply(200, { to: deps.paymentModule ?? null, data });
-        if (!deps.sender) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
-        return reply(200, { txHash: await deps.sender.send(data) });
+        if (!deps.sender || !deps.paymentModule) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
+        return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
       }
       return reply(404, { error: 'not found' });
     } catch (e) {

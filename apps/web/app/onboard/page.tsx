@@ -12,6 +12,7 @@ export default function OnboardPage() {
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [deploy, setDeploy] = useState<{ txHash: string | null } | null>(null);
 
   useEffect(() => setStored(loadPasskey()), []);
 
@@ -25,7 +26,16 @@ export default function OnboardPage() {
       const record = { credentialId: key.credentialId, x: key.x, y: key.y, verifier: p.verifier, approverAccount: p.account };
       setStored(record);
       setSigner(p.signer);
-      setNote(savePasskey(record) ? 'Saved on this device.' : 'Could not save on this device; copy the values below.');
+      const saved = savePasskey(record) ? 'Saved on this device.' : 'Could not save on this device; copy the values below.';
+      setNote(saved);
+      if (!config.relayerUrl) return setNote(`${saved} No relayer configured: anyone can deploy this account later with createAccount([signer id]).`);
+      const res = await fetch(`${config.relayerUrl}/approver`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signer: p.signer }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
+      if (body.account.toLowerCase() !== p.account.toLowerCase()) throw new Error('relayer returned a different account address');
+      setDeploy({ txHash: body.txHash });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -39,7 +49,7 @@ export default function OnboardPage() {
       <p data-testid="wb-label">Verified by WhiteBIT (simulated on testnet)</p>
       <p>
         Your passkey stays in your device keychain. Your approver account address is derived from its public key
-        and is deployed later by the relayer.
+        and the relayer deploys it for you.
       </p>
       <button data-testid="create" onClick={onCreate} disabled={busy}>Create passkey</button>
       {error && <p data-testid="error" style={{ color: 'crimson' }}>{error}</p>}
@@ -49,6 +59,13 @@ export default function OnboardPage() {
           <tbody>
             <tr><td>Approver account (predicted)</td><td data-testid="approver-account">{stored.approverAccount}</td></tr>
             {signer && <tr><td>Signer id</td><td data-testid="signer" style={{ wordBreak: 'break-all' }}>{signer}</td></tr>}
+            {deploy && (
+              <tr><td>Deployment</td><td data-testid="deploy">
+                {deploy.txHash
+                  ? <a href={`${config.explorer}/tx/${deploy.txHash}`} target="_blank" rel="noreferrer">{deploy.txHash}</a>
+                  : 'already deployed'}
+              </td></tr>
+            )}
             <tr><td>Passkey x</td><td style={{ wordBreak: 'break-all' }}>{stored.x}</td></tr>
             <tr><td>Passkey y</td><td style={{ wordBreak: 'break-all' }}>{stored.y}</td></tr>
           </tbody>

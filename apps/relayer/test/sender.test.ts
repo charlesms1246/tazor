@@ -20,8 +20,9 @@ before(async () => {
 after(() => anvil?.kill());
 
 test('concurrent sends are signed locally and serialised with sequential nonces', async () => {
-  const sender = createSender({ rpcUrl: RPC, chain, privateKey: ANVIL_KEY_0, to: '0x0000000000000000000000000000000000007000' });
-  const hashes = await Promise.all([sender.send('0x01'), sender.send('0x02'), sender.send('0x03')]);
+  const sender = createSender({ rpcUrl: RPC, chain, privateKey: ANVIL_KEY_0 });
+  const to = '0x0000000000000000000000000000000000007000';
+  const hashes = await Promise.all([sender.send(to, '0x01'), sender.send(to, '0x02'), sender.send(to, '0x03')]);
   const c = createPublicClient({ chain, transport: http(RPC) });
   const receipts = await Promise.all(hashes.map((hash) => c.waitForTransactionReceipt({ hash })));
   const txs = await Promise.all(hashes.map((hash) => c.getTransaction({ hash })));

@@ -64,11 +64,20 @@ test('matching digest enables Approve; passkey approval feeds the payOne calldat
   });
   await mockRpc(page, digest);
 
+  const deployTx = `0x${'ab'.repeat(32)}`;
+  let relayed: unknown;
+  await page.route('http://relayer.test/approver', async (route) => {
+    relayed = route.request().postDataJSON();
+    await route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ account: APPROVER_ACCOUNT, txHash: deployTx }) });
+  });
+
   await page.goto('/onboard/');
   await expect(page.getByTestId('wb-label')).toHaveText('Verified by WhiteBIT (simulated on testnet)');
   await page.getByTestId('create').click();
   await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
   await expect(page.getByTestId('signer')).toHaveText(new RegExp(`^${VERIFIER}[0-9a-f]{128}$`, 'i'));
+  await expect(page.getByTestId('deploy').locator('a')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${deployTx}`);
+  expect(relayed).toEqual({ signer: await page.getByTestId('signer').textContent() });
 
   await page.goto(await link());
   await expect(page.getByTestId('guard-ok')).toContainText(digest);

@@ -3,24 +3,24 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 export class SimulationFailed extends Error {}
 
-export function createSender(opts: { rpcUrl: string; chain: Chain; privateKey: Hex; to: Address }) {
+export function createSender(opts: { rpcUrl: string; chain: Chain; privateKey: Hex }) {
   const client = createPublicClient({ chain: opts.chain, transport: http(opts.rpcUrl) });
   const account = privateKeyToAccount(opts.privateKey);
   let queue: Promise<unknown> = Promise.resolve();
 
-  async function sendOne(data: Hex): Promise<{ txHash: Hex; done: Promise<unknown> }> {
+  async function sendOne(to: Address, data: Hex): Promise<{ txHash: Hex; done: Promise<unknown> }> {
     try {
-      await client.call({ account: account.address, to: opts.to, data });
+      await client.call({ account: account.address, to: to, data });
     } catch (e) {
       throw new SimulationFailed(e instanceof BaseError ? e.shortMessage : String(e));
     }
     const [nonce, gas, fees] = await Promise.all([
       client.getTransactionCount({ address: account.address, blockTag: 'pending' }),
-      client.estimateGas({ account: account.address, to: opts.to, data }),
+      client.estimateGas({ account: account.address, to: to, data }),
       client.estimateFeesPerGas(),
     ]);
     const serialized = await account.signTransaction({
-      chainId: opts.chain.id, type: 'eip1559', to: opts.to, data, nonce, gas: (gas * 12n) / 10n,
+      chainId: opts.chain.id, type: 'eip1559', to: to, data, nonce, gas: (gas * 12n) / 10n,
       maxFeePerGas: fees.maxFeePerGas, maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
     });
     const txHash = await client.sendRawTransaction({ serializedTransaction: serialized });
@@ -29,8 +29,8 @@ export function createSender(opts: { rpcUrl: string; chain: Chain; privateKey: H
 
   return {
     address: account.address,
-    send(data: Hex): Promise<Hex> {
-      const result = queue.then(() => sendOne(data));
+    send(to: Address, data: Hex): Promise<Hex> {
+      const result = queue.then(() => sendOne(to, data));
       queue = result.then((r) => r.done, () => undefined).catch(() => undefined);
       return result.then((r) => r.txHash);
     },

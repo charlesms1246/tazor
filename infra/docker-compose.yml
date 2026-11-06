@@ -8,6 +8,7 @@ services:
     environment:
       WC_RPC: ${WC_RPC:-https://rpc.testnet.whitechain.io}
       PAYMENT_MODULE: ${PAYMENT_MODULE:-}
+      APPROVER_ACCOUNT_FACTORY: ${APPROVER_ACCOUNT_FACTORY:-}
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
