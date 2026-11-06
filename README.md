@@ -15,7 +15,13 @@ Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everythin
 The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`, `order.finality`). In the live run all three signatures verified ([`hosted-last-run.json`](scripts/checkout-live/hosted-last-run.json)).
 
 **Try it (testnet only):**
-- **The shop:** https://bluejay-shop.vercel.app. Click "Pay with a demo wallet (no extension)". The customer and merchant views are side by side, with refund and accountant export on the right.
+- **The shop, in about a minute, with no wallet extension:** https://bluejay-shop.vercel.app
+  1. "Use a demo merchant wallet" (right);
+  2. "Pay with a demo wallet" (left);
+  3. "Refund 0.05" (right): the customer card shows the refund;
+  4. "Accountant export (CSV)".
+
+  Both demo wallets live in your browser, are testnet-only, and are topped up with test USDT by our sandbox. Live run: pay [`0x0750…304b`](https://explorer.testnet.whitechain.io/tx/0x0750f8241c6093f45048908fbc0aa37a1aafdebb895d8185aa866dfa321a304b), refund [`0x2d24…9496`](https://explorer.testnet.whitechain.io/tx/0x2d24a044e637d714ce09ab4438bf57961c9f71870729ef69a3f5f75eddd19496).
 - **The merchant console and receipts:** https://tazor-app.vercel.app/checkout/
 - **The whole story in one click:** https://tazor-app.vercel.app/autopilot/
 - **Reproduce from a terminal:** `scripts/hosted-checkout-live.ts` (pay → refund → webhooks) and `scripts/accountant-export.ts`.
