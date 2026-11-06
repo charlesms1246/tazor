@@ -348,3 +348,4 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .kv > dd { border-top: 0; padding-top: 2px; }
 }
 .in { color: var(--positive); }
+.tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }

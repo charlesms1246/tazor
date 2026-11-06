@@ -1,16 +1,103 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { Address } from 'viem';
 import { toCamt054, toQuickBooksCsv, toTallyCsv, toXeroCsv, usdt2dp, type PaymentRecord } from '@/lib/export.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import { config } from '@/lib/config.ts';
-import { Addr, Card, Empty, Field, PageHeader } from '../_ui/index.tsx';
+import { configV2 } from '@/lib/config-v2.ts';
+import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
+import { counterpartyOf, directionOf, toStatementCsv } from '@/lib/statement.ts';
+import { Addr, Card, Empty, Field, Notice, PageHeader, short } from '../_ui/index.tsx';
 
 function download(name: string, type: string, body: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+
+const STATEMENT_ROWS = 10;
+
+type StatementState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ok'; transfers: Transfer[] };
+
+function Statement({ accounts }: { accounts: string[] }) {
+  const options = [...new Map([configV2.demoAccount, ...accounts].map((a) => [a.toLowerCase(), a])).values()];
+  const [acct, setAcct] = useState<string>(configV2.demoAccount);
+  const [state, setState] = useState<StatementState>({ status: 'loading' });
+
+  const load = useCallback(() => {
+    setState({ status: 'loading' });
+    fetchTransfers(config.explorer, acct as Address, configV2.usdt)
+      .then((t) => setState({ status: 'ok', transfers: [...t].sort((a, b) => b.time.localeCompare(a.time)) }))
+      .catch((e) => setState({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
+  }, [acct]);
+  useEffect(load, [load]);
+
+  const rows = state.status === 'ok' ? state.transfers : [];
+  const explorerUrl = `${config.explorer}/address/${acct}?tab=token_transfers`;
+
+  return (
+    <Card
+      title="On-chain statement"
+      subtitle="USDT transfers for this account, read live from the Whitechain explorer."
+      flush
+      testId="statement"
+      actions={<>
+        <a className="small" href={explorerUrl} target="_blank" rel="noreferrer">View all on explorer</a>
+        <button className="btn btn-sm" data-testid="statement-csv" disabled={rows.length === 0}
+          onClick={() => download(`tazor-statement-${acct.slice(2, 10).toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv', toStatementCsv(rows))}>Download CSV</button>
+      </>}
+    >
+      <div style={{ padding: '0 24px 16px' }}>
+        <Field label="Account">
+          <select className="select mono" data-testid="statement-account" value={acct} onChange={(e) => setAcct(e.target.value)}>
+            {options.map((a) => <option key={a} value={a}>{nameOf(a as Address) ? `${nameOf(a as Address)} · ${short(a)}` : a}</option>)}
+          </select>
+        </Field>
+      </div>
+      {state.status === 'error' ? (
+        <div style={{ padding: '0 24px 24px' }}>
+          <Notice tone="negative">
+            <span className="spread" style={{ width: '100%' }}>
+              <span data-testid="statement-error">Couldn&apos;t load transfers from the explorer ({state.message}).</span>
+              <button className="btn btn-sm" data-testid="statement-retry" onClick={load}>Retry</button>
+            </span>
+          </Notice>
+        </div>
+      ) : state.status === 'ok' && rows.length === 0 ? (
+        <div style={{ padding: '0 24px 24px' }}><Empty><span data-testid="statement-empty">No USDT transfers for this account yet.</span></Empty></div>
+      ) : (
+        <div className="table-wrap"><table className="table table-stack" data-testid="statement-table">
+          <thead><tr><th>Date</th><th>Counterparty</th><th>Direction</th><th className="num">Amount</th><th>Transaction</th></tr></thead>
+          <tbody>
+            {state.status === 'loading'
+              ? [0, 1, 2].map((i) => (
+                <tr key={i}>
+                  <td><span className="skeleton" /></td><td><span className="skeleton" style={{ width: 140 }} /></td>
+                  <td><span className="skeleton" style={{ minWidth: 60 }} /></td><td className="num"><span className="skeleton" /></td><td><span className="skeleton" /></td>
+                </tr>
+              ))
+              : rows.slice(0, STATEMENT_ROWS).map((t) => {
+                const cp = counterpartyOf(t);
+                return (
+                  <tr key={t.id} data-testid="statement-row">
+                    <td className="tnum">{t.time.slice(0, 10)}</td>
+                    <td>{nameOf(cp) ?? <span className="mono">{short(cp)}</span>}</td>
+                    <td>{directionOf(t)}</td>
+                    <td className="num" data-testid="statement-amount">
+                      {t.incoming ? <span className="in">+{usdt2dp(t.amount)}</span> : <span>{'\u2212'}{usdt2dp(t.amount)}</span>} <span className="faint">USDT</span>
+                    </td>
+                    <td><Addr value={t.txHash} href={`${config.explorer}/tx/${t.txHash}`} /></td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table></div>
+      )}
+    </Card>
+  );
 }
 
 export default function ExportPage() {
@@ -60,7 +147,7 @@ export default function ExportPage() {
                 <tbody>
                   {mine.map((p) => (
                     <tr key={p.txHash}>
-                      <td className="num">{new Date(p.blockTimestamp * 1000).toISOString().slice(0, 10)}</td>
+                      <td className="tnum">{new Date(p.blockTimestamp * 1000).toISOString().slice(0, 10)}</td>
                       <td>{p.invoice.id}</td>
                       <td>{p.invoice.supplierName}</td>
                       <td className="num">{usdt2dp(p.invoice.amount)} <span className="faint">USDT</span></td>
@@ -73,6 +160,7 @@ export default function ExportPage() {
           </Card>
         </>
       )}
+      <Statement accounts={accounts} />
     </div>
   );
 }
