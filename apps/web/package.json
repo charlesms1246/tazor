@@ -1,0 +1,23 @@
+{
+  "name": "@tazor/web",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "serve": "node scripts/serve.mjs",
+    "test:passkey": "NEXT_TELEMETRY_DISABLED=1 next build && playwright test"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "7.0.2"
+  }
+}
