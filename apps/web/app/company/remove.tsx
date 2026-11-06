@@ -104,7 +104,7 @@ export function RemovePerson({ initialAccount = '', initialTarget = '' }: { init
           </Field>
         </div>
         <div className="row">
-          <button className="btn btn-danger" data-testid="revoke" onClick={onRemove} disabled={busy}>Remove with Face ID</button>
+          <button className="btn btn-danger" data-testid="revoke" onClick={onRemove} disabled={busy}>Remove with passkey</button>
           <span className="small faint">They can no longer approve payments for this company. Re-adding them needs a new approver account.</span>
         </div>
         {digest && <p className="small muted">Signed digest (matches the contract): <code className="break" data-testid="revoke-digest">{digest}</code></p>}

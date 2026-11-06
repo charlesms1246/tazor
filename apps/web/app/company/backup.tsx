@@ -87,7 +87,7 @@ export function BackupSigner() {
       setStep('Asking the sponsor (WB Soul quota)…');
       op = applyPaymasterResult(op, await relayerRpc(relayerUrl, 'pm_getPaymasterStubData', [toRpcUserOp(op), ep, chainId, {}]));
       op = applyPaymasterResult(op, await relayerRpc(relayerUrl, 'pm_getPaymasterData', [toRpcUserOp(op), ep, chainId, {}]));
-      setStep('Approve with Face ID…');
+      setStep('Confirm with your passkey (Face ID, fingerprint or device PIN)…');
       const userOpHash = decodeGetUserOpHash(await ethCall(ep, encodeGetUserOpHash(op)));
       op = { ...op, signature: await signDigestWithPasskey(key.credentialId, userOpHash, key) };
       setStep('Submitting…');
@@ -110,7 +110,7 @@ export function BackupSigner() {
         {eoa && !valid && <Notice tone="negative">Not a valid address.</Notice>}
         {valid && <p className="small muted">Backup signer id: <code className="break" data-testid="backup-signer">{backupSigner(eoa)}</code></p>}
         <div className="row">
-          <button className="btn btn-primary" data-testid="add-backup" onClick={onAdd} disabled={busy || !valid}>Add with Face ID</button>
+          <button className="btn btn-primary" data-testid="add-backup" onClick={onAdd} disabled={busy || !valid}>Add with passkey</button>
           {step && <span className="small muted" data-testid="backup-step">{step}</span>}
         </div>
         {error && <Notice tone="negative"><span data-testid="backup-error">{error}</span></Notice>}

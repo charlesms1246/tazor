@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { encodeAbiParameters, toFunctionSelector, type Hex } from 'viem';
+import { encodeAbiParameters, encodeEventTopics, toFunctionSelector, type Hex } from 'viem';
+import { registryEventsAbi } from '../lib/ens-directory.ts';
 import { ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR_ADMIN } from '../lib/policies.ts';
 
 const WC = 'https://rpc.testnet.whitechain.io/';
@@ -11,7 +12,7 @@ const MEERA = '0x03c291d446b870e0b8f128681937a9eceda97763';
 const REGISTRY = '0x331bdb575a72fb3dd8a6c85b6c043a753340fbf1';
 const SEL = Object.fromEntries(([
   'getSignerCount()', 'getSigners(uint64,uint64)', 'registryOf(address)', 'isRevoked(address,address)',
-  'rolesOf(address,address)', 'roles(uint256,address)', 'soulOf(address)', 'soulAttributeValue(uint256,address)', 'number()',
+  'rolesOf(address,address)', 'roles(uint256,address)', 'soulOf(address)', 'soulAttributeValue(uint256,address)', 'number()', 'getSubregistry(string)',
 ] as const).map((s) => [s.split('(')[0], toFunctionSelector(s)]));
 const arg = (data: string, i: number) => `0x${data.slice(10 + 64 * i + 24, 10 + 64 * (i + 1))}`.toLowerCase();
 const enc = (types: string[], values: unknown[]) => encodeAbiParameters(types.map((type) => ({ type })), values);
@@ -26,6 +27,27 @@ const CACHE: Record<string, [bigint, bigint]> = {
 };
 const REVOKED = new Set([MEERA]);
 
+// ENS registry logs as Blockscout returns them: companies under taz0r.eth, and acme's subnames and role history.
+const TAZ0R_REG = '0x44007108c0cca53498f19f259e73e70c2ebe900a';
+const CE43 = '0xce4389acb79463062c362facb8cb04513fa3d8d8';
+let tok = 0;
+const regLog = (label: string, owner: string, expiry: number, block: number) => ({
+  topics: encodeEventTopics({ abi: registryEventsAbi, eventName: 'LabelRegistered', args: { tokenId: BigInt(++tok), labelHash: `0x${tok.toString(16).padStart(64, '0')}`, sender: CE43 as Hex } }),
+  data: encodeAbiParameters([{ type: 'string' }, { type: 'address' }, { type: 'uint64' }], [label, owner as Hex, BigInt(expiry)]), block_number: block, index: 0,
+});
+const roleLog = (account: string, bitmap: bigint, block: number) => ({
+  topics: encodeEventTopics({ abi: registryEventsAbi, eventName: 'EACRolesChanged', args: { resource: 0n, account: account as Hex } }),
+  data: encodeAbiParameters([{ type: 'uint256' }, { type: 'uint256' }], [0n, bitmap]), block_number: block, index: 0,
+});
+const MEERA_EXPIRY = 1794124872;
+const LOGS: Record<string, unknown[]> = {
+  [TAZ0R_REG]: [regLog('acme', CE43, 1888629000, 1), regLog('bluejay', CE43, 1888629000, 2)],
+  [REGISTRY]: [
+    regLog('ap-agent', CFO, 1888629000, 10), regLog('contractor-meera', MEERA, MEERA_EXPIRY, 11),
+    roleLog(PRIYA, ROLE_APPROVER | ROLE_TAZOR_ADMIN, 12), roleLog(CFO, ROLE_APPROVER | ROLE_AGENT, 13), roleLog(RAVI, ROLE_APPROVER, 14), roleLog(RAVI, 0n, 15),
+  ],
+};
+
 async function mock(page: Page, cache: Record<string, [bigint, bigint]> = Object.fromEntries(Object.entries(CACHE).map(([k, v]) => [k, [...v] as [bigint, bigint]]))) {
   // Real WB Soul is read from Whitechain mainnet; the demo people have no mainnet Soul.
   await page.route('https://rpc.whitechain.io/', async (route) => {
@@ -36,12 +58,17 @@ async function mock(page: Page, cache: Record<string, [bigint, bigint]> = Object
     contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
     body: JSON.stringify(result === undefined ? { jsonrpc: '2.0', id, error: { code: 3, message: 'execution reverted' } } : { jsonrpc: '2.0', id, result }),
   });
+  await page.route('https://eth-sepolia.blockscout.com/api/v2/addresses/**', async (route) => {
+    const a = route.request().url().match(/addresses\/(0x[0-9a-fA-F]{40})\/logs/)?.[1].toLowerCase() ?? '';
+    await route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ items: LOGS[a] ?? [], next_page_params: null }) });
+  });
   for (const url of [WC, SEPOLIA]) {
     await page.route(url, async (route) => {
       const { id, method, params } = route.request().postDataJSON();
       if (method !== 'eth_call') return route.fulfill(reply(id, '0x1'));
       const d: string = params[0].data;
       const s = d.slice(0, 10);
+      if (s === SEL.getSubregistry) return route.fulfill(reply(id, enc(['address'], [REGISTRY])));
       if (s === SEL.getSignerCount) return route.fulfill(reply(id, enc(['uint256'], [1n])));
       if (s === SEL.getSigners) return route.fulfill(reply(id, enc(['bytes[]'], [[PRIYA]])));
       if (s === SEL.registryOf) return route.fulfill(reply(id, enc(['address'], [REGISTRY])));
@@ -150,4 +177,23 @@ test('drawer Sync now syncs a person on demand', async ({ page }) => {
   await drawer.getByTestId('person-sync').click();
   await expect(drawer.getByTestId('person-drawer-sync-state')).toContainText('Synced');
   expect(bodies.some((b) => String(b.account).toLowerCase() === CFO)).toBe(true);
+});
+
+test('ENS directory: people from registry logs, fallback labels marked, subnames with contractor expiry and agent namespace', async ({ page }) => {
+  await mock(page);
+  await page.goto('/company/');
+  await expect(page.getByTestId('person-row')).toHaveCount(4);
+  const priya = page.locator(`[data-testid="person-row"][data-address="${PRIYA}"]`);
+  await expect(priya).toContainText('Priya (Finance)');
+  await expect(priya.getByTestId('person-label-fallback')).toHaveText('demo label · no ENS name record yet');
+  await expect(page.getByTestId('company-source')).toContainText('demo fallback for name, role, account');
+  const rows = page.getByTestId('subname-row');
+  await expect(rows).toHaveCount(2);
+  const meera = page.locator('[data-testid="subname-row"][data-label="contractor-meera"]');
+  await expect(meera).toContainText('Contractor · expiring');
+  await expect(meera.getByTestId('subname-expiry')).toContainText(new Date(MEERA_EXPIRY * 1000).toISOString().slice(0, 10));
+  await expect(meera.getByRole('link')).toHaveAttribute('href', 'https://sepolia.explorer.ens.domains/contractor-meera.acme.taz0r.eth');
+  const agent = page.locator('[data-testid="subname-row"][data-label="ap-agent"]');
+  await expect(agent).toContainText('Agent namespace');
+  await expect(agent.getByTestId('agent-limits')).toBeVisible();
 });

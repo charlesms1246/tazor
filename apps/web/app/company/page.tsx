@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DIRECTORY_EVENT, cachedDirectory } from '@/lib/ens-directory.ts';
 import type { Address } from 'viem';
 import './company.css';
 import { config } from '@/lib/config.ts';
 import { useCompany } from '@/lib/company.ts';
 import { agoText, companyRegistry, loadPeople, type Person } from '@/lib/people.ts';
 import { PersonDrawer } from './drawer.tsx';
+import { SubnamesCard } from './subnames.tsx';
 import { SoulStatus } from '@/app/_soul/soul-badge.tsx';
 import { BackupSigner } from './backup.tsx';
 import { RemovePerson } from './remove.tsx';
@@ -34,6 +36,17 @@ export default function CompanyPage() {
   const [registry, setRegistry] = useState<Address | null>(null);
   const [selected, setSelected] = useState<Person | null>(null);
   const close = useCallback(() => setSelected(null), []);
+  const [fallbackFields, setFallbackFields] = useState<string[]>([]);
+  useEffect(() => {
+    const sync = () => {
+      const d = cachedDirectory();
+      const c = d?.companies.find((x) => x.label === company.id);
+      setFallbackFields(c ? c.fallback : ['name', 'role', 'account']);
+    };
+    sync();
+    globalThis.addEventListener(DIRECTORY_EVENT, sync);
+    return () => globalThis.removeEventListener(DIRECTORY_EVENT, sync);
+  }, [company.id]);
 
   useEffect(() => {
     setRegistry(null);
@@ -113,7 +126,7 @@ export default function CompanyPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Company" subtitle="Who your company is on ENS, who acts for it, and the controls to add or remove people." />
+      <PageHeader title="Company" subtitle="Your company, the people who can approve for it, and how to add or remove them." />
 
       <Card title={company.name} subtitle="Company profile" testId="company-profile"
         actions={<>
@@ -123,6 +136,10 @@ export default function CompanyPage() {
         <dl className="kv">
           <dt>ENS name</dt><dd className="mono" data-testid="company-ens">{company.ens}</dd>
           <dt>Name</dt><dd>{company.name}</dd>
+          <dt>Source</dt>
+          <dd data-testid="company-source">{fallbackFields.length
+            ? <span className="small muted">From ENS, with demo fallback for {fallbackFields.join(', ')} (no ENS record yet)</span>
+            : <Pill tone="positive">ENS records</Pill>}</dd>
           <dt>Role in the demo</dt><dd><Pill tone="info">{company.role}</Pill></dd>
           <dt>Account on Whitechain</dt><dd><Addr value={company.account} href={`${config.explorer}/address/${company.account}`} /></dd>
           <dt>ENS registry</dt>
@@ -140,7 +157,7 @@ export default function CompanyPage() {
       </Card>
 
       <div data-tour="people">
-        <Card title="People" subtitle={<>Admin signers of the account and the people who act for it. Select a person for their ENS data. WB Soul shows the real mainnet registry, read live, and the simulated testnet mirror. <a href="/docs/wb-soul/">Check any address against the real registry</a>.</>} flush
+        <Card title="People" subtitle={<>Everyone who can act for the company. Select a person to see their ENS record and manage their access. WB Soul is checked live on mainnet, plus the testnet mirror; <a href="/docs/wb-soul/">check any address against the real registry</a>.</>} flush
           actions={<button className="btn btn-sm" onClick={load}>Refresh</button>}>
           {error ? (
             <div style={{ padding: '0 24px 24px' }}><Notice tone="negative">Couldn&apos;t read the team from Whitechain and ENS ({error}). <button className="btn btn-sm" onClick={load}>Retry</button></Notice></div>
@@ -160,7 +177,11 @@ export default function CompanyPage() {
                       <td>
                         <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
                           <span className="avatar" aria-hidden="true">{p.label.charAt(0).toUpperCase()}</span>
-                          <span><span style={{ fontWeight: 500 }}>{p.label}</span><span className="cell-sub mono">{`${p.address.slice(0, 6)}…${p.address.slice(-4)}`}</span></span>
+                          <span>
+                            <span style={{ fontWeight: 500 }}>{p.label}</span>
+                            <span className="cell-sub mono">{p.ensName ?? `${p.address.slice(0, 6)}…${p.address.slice(-4)}`}</span>
+                            {p.labelSource === 'fallback' && <span className="cell-sub" data-testid="person-label-fallback">demo label · no ENS name record yet</span>}
+                          </span>
                         </span>
                       </td>
                       <td><span className="row">{p.roles.length ? p.roles.map((r) => <Pill key={r}>{r}</Pill>) : <span className="faint">none</span>}</span></td>
@@ -183,7 +204,9 @@ export default function CompanyPage() {
         </Card>
       </div>
 
-      <Card title="Add a person" subtitle="Roles are granted on your company's ENS name by an admin, not in this app." testId="add-person">
+      <SubnamesCard ens={company.ens} registry={registry} account={company.account} />
+
+      <Card title="Add a person" subtitle="An admin gives the role on your company's ENS name; it takes about a minute to reach Whitechain." testId="add-person">
         <ol className="stack" style={{ gap: 8, paddingLeft: 20, margin: 0 }}>
           <li>The new person sets up an approver passkey and sends you their approver account address.</li>
           <li>An admin opens <a href={ensRolesUrl(company.ens)} target="_blank" rel="noreferrer">Roles in ENS</a> for <span className="mono">{company.ens}</span> and grants the Approver role to that address.</li>
