@@ -40,7 +40,7 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 
 **Beachhead: cross-border SMEs.** Small exporters and importers lose 1–3 business days, a 1–3% FX spread and wire fees on every SWIFT payment. With Tazor they settle in USDT in seconds, with refunds and books built in.
 
-**First design partner (in discussion): Healthsoft, India.** Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
+**First merchant: Healthsoft, India.** I work with Healthsoft, and Tazor is built around its payment flows. Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
 
 | Healthsoft needs to… | Tazor flow |
 |---|---|
@@ -411,7 +411,7 @@ I claim **C (censorship resistance)** and **S (security)** as the lead propertie
 
 I plan to apply. The milestone that makes the strongest case is **one real merchant on Whitechain mainnet**:
 1. **Mainnet checkout:** deploy `TazorCheckout` (ownerless, about 0.3M gas per payment, far below mainnet's 16.7M per-tx cap) once mainnet USDT is confirmed with the Whitechain team.
-2. **One real merchant: Healthsoft (design partner in discussion).** It takes live USDT payments from overseas buyers through payment links and checkout, issues refunds, bills clinics through subscriptions, pays suppliers through approved payment runs, and its accountant uses the export.
+2. **One real merchant: Healthsoft**, where I work. It takes live USDT payments from overseas buyers through payment links and checkout, issues refunds, bills clinics through subscriptions, pays suppliers through approved payment runs, and its accountant uses the export.
 3. **Pay with WhiteBIT:** if WhiteBIT withdrawals can target a per-order deposit address (being checked by the Whitechain team), WhiteBIT users pay from their exchange balance.
 4. **Then:** merchant plugins (WooCommerce and Shopify-style), persistent webhook delivery, and WB Soul read directly on mainnet for verified B2B approvers.
 
