@@ -21,7 +21,11 @@ import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { NoLink } from './no-link.tsx';
-import { InvoicePaper, paperFromInvoice } from '../_invoice/paper.tsx';
+import { InvoicePaper, issuedFromId, paperFromInvoice } from '../_invoice/paper.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
+import { eventsFor, recordEvent, type TimelineEvent } from '@/lib/events.ts';
+import { loadInbox, upsertInbox } from '@/lib/inbox.ts';
+import { INVOICE_STEPS, inboxForInvoice, pendingSteps, recordOpened, shortAddr, subjectOf, useEvents } from '@/lib/story.ts';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -45,6 +49,12 @@ export default function PayPage() {
   const [supplier, setSupplier] = useState<CompanyVerification | 'checking' | 'error'>('checking');
   const [v2, setV2] = useState<boolean | null>(null);
   const [paidBefore, setPaidBefore] = useState<Hex | null>(null);
+  const subject = typeof state === 'object' ? subjectOf(state.invoice) : null;
+  const events = useEvents(subject);
+  /** Adds an event to this invoice's timeline (no-op before an invoice is loaded). */
+  const story = (kind: TimelineEvent['kind'], title: string, extra: Partial<TimelineEvent> = {}) => {
+    if (subject) recordEvent({ subject, kind, at: Date.now(), title, ...extra });
+  };
 
   useEffect(() => {
     const load = () => (location.hash.length <= 1 ? Promise.resolve(setState('none')) :
@@ -64,6 +74,9 @@ export default function PayPage() {
     const h = invoiceHash(state.invoice);
     const hit = loadPayments().find((p) => { try { return invoiceHash(p.invoice) === h; } catch { return false; } });
     setPaidBefore((hit?.txHash as Hex | undefined) ?? null);
+    const issued = issuedFromId(state.invoice.id);
+    recordOpened(state.invoice, issued === null ? null : issued * 1000);
+    upsertInbox({ ...inboxForInvoice(state.invoice, location.href), ...(hit ? { status: 'paid' as const } : {}) });
   }, [state]);
 
   useEffect(() => {
@@ -81,11 +94,19 @@ export default function PayPage() {
     ethCall(pm, encodeInvoiceDigestCall(state.auth))
       .then((res) => {
         const onchain = decodeInvoiceDigest(res);
-        setGuard(onchain.toLowerCase() === local.toLowerCase()
+        const ok = onchain.toLowerCase() === local.toLowerCase();
+        setGuard(ok
           ? { status: 'ok', digest: local }
           : { status: 'refused', reason: `On-chain digest ${onchain} does not match the invoice shown (${local}).` });
+        const s = subjectOf(state.invoice);
+        recordEvent(ok
+          ? { subject: s, kind: 'policy-passed', at: Date.now(), title: `${state.invoice.id} passed the contract check`, detail: `${v2 ? 'PaymentModuleV2' : 'PaymentModule'} digest matches` }
+          : { subject: s, kind: 'failed', at: Date.now(), title: `${state.invoice.id} refused: digest mismatch`, detail: 'the contract digest does not match the invoice shown' });
       })
-      .catch((e) => setGuard({ status: 'refused', reason: `Could not read the on-chain digest: ${msg(e)}` }));
+      .catch((e) => {
+        setGuard({ status: 'refused', reason: `Could not read the on-chain digest: ${msg(e)}` });
+        recordEvent({ subject: subjectOf(state.invoice), kind: 'failed', at: Date.now(), title: `${state.invoice.id}: contract check unavailable`, detail: msg(e).slice(0, 120) });
+      });
   }, [state, v2]);
 
   useEffect(() => {
@@ -93,9 +114,16 @@ export default function PayPage() {
     const { paymentModule, wbSoulMirror } = config;
     if (!paymentModule || !wbSoulMirror) return setSupplier('error');
     setSupplier('checking');
+    const s = subjectOf(state.invoice);
+    const { id, supplierName } = state.invoice;
+    const unverified = () => recordEvent({ subject: s, kind: 'supplier-unverified', at: Date.now(), title: `${id}: ${supplierName} not verified`, detail: 'WB Soul, simulated on testnet' });
     verifyCompany(state.invoice.supplierAccount, { paymentModule, mirror: wbSoulMirror })
-      .then(setSupplier)
-      .catch(() => setSupplier('error'));
+      .then((v) => {
+        setSupplier(v);
+        if (v.verified) recordEvent({ subject: s, kind: 'supplier-verified', at: Date.now(), title: `${id}: ${supplierName} verified by WhiteBIT`, detail: 'WB Soul, simulated on testnet' });
+        else unverified();
+      })
+      .catch(() => { setSupplier('error'); unverified(); });
   }, [state]);
 
   useEffect(() => {
@@ -105,8 +133,17 @@ export default function PayPage() {
         const r = await getReceipt(tx.hash);
         if (!r) return;
         setTx({ ...tx, seconds: (Date.now() - tx.started) / 1000, status: r.status === '0x1' ? 'success' : 'reverted' });
-        if (r.status === '0x1' && typeof state === 'object') {
-          appendPayment({ invoice: state.invoice, txHash: tx.hash, blockTimestamp: await getBlockTimestamp(r.blockNumber) });
+        if (typeof state === 'object') {
+          const s = subjectOf(state.invoice);
+          if (r.status === '0x1') {
+            const submitted = eventsFor(s).find((e) => e.kind === 'submitted' && e.tx === tx.hash)?.at ?? tx.started;
+            const secs = ((Date.now() - submitted) / 1000).toFixed(1);
+            recordEvent({ subject: s, kind: 'paid', at: Date.now(), title: `${state.invoice.id} paid in ${secs} s`, detail: `settled in ${secs} s`, tx: tx.hash, chain: 'whitechain' });
+            upsertInbox({ id: s, status: 'paid' });
+            appendPayment({ invoice: state.invoice, txHash: tx.hash, blockTimestamp: await getBlockTimestamp(r.blockNumber) });
+          } else {
+            recordEvent({ subject: s, kind: 'failed', at: Date.now(), title: `${state.invoice.id} payment reverted`, detail: 'transaction reverted', tx: tx.hash, chain: 'whitechain' });
+          }
         }
       } catch { /* keep polling */ }
     }, 1000);
@@ -119,7 +156,14 @@ export default function PayPage() {
     const t = setInterval(async () => {
       try {
         const hit = await findInvoicePaidViaL1(pm, state.auth.account, state.auth.nonce, l1.fromBlock ?? 0n);
-        if (hit) setL1({ ...l1, l2Tx: hit.txHash, seconds: (Date.now() - l1.started!) / 1000 });
+        if (hit) {
+          const seconds = (Date.now() - l1.started!) / 1000;
+          setL1({ ...l1, l2Tx: hit.txHash, seconds });
+          const s = subjectOf(state.invoice);
+          recordEvent({ subject: s, kind: 'fallback-delivered', at: Date.now(), title: `${state.invoice.id} delivered via Ethereum in ${seconds.toFixed(0)} s`, detail: 'OptimismPortal deposit', tx: hit.txHash, chain: 'whitechain' });
+          recordEvent({ subject: s, kind: 'paid', at: Date.now(), title: `${state.invoice.id} paid via Ethereum`, detail: `settled in ${seconds.toFixed(0)} s`, tx: hit.txHash, chain: 'whitechain' });
+          upsertInbox({ id: s, status: 'paid' });
+        }
       } catch { /* keep polling */ }
     }, 3000);
     return () => clearInterval(t);
@@ -146,7 +190,10 @@ export default function PayPage() {
   const run = (fn: () => Promise<void>) => async () => {
     setBusy(true);
     setError('');
-    try { await fn(); } catch (e) { setError(msg(e)); } finally { setBusy(false); }
+    try { await fn(); } catch (e) {
+      setError(msg(e));
+      story('failed', `${i.id}: ${msg(e).slice(0, 80)}`, { detail: msg(e).slice(0, 160) });
+    } finally { setBusy(false); }
   };
 
   const onApprove = run(async () => {
@@ -155,6 +202,12 @@ export default function PayPage() {
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
     const signature = await counterfactualApproval(key, await signInvoiceAuthWithPasskey(key.credentialId, guard.digest, key));
     setMine({ approver: key.approverAccount, signature });
+    const who = shortAddr(key.approverAccount);
+    story('approved', `${i.id} approved by ${who}`, { actor: who, detail: 'passkey signature' });
+    const others = (() => { try { return pasted.trim() ? parseApprovals(pasted) : []; } catch { return []; } })();
+    const count = mergeApprovals([{ approver: key.approverAccount, signature }], others).length;
+    const prev = loadInbox().find((x) => x.id === subject)?.approvals ?? 0;
+    upsertInbox({ id: subject!, status: 'approved', approvals: Math.max(prev, count) });
   });
 
   const onPay = run(async () => {
@@ -172,6 +225,7 @@ export default function PayPage() {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
     setTx({ hash: body.txHash, started });
+    story('submitted', `${i.id} submitted via the relayer`, { detail: `${approvals.length} approval${approvals.length === 1 ? '' : 's'}`, tx: body.txHash, chain: 'whitechain' });
   });
 
   const gate = v2 ? configV2.ensGateV2 : config.sepolia.ensGate;
@@ -196,6 +250,7 @@ export default function PayPage() {
     const started = Date.now();
     const hash = await sendWithInjectedWallet(gate, l1.data, l1.gas ?? 600_000n);
     setL1({ ...l1, hash, started, fromBlock });
+    story('fallback-sent', `${i.id} sent via Ethereum (${label.trim()}.taz0r.eth)`, { detail: 'EnsGate → OptimismPortal', tx: hash, chain: 'sepolia' });
   });
 
   const onWatchL1 = run(async () => {
@@ -292,6 +347,11 @@ export default function PayPage() {
             </div>
           </Card>
 
+          <Card title="Activity" subtitle="What happened to this invoice, as seen from this device.">
+            <Timeline subject={subject ?? undefined} pending={pendingSteps(events, INVOICE_STEPS)} testId="pay-timeline" />
+          </Card>
+
+          <div data-tour="pay-fallback">
           <Card title="Send via Ethereum" subtitle="Works with Tazor's relayer and Whitechain's sequencer down.">
             <div className="stack">
               <p className="muted">
@@ -328,6 +388,7 @@ export default function PayPage() {
               )}
             </div>
           </Card>
+          </div>
 
           <Card>
             <details className="tech-details" open={!!(calldata || l1)}>
