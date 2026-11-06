@@ -2,7 +2,7 @@ import { DocPage, Note, Simulated, Steps } from '../_doc.tsx';
 
 const example = `<script src="./tazor-pay.js"></script>
 <tazor-pay-button
-  mode="wallet"
+  mode="wallet" demo-wallet="true"
   merchant="0xc1dce946D192e344251972470237F1471C93876c"
   amount="0.20"
   order-ref="BJ-1042"
@@ -42,6 +42,7 @@ const attrs: [string, string][] = [
   ['order-ref', 'Wallet mode, required. Your order number; it becomes the on-chain order reference.'],
   ['deadline', 'Wallet mode. Minutes the customer has to pay (default 30).'],
   ['deposit', 'Wallet mode. "false" hides "Pay from WhiteBIT or any exchange".'],
+  ['demo-wallet', 'Wallet mode, testnet demos only. "true" adds "Pay with a demo wallet (no extension)": a wallet made in the page and topped up with test USDT by the sandbox.'],
   ['relayer', 'Wallet mode. The relayer that submits the signature (default Tazor\'s).'],
   ['supplier-name', 'Required. Your company name, shown on the invoice.'],
   ['payee', 'Required. The Whitechain address that receives the USDT.'],
