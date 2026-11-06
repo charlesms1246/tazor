@@ -53,12 +53,15 @@ export default function CheckoutPage() {
   const relayer = getRelayerUrl();
   const [tab, setTabState] = useState<Tab>('orders');
   const [linked, setLinked] = useState<Address | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const [demo, setDemo] = useState(true);
   // deep links: ?merchant=0x…&tab=agents, or /checkout/#subscriptions
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const m = q.get('merchant')?.trim() ?? '';
     if (isAddress(m)) setLinked(getAddress(m));
+    const o = q.get('order')?.trim().toLowerCase() ?? '';
+    if (/^0x[0-9a-f]{64}$/.test(o)) setFocus(o);
     const t = q.get('tab');
     if (isTab(t)) setTabState(t);
     try { if (localStorage.getItem(DEMO_KEY) === 'off') setDemo(false); } catch { /* private mode */ }
@@ -102,6 +105,14 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkout, merchants.join(',')]);
   useEffect(() => { void load(); }, [load]);
+  // a linked ?order= that the explorer has not indexed yet: read again every 5 s until it shows
+  const focusFound = !!focus && !!data?.orders.some((o) => o.id.toLowerCase() === focus);
+  useEffect(() => {
+    if (!focus || focusFound) return;
+    const t = setInterval(() => void load(), 5000);
+    return () => clearInterval(t);
+  }, [focus, focusFound, load]);
+  useEffect(() => { if (focusFound) document.querySelector('[data-focus="true"]')?.scrollIntoView({ block: 'center' }); }, [focusFound]);
 
   // the merchant webhooks are tested for: a linked ?merchant= first, else the selected company
   const merchant = linked ?? (ready ? company.account : null);
@@ -200,8 +211,8 @@ export default function CheckoutPage() {
                 const left = o.amount - o.refunded;
                 const status = o.refunded === 0n ? 'Paid' : left === 0n ? 'Refunded' : 'Partly refunded';
                 return (
-                  <tr key={o.id} data-testid="co-order-row">
-                    <td>{shortRef(o.id)}<span className="cell-sub">{when(o.paidAt)}</span>
+                  <tr key={o.id} data-testid="co-order-row" data-focus={o.id.toLowerCase() === focus ? 'true' : undefined}>
+                    <td>{shortRef(o.id)}{o.id.toLowerCase() === focus && <> <Pill tone="info" testId="co-order-focus">This order</Pill></>}<span className="cell-sub">{when(o.paidAt)}</span>
                       {!ownSet.has(o.merchant.toLowerCase()) && <span className="cell-sub" data-testid="co-order-merchant">to {nameOf(o.merchant) ?? demoName(o.merchant) ?? `${o.merchant.slice(0, 6)}…${o.merchant.slice(-4)}`}</span>}</td>
                     <td>{o.method === 'signed' && nameOf(o.payer) && <b>{nameOf(o.payer)} </b>}<AddrChip value={o.payer} href={`${config.explorer}/address/${o.payer}`} />
                       <span className="cell-sub" data-testid="co-order-method">{methodLabel(o.method)}{o.method === 'transfer' ? ' (deposit address)' : ''}</span></td>

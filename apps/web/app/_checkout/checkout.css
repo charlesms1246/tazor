@@ -40,3 +40,4 @@
   .co-orders td:nth-child(3) { text-align: left; }
   .co-orders td:nth-child(6) { justify-self: end; }
 }
+.co-orders tr[data-focus="true"] { background: var(--pill-info-bg); }
