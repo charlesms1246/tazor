@@ -1,0 +1,6 @@
+.mb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; }
+.mb-name { color: var(--text); }
+.mb-pill { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; border-radius: 999px; font-size: 12px; line-height: 16px; }
+.mb-ok { background: var(--pill-positive-bg, #e7f6ee); color: var(--pill-positive-ink, #11663a); cursor: help; }
+.mb-neutral { background: var(--active, #f1f3f5); color: var(--muted); }
+.mb-loading { color: var(--faint); }

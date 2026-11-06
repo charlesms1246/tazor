@@ -5,9 +5,10 @@ import { checkoutAddress, readyToShip } from '@/lib/checkout.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { dueMs, parsePaylink, receiptHref, shortAddress, type Paylink } from '@/lib/paylink.ts';
 import { dueIn } from '@/lib/reminders.ts';
+import { MerchantBadge } from '../_soul/merchant-badge.tsx';
 import './paylink.css';
 
-type Paid = { orderId: string; explorerUrl: string; method: string };
+type Paid = { orderId: string; explorerUrl: string; method: string; payer?: string };
 const SCRIPT = '/tazor-pay.js';
 
 /** Loads the same <tazor-pay-button> bundle merchants embed (public/tazor-pay.js), once. */
@@ -43,8 +44,8 @@ export default function PaylinkPage() {
     const host = slot.current;
     let cancelled = false;
     const onPaid = (e: Event) => {
-      const d = (e as CustomEvent<{ orderId?: string; explorerUrl?: string; method?: string }>).detail ?? {};
-      if (d.orderId) setPaid({ orderId: d.orderId, explorerUrl: d.explorerUrl ?? '', method: d.method ?? 'wallet' });
+      const d = (e as CustomEvent<{ orderId?: string; explorerUrl?: string; method?: string; payer?: string }>).detail ?? {};
+      if (d.orderId) setPaid({ orderId: d.orderId, explorerUrl: d.explorerUrl ?? '', method: d.method ?? 'wallet', payer: d.payer });
     };
     const onReady = () => setReady(true);
     loadButton().then(() => {
@@ -91,6 +92,7 @@ export default function PaylinkPage() {
                 </dd></>;
               })()}
               <dt>Paid to</dt><dd className="mono" data-testid="pl-merchant" data-value={link.merchant} title={link.merchant}>{shortAddress(link.merchant)}</dd>
+              <dt className="pl-trust-dt">Business</dt><dd className="pl-trust"><MerchantBadge merchant={link.merchant} /></dd>
               <dt>Network</dt><dd>Whitechain (USDT, no gas needed)</dd>
             </dl>
             {/* stays mounted after payment: the button keeps watching finality and fires tazor-ready */}
@@ -102,6 +104,7 @@ export default function PaylinkPage() {
                 <span>
                   <a href={receiptHref(paid.orderId, link.ref)} data-testid="pl-receipt">View the receipt</a>
                   {paid.explorerUrl && <> · <a href={paid.explorerUrl} target="_blank" rel="noreferrer">Transaction ↗</a></>}
+                  {paid.payer && <> · <a href={`/me/?address=${paid.payer}`} data-testid="pl-my-payments">All my payments</a></>}
                 </span>
               </div>
             )}

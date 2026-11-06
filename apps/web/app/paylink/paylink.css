@@ -20,3 +20,5 @@
 .pl-foot a { color: inherit; }
 .pl-overdue { color: var(--negative); }
 .pl-due-sub { color: var(--muted); }
+.pl-kv .pl-trust-dt { display: none; }
+.pl-kv .pl-trust { grid-column: 1 / -1; text-align: left; }
