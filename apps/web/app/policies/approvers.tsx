@@ -6,6 +6,7 @@ import { config } from '@/lib/config.ts';
 import { ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR_ADMIN } from '@/lib/policies.ts';
 import { decodeIsRevoked, encodeIsRevokedCall } from '@/lib/revoke.ts';
 import { ethCall, rpc } from '@/lib/rpc.ts';
+import { Card, Field, Notice, Pill } from '../_ui/index.tsx';
 
 const abi = parseAbi([
   'function getSignerCount() view returns (uint256)',
@@ -68,10 +69,13 @@ export function ApproversPanel({ account, registry, revocationList }: { account:
   };
 
   return (
-    <section>
-      <h2>Approvers: Whitechain vs ENS</h2>
-      <p>Admins come from the account&apos;s signers; add other approvers you know. ENS roles are read live from Ethereum Sepolia (registry {registry}).</p>
-      <table data-testid="approvers">
+    <Card
+      title="Approvers"
+      subtitle={<>Whitechain vs ENS. Admins come from the account&apos;s signers; ENS roles are read live from Ethereum Sepolia (registry <span className="mono break">{registry}</span>).</>}
+      actions={<button className="btn btn-sm" data-testid="approvers-refresh" onClick={() => void load()}>Refresh</button>}
+      flush
+    >
+      <div className="table-wrap"><table className="table table-stack" data-testid="approvers">
         <thead><tr><th>Approver</th><th>Whitechain</th><th>Role cache</th><th>ENS now</th><th>Flags</th></tr></thead>
         <tbody>
           {rows?.map((r) => {
@@ -80,20 +84,28 @@ export function ApproversPanel({ account, registry, revocationList }: { account:
             if (r.ens !== null && r.cached !== null && r.ens !== r.cached) flags.push('ENS role changed, cache stale (sync pending)');
             return (
               <tr key={r.approver} data-testid={`approver-${r.approver.toLowerCase()}`}>
-                <td>{r.approver}{r.admin ? ' (admin signer)' : ''}</td>
-                <td>{r.revoked === null ? 'unknown' : r.revoked ? 'revoked' : 'active'}</td>
-                <td>{r.cached === null ? 'unknown' : `${roleNames(r.cached)}${r.cachedAt ? ` (L1 block ${r.cachedAt}${l1 !== null ? `, ${l1 - r.cachedAt} blocks old` : ''})` : ' (never synced)'}`}</td>
-                <td>{r.ens === null ? 'unknown' : roleNames(r.ens)}</td>
-                <td data-testid="approver-flags" style={{ color: flags.length ? '#b45309' : undefined }}>{flags.join('; ') || 'in sync'}</td>
+                <td><span className="mono break">{r.approver}</span>{r.admin && <span className="cell-sub"> (admin signer)</span>}</td>
+                <td>{r.revoked === null ? <Pill>unknown</Pill> : r.revoked ? <Pill tone="negative">revoked</Pill> : <Pill tone="positive">active</Pill>}</td>
+                <td>{r.cached === null ? <span className="faint">unknown</span> : <>{roleNames(r.cached)}<span className="cell-sub">{r.cachedAt ? ` (L1 block ${r.cachedAt}${l1 !== null ? `, ${l1 - r.cachedAt} blocks old` : ''})` : ' (never synced)'}</span></>}</td>
+                <td>{r.ens === null ? <span className="faint">unknown</span> : roleNames(r.ens)}</td>
+                <td data-testid="approver-flags">{flags.length
+                  ? <span className="pill pill-warning" style={{ whiteSpace: 'normal', height: 'auto', padding: '4px 9px', lineHeight: '16px' }}>{flags.join('; ')}</span>
+                  : <Pill tone="positive">in sync</Pill>}</td>
               </tr>
             );
           })}
         </tbody>
-      </table>
-      <p><label>Approver <input data-testid="approver-add" value={add} onChange={(e) => setAdd(e.target.value)} size={44} /></label>{' '}
-        <button data-testid="approver-add-btn" onClick={onAdd}>Track</button>{' '}
-        <button data-testid="approvers-refresh" onClick={() => void load()}>Refresh</button></p>
-      {error && <p data-testid="approvers-error" style={{ color: 'crimson' }}>{error}</p>}
-    </section>
+      </table></div>
+      {rows !== null && rows.length === 0 && <div style={{ padding: '0 24px 16px' }}><div className="empty">No approvers found for this account yet. Track one below.</div></div>}
+      <div className="stack" style={{ padding: '16px 24px 24px' }}>
+        <Field label="Track another approver">
+          <div className="input-group">
+            <input className="input mono" data-testid="approver-add" value={add} onChange={(e) => setAdd(e.target.value)} placeholder="0x…" />
+            <button className="btn" data-testid="approver-add-btn" onClick={onAdd}>Track</button>
+          </div>
+        </Field>
+        {error && <Notice tone="negative"><span data-testid="approvers-error">{error}</span></Notice>}
+      </div>
+    </Card>
   );
 }

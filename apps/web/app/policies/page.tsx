@@ -15,6 +15,7 @@ import { loadPasskey } from '@/lib/storage.ts';
 import { sendOnWhitechain } from '@/lib/wallet-wc.ts';
 import { decodeFunctionResult, encodeFunctionData, parseAbi } from 'viem';
 import { ApproversPanel } from './approvers.tsx';
+import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
 const registryAbi = parseAbi(['function registryOf(address account) view returns (address)']);
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
@@ -28,7 +29,7 @@ async function v1Registry(account: Address): Promise<Address | null> {
   }
 }
 
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
+const Amount = ({ v }: { v: bigint }) => <><span className="num">{formatUnits(v, 6)}</span> <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const nowS = () => BigInt(Math.floor(Date.now() / 1000));
 const PAYEES_KEY = (account: Address) => `tazor.v2.payees.${account.toLowerCase()}`;
@@ -50,14 +51,18 @@ function Calldata({ p, id }: { p: Prepared; id: string }) {
   const [hash, setHash] = useState<Hex | null>(null);
   const [err, setErr] = useState('');
   return (
-    <div data-testid={`${id}-out`}>
-      {p.digest && <p>Signed digest (matches the contract): <code data-testid={`${id}-digest`}>{p.digest}</code></p>}
-      <p>To {p.to} on Whitechain Sepolia (anyone can send it):<br />
-        <code data-testid={`${id}-calldata`} style={{ wordBreak: 'break-all' }}>{p.data}</code></p>
-      <button onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: p.to, data: p.data })).catch(() => undefined)}>Copy calldata</button>{' '}
-      <button onClick={() => sendOnWhitechain(p.to, p.data).then(setHash, (e) => setErr(msg(e)))}>Send with your wallet</button>
-      {hash && <p>Sent: <a href={`${config.explorer}/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a></p>}
-      {err && <p style={{ color: 'crimson' }}>{err}</p>}
+    <div className="well stack" data-testid={`${id}-out`}>
+      {p.digest && <p className="small muted">Signed digest (matches the contract): <code className="break" data-testid={`${id}-digest`}>{p.digest}</code></p>}
+      <div>
+        <p className="small muted">To <span className="mono break">{p.to}</span> on Whitechain Sepolia. Anyone can send it.</p>
+        <code className="break small" data-testid={`${id}-calldata`}>{p.data}</code>
+      </div>
+      <div className="row">
+        <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: p.to, data: p.data })).catch(() => undefined)}>Copy calldata</button>
+        <button className="btn btn-sm" onClick={() => sendOnWhitechain(p.to, p.data).then(setHash, (e) => setErr(msg(e)))}>Send with your wallet</button>
+      </div>
+      {hash && <p className="small">Sent: <a className="mono break" href={`${config.explorer}/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a></p>}
+      {err && <Notice tone="negative">{err}</Notice>}
     </div>
   );
 }
@@ -140,118 +145,149 @@ export default function PoliciesPage() {
   void tick; // re-render every second for the countdowns
   const now = Number(nowS());
 
-  return (
-    <main>
-      <h1>Company policies (v2)</h1>
-      <p>
-        <label>Company account <input data-testid="account" value={input} onChange={(e) => setInput(e.target.value)} size={44} /></label>{' '}
-        <button data-testid="load" onClick={load}>Load</button>
-      </p>
-      {loadError && <p data-testid="load-error" style={{ color: 'crimson' }}>{loadError}</p>}
+  const hasExit = !!exit && exit[0] !== ZERO_ADDR;
 
-      {v1 && (
-        <>
-          <p data-testid="v1-account">v1 company (PaymentModule {config.paymentModule}): limits and payee rules are v2 features; showing approvers only.</p>
-          <ApproversPanel account={v1.account} registry={v1.registry} revocationList={config.revocationList} />
-        </>
-      )}
+  return (
+    <div className="page">
+      <PageHeader title="Policies" subtitle="Spending limits, payee rules, temporary access and the time-locked exit for a company account." />
+
+      <Card title="Company account">
+        <div className="fields">
+          <Field label="Account address">
+            <div className="input-group">
+              <input className="input mono" data-testid="account" value={input} onChange={(e) => setInput(e.target.value)} />
+              <button className="btn btn-primary" data-testid="load" onClick={load}>Load</button>
+            </div>
+          </Field>
+          {loadError && <Notice tone="negative"><span data-testid="load-error">{loadError}</span></Notice>}
+          {v1 && (
+            <Notice tone="info"><span data-testid="v1-account">v1 company (PaymentModule <span className="mono break">{config.paymentModule}</span>): limits and payee rules are v2 features; showing approvers only.</span></Notice>
+          )}
+        </div>
+      </Card>
+
+      {v1 && <ApproversPanel account={v1.account} registry={v1.registry} revocationList={config.revocationList} />}
 
       {account && cfg && pm && (
         <>
-          <h2>Limits and rules</h2>
-          <table data-testid="config">
-            <tbody>
-              <tr><td>ENS registry</td><td>{cfg.registry}</td></tr>
-              <tr><td>Two approvers above</td><td data-testid="cfg-two">{usdt(cfg.twoApproverThreshold)}</td></tr>
-              <tr><td>Per-payment limit</td><td data-testid="cfg-per-payment">{usdt(cfg.perPaymentLimit)}</td></tr>
-              <tr><td>30-day limit</td><td data-testid="cfg-monthly">{usdt(cfg.monthlyLimit)}{win && <> (available now: <span data-testid="win-company">{usdt(win[0])}</span>)</>}</td></tr>
-              <tr><td>New-payee delay</td><td data-testid="cfg-payee-delay">{cfg.payeeDelay} s</td></tr>
-              <tr><td>Fresh ENS proof above</td><td data-testid="cfg-fresh">{usdt(cfg.freshThreshold)} (roles cached within {cfg.maxCacheAge} L1 blocks)</td></tr>
-              <tr><td>Agent 30-day cap</td><td data-testid="cfg-agent">{usdt(cfg.agentMonthlyCap)}{win && <> (available now: <span data-testid="win-agent">{usdt(win[1])}</span>)</>}</td></tr>
-              <tr><td>Exit accounts</td><td data-testid="cfg-exits">{cfg.exitAccounts.join(', ') || 'none'} (delay {cfg.exitDelay} s)</td></tr>
-            </tbody>
-          </table>
+          <Card title="Limits and rules" subtitle="Enforced by PaymentModule v2 on every payment.">
+            <dl className="kv" data-testid="config">
+              <dt>ENS registry</dt><dd className="mono">{cfg.registry}</dd>
+              <dt>Two approvers above</dt><dd data-testid="cfg-two"><Amount v={cfg.twoApproverThreshold} /></dd>
+              <dt>Per-payment limit</dt><dd data-testid="cfg-per-payment"><Amount v={cfg.perPaymentLimit} /></dd>
+              <dt>30-day limit</dt>
+              <dd data-testid="cfg-monthly"><Amount v={cfg.monthlyLimit} />{win && <span className="muted"> (available now: <span data-testid="win-company"><Amount v={win[0]} /></span>)</span>}</dd>
+              <dt>New-payee delay</dt><dd className="num" data-testid="cfg-payee-delay">{cfg.payeeDelay} s</dd>
+              <dt>Fresh ENS proof above</dt><dd data-testid="cfg-fresh"><Amount v={cfg.freshThreshold} /> <span className="muted">(roles cached within {cfg.maxCacheAge} L1 blocks)</span></dd>
+              <dt>Agent 30-day cap</dt>
+              <dd data-testid="cfg-agent"><Amount v={cfg.agentMonthlyCap} />{win && <span className="muted"> (available now: <span data-testid="win-agent"><Amount v={win[1]} /></span>)</span>}</dd>
+              <dt>Exit accounts</dt><dd data-testid="cfg-exits"><span className="mono">{cfg.exitAccounts.join(', ') || 'none'}</span> <span className="muted">(delay {cfg.exitDelay} s)</span></dd>
+            </dl>
+          </Card>
 
-          <h2>Payees</h2>
-          <p>Every payee, including other Tazor companies, must be added by an admin and wait {cfg.payeeDelay} s.</p>
-          <table data-testid="payees">
-            <tbody>
-              {payees.map((p) => {
-                const from = Number(p.addedAt) + cfg.payeeDelay;
-                return (
-                  <tr key={p.payee}><td>{p.payee}</td><td>{p.addedAt === 0n ? 'not added' : now >= from ? 'allowed' : `allowed in ${from - now} s`}</td></tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p>
-            <label>Payee <input data-testid="payee" value={payee} onChange={(e) => setPayee(e.target.value)} size={44} /></label>{' '}
-            <button data-testid="add-payee" disabled={addPayee.busy} onClick={addPayee.run(async () => {
-              if (!isAddress(payee)) throw new Error('Enter the payee address.');
-              const p = getAddress(payee);
-              rememberPayee(account, p);
-              return signPolicy(pm, { type: 'AddPayee', message: { account, payee: p, deadline: deadline() } });
-            })}>Add payee (admin signs)</button>
-          </p>
-          {addPayee.error && <p data-testid="add-payee-error" style={{ color: 'crimson' }}>{addPayee.error}</p>}
-          {addPayee.out && <Calldata p={addPayee.out} id="add-payee" />}
+          <Card title="Payees" subtitle={`Every payee, including other Tazor companies, must be added by an admin and wait ${cfg.payeeDelay} s.`}>
+            <div className="fields">
+              {payees.length === 0 ? <div className="empty">No payees tracked on this device yet. Add one below.</div> : (
+                <div className="table-wrap"><table className="table table-stack" data-testid="payees">
+                  <thead><tr><th>Payee</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {payees.map((p) => {
+                      const from = Number(p.addedAt) + cfg.payeeDelay;
+                      return (
+                        <tr key={p.payee}>
+                          <td className="mono break">{p.payee}</td>
+                          <td>{p.addedAt === 0n ? <Pill>not added</Pill> : now >= from ? <Pill tone="positive">allowed</Pill> : <Pill tone="warning">{`allowed in ${from - now} s`}</Pill>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table></div>
+              )}
+              <Field label="Payee address">
+                <div className="input-group">
+                  <input className="input mono" data-testid="payee" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="0x…" />
+                  <button className="btn" data-testid="add-payee" disabled={addPayee.busy} onClick={addPayee.run(async () => {
+                    if (!isAddress(payee)) throw new Error('Enter the payee address.');
+                    const p = getAddress(payee);
+                    rememberPayee(account, p);
+                    return signPolicy(pm, { type: 'AddPayee', message: { account, payee: p, deadline: deadline() } });
+                  })}>Add payee (admin signs)</button>
+                </div>
+              </Field>
+              {addPayee.error && <Notice tone="negative"><span data-testid="add-payee-error">{addPayee.error}</span></Notice>}
+              {addPayee.out && <Calldata p={addPayee.out} id="add-payee" />}
+            </div>
+          </Card>
 
-          <h2>Provisional grant (up to 10 minutes)</h2>
-          <p>
-            <label>Grantee <input data-testid="grantee" value={grantee} onChange={(e) => setGrantee(e.target.value)} size={44} /></label>{' '}
-            <label><input type="checkbox" checked={grantRoles.approver} onChange={(e) => setGrantRoles({ ...grantRoles, approver: e.target.checked })} /> approver</label>{' '}
-            <label><input type="checkbox" checked={grantRoles.agent} onChange={(e) => setGrantRoles({ ...grantRoles, agent: e.target.checked })} /> agent</label>{' '}
-            <button data-testid="grant" disabled={grant.busy} onClick={grant.run(async () => {
-              if (!isAddress(grantee)) throw new Error('Enter the grantee address.');
-              const roles = (grantRoles.approver ? ROLE_APPROVER : 0n) | (grantRoles.agent ? ROLE_AGENT : 0n);
-              if (roles === 0n) throw new Error('Pick at least one role.');
-              return signPolicy(pm, { type: 'ProvisionalGrant', message: { account, grantee: getAddress(grantee), roles, validUntil: nowS() + MAX_GRANT_SECONDS - 30n, deadline: deadline() } });
-            })}>Grant (admin signs)</button>
-          </p>
-          <p>Provisional roles never satisfy the fresh-proof rule and can never include admin.</p>
-          {grant.error && <p style={{ color: 'crimson' }}>{grant.error}</p>}
-          {grant.out && <Calldata p={grant.out} id="grant" />}
+          <div className="grid-2">
+            <Card title="Provisional grant" subtitle="Up to 10 minutes. Never satisfies the fresh-proof rule and can never include admin.">
+              <div className="fields">
+                <Field label="Grantee">
+                  <input className="input mono" data-testid="grantee" value={grantee} onChange={(e) => setGrantee(e.target.value)} placeholder="0x…" />
+                </Field>
+                <div className="row">
+                  <label className="check"><input type="checkbox" checked={grantRoles.approver} onChange={(e) => setGrantRoles({ ...grantRoles, approver: e.target.checked })} /> approver</label>
+                  <label className="check"><input type="checkbox" checked={grantRoles.agent} onChange={(e) => setGrantRoles({ ...grantRoles, agent: e.target.checked })} /> agent</label>
+                </div>
+                <div><button className="btn" data-testid="grant" disabled={grant.busy} onClick={grant.run(async () => {
+                  if (!isAddress(grantee)) throw new Error('Enter the grantee address.');
+                  const roles = (grantRoles.approver ? ROLE_APPROVER : 0n) | (grantRoles.agent ? ROLE_AGENT : 0n);
+                  if (roles === 0n) throw new Error('Pick at least one role.');
+                  return signPolicy(pm, { type: 'ProvisionalGrant', message: { account, grantee: getAddress(grantee), roles, validUntil: nowS() + MAX_GRANT_SECONDS - 30n, deadline: deadline() } });
+                })}>Grant (admin signs)</button></div>
+                {grant.error && <Notice tone="negative">{grant.error}</Notice>}
+                {grant.out && <Calldata p={grant.out} id="grant" />}
+              </div>
+            </Card>
 
-          <h2>Contractor expiry</h2>
-          <p>
-            <label>Approver <input data-testid="exp-approver" value={expApprover} onChange={(e) => setExpApprover(e.target.value)} size={44} /></label>{' '}
-            <label>Valid until <input data-testid="exp-until" type="datetime-local" value={expUntil} onChange={(e) => setExpUntil(e.target.value)} /></label>{' '}
-            <button data-testid="set-expiry" disabled={expiry.busy} onClick={expiry.run(async () => {
-              if (!isAddress(expApprover)) throw new Error('Enter the approver address.');
-              const until = Math.floor(new Date(expUntil).getTime() / 1000);
-              if (!Number.isFinite(until)) throw new Error('Pick a date and time.');
-              return signPolicy(pm, { type: 'ApproverExpiry', message: { account, approver: getAddress(expApprover), until: BigInt(until), deadline: deadline() } });
-            })}>Set expiry (admin signs)</button>
-          </p>
-          {expiry.error && <p style={{ color: 'crimson' }}>{expiry.error}</p>}
-          {expiry.out && <Calldata p={expiry.out} id="expiry" />}
+            <Card title="Contractor expiry" subtitle="An approver stops being able to approve after this time.">
+              <div className="fields">
+                <Field label="Approver">
+                  <input className="input mono" data-testid="exp-approver" value={expApprover} onChange={(e) => setExpApprover(e.target.value)} placeholder="0x…" />
+                </Field>
+                <Field label="Valid until">
+                  <input className="input" data-testid="exp-until" type="datetime-local" value={expUntil} onChange={(e) => setExpUntil(e.target.value)} />
+                </Field>
+                <div><button className="btn" data-testid="set-expiry" disabled={expiry.busy} onClick={expiry.run(async () => {
+                  if (!isAddress(expApprover)) throw new Error('Enter the approver address.');
+                  const until = Math.floor(new Date(expUntil).getTime() / 1000);
+                  if (!Number.isFinite(until)) throw new Error('Pick a date and time.');
+                  return signPolicy(pm, { type: 'ApproverExpiry', message: { account, approver: getAddress(expApprover), until: BigInt(until), deadline: deadline() } });
+                })}>Set expiry (admin signs)</button></div>
+                {expiry.error && <Notice tone="negative">{expiry.error}</Notice>}
+                {expiry.out && <Calldata p={expiry.out} id="expiry" />}
+              </div>
+            </Card>
+          </div>
 
-          <h2>Time-locked exit</h2>
-          {exit && exit[0] !== '0x0000000000000000000000000000000000000000' ? (
-            <p data-testid="exit-status">Exit pending to {exit[0]}: {now >= Number(exit[1])
-              ? 'executable now'
-              : <>executable in <span data-testid="exit-countdown">{Number(exit[1]) - now}</span> s</>}</p>
-          ) : <p data-testid="exit-status">No exit pending.</p>}
-          <p>
-            <label>Exit account{' '}
-              <select data-testid="exit-index" value={exitIndex} onChange={(e) => setExitIndex(Number(e.target.value))}>
-                {cfg.exitAccounts.map((a, i) => <option key={a} value={i}>{a}</option>)}
-              </select>
-            </label>{' '}
-            <button data-testid="request-exit" disabled={exitAction.busy || cfg.exitAccounts.length === 0} onClick={exitAction.run(() =>
-              signPolicy(pm, { type: 'RequestExit', message: { account, exitIndex: BigInt(exitIndex), deadline: deadline() } }))}>Request exit (approver signs)</button>{' '}
-            <button data-testid="cancel-exit" disabled={exitAction.busy} onClick={exitAction.run(() =>
-              signPolicy(pm, { type: 'CancelExit', message: { account, deadline: deadline() } }))}>Cancel exit (approver signs)</button>{' '}
-            <button data-testid="execute-exit" disabled={exitAction.busy || !exit || exit[0] === '0x0000000000000000000000000000000000000000' || now < Number(exit[1])}
-              onClick={exitAction.run(async () => ({ to: pm, data: encodeExecuteExit(account) }))}>Execute exit (anyone)</button>
-          </p>
-          <p>The exit moves the whole USDT balance to one of the company&apos;s own exit accounts after {cfg.exitDelay} s; any valid approver can cancel it before then.</p>
-          {exitAction.error && <p style={{ color: 'crimson' }}>{exitAction.error}</p>}
-          {exitAction.out && <Calldata p={exitAction.out} id="exit" />}
+          <Card title="Time-locked exit" subtitle={`Moves the whole USDT balance to one of the company's own exit accounts after ${cfg.exitDelay} s. Any valid approver can cancel it before then.`}>
+            <div className="fields">
+              {hasExit ? (
+                <Notice tone="warning"><span data-testid="exit-status">Exit pending to <span className="mono break">{exit![0]}</span>: {now >= Number(exit![1])
+                  ? 'executable now'
+                  : <>executable in <span className="num" data-testid="exit-countdown">{Number(exit![1]) - now}</span> s</>}</span></Notice>
+              ) : <p className="muted" data-testid="exit-status">No exit pending.</p>}
+              <Field label="Exit account">
+                <select className="select mono" data-testid="exit-index" value={exitIndex} onChange={(e) => setExitIndex(Number(e.target.value))}>
+                  {cfg.exitAccounts.map((a, i) => <option key={a} value={i}>{a}</option>)}
+                </select>
+              </Field>
+              <div className="row">
+                <button className="btn" data-testid="request-exit" disabled={exitAction.busy || cfg.exitAccounts.length === 0} onClick={exitAction.run(() =>
+                  signPolicy(pm, { type: 'RequestExit', message: { account, exitIndex: BigInt(exitIndex), deadline: deadline() } }))}>Request exit (approver signs)</button>
+                <button className="btn" data-testid="cancel-exit" disabled={exitAction.busy} onClick={exitAction.run(() =>
+                  signPolicy(pm, { type: 'CancelExit', message: { account, deadline: deadline() } }))}>Cancel exit (approver signs)</button>
+                <button className="btn" data-testid="execute-exit" disabled={exitAction.busy || !hasExit || now < Number(exit![1])}
+                  onClick={exitAction.run(async () => ({ to: pm, data: encodeExecuteExit(account) }))}>Execute exit (anyone)</button>
+              </div>
+              {exitAction.error && <Notice tone="negative">{exitAction.error}</Notice>}
+              {exitAction.out && <Calldata p={exitAction.out} id="exit" />}
+            </div>
+          </Card>
 
           <ApproversPanel account={account} registry={cfg.registry} revocationList={configV2.revocationList} />
         </>
       )}
-    </main>
+    </div>
   );
 }
