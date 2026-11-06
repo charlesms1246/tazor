@@ -1,6 +1,6 @@
 // <tazor-pay-button>: a framework-free custom element that creates a Tazor payment link, opens it, and waits for payment.
 import { createInvoiceLink, DEFAULT_EXPLORER, watchPayment, type InvoiceInput, type InvoiceLink, type LineInput, type Payment } from './core.ts';
-import { accountSigner, CHECKOUT, EXPLORER, orderId, orderRef, payOrder, RELAYER_URL, walletSigner, watchOrder, type Eip1193, type Order, type Signer, type Stage } from './checkout.ts';
+import { accountSigner, CHECKOUT, EXPLORER, orderId, orderRef, payOrder, readyToShip, RELAYER_URL, walletSigner, watchOrder, type Eip1193, type Order, type ShipPolicy, type Signer, type Stage } from './checkout.ts';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { addressQrSvg, depositOrder, watchDeposit, type DepositOrder, type DepositStatus } from './deposit.ts';
 
@@ -12,6 +12,8 @@ export const ATTRIBUTES = [
   // offer "Pay from WhiteBIT or any exchange" (plain USDT transfer to a per-order address); "false" hides it
   'deposit',
   'demo-wallet',
+  // payments at or above this many USDT fire tazor-ready only once posted to Ethereum (default 100)
+  'ship-above',
 ] as const;
 
 export type WalletPaidDetail = { orderId: `0x${string}`; txHash: `0x${string}`; explorerUrl: string; payer: string; amount: string; ref: string };
@@ -130,6 +132,26 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
     }
 
     #wallet = () => this.getAttribute('mode') === 'wallet';
+    #readySent = false;
+    #shipNote = '';
+    #policy = (): ShipPolicy => {
+      const v = this.getAttribute('ship-above')?.trim();
+      return { waitForEthereumAbove: v && /^\d+(\.\d{1,6})?$/.test(v) ? v : '100' };
+    };
+    /** tazor-ready once the payment may ship: at once for small amounts, after Ethereum for big ones (ship-above). */
+    #maybeReady(orderId: string, stage: Stage | null, extra: Record<string, unknown> = {}) {
+      if (this.#readySent) return;
+      const amount = this.getAttribute('amount')?.trim() ?? '0';
+      let d;
+      try { d = readyToShip(amount, stage, this.#policy()); } catch { return; }
+      if (!d.ready) {
+        this.#shipNote = stage && stage !== 'pending' ? 'Payment received; waiting for Whitechain to post it to Ethereum (big payments only)' : '';
+        return;
+      }
+      this.#readySent = true;
+      this.#shipNote = '';
+      this.dispatchEvent(new CustomEvent('tazor-ready', { detail: { orderId, stage, waitFor: d.waitFor, reason: d.reason, ...extra }, bubbles: true, composed: true }));
+    }
     #stage: Stage | null = null;
     #dep: { open: boolean; refundTo: string; busy: boolean; error: string; order?: DepositOrder; address?: string; id?: string; qr?: string; status?: DepositStatus } = { open: false, refundTo: '', busy: false, error: '' };
 
@@ -158,6 +180,9 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
             this.#txUrl = st.explorer || (st.txHash ? `${this.getAttribute('explorer') ?? EXPLORER}/tx/${st.txHash}` : '');
             const detail = { method: 'deposit', orderId: d.orderId, txHash: st.txHash ?? '', explorerUrl: this.#txUrl, payer: refundTo, amount: this.getAttribute('amount') ?? '', ref: this.getAttribute('order-ref') ?? '' };
             this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
+          }
+          if (st.status === 'paid' || st.status === 'ethereum' || st.status === 'finalized') {
+            this.#maybeReady(d.orderId, st.status === 'paid' ? 'sequencer' : st.status, { method: 'deposit', txHash: st.txHash ?? '' });
           }
           this.#render();
         }, { relayer: this.getAttribute('relayer') || undefined });
@@ -260,8 +285,16 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
         this.#state = 'paid'; this.#stage = sub.stage ?? 'pending'; this.#render();
         const detail: WalletPaidDetail = { orderId: id, txHash: sub.txHash, explorerUrl: this.#txUrl, payer: wallet.address, amount: this.getAttribute('amount') ?? '', ref: this.getAttribute('order-ref') ?? '' };
         this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
+        this.#readySent = false;
+        this.#maybeReady(id, 'sequencer', { txHash: sub.txHash });
+        this.#render();
         this.#stop?.();
-        this.#stop = watchOrder(id, (st) => { this.#stage = st; this.#render(); this.dispatchEvent(new CustomEvent('tazor-finality', { detail: { orderId: id, stage: st }, bubbles: true, composed: true })); }, { checkout, relayer });
+        this.#stop = watchOrder(id, (st) => {
+          this.#stage = st;
+          this.#maybeReady(id, st, { txHash: sub.txHash });
+          this.#render();
+          this.dispatchEvent(new CustomEvent('tazor-finality', { detail: { orderId: id, stage: st }, bubbles: true, composed: true }));
+        }, { checkout, relayer });
       } catch (e) {
         this.#fail(e);
       }
@@ -295,6 +328,9 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
           this.#render();
           const detail: PaidDetail = { ...p, url: l.url, id: l.id };
           this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
+          // invoice links settle through the company's PaymentModule: small amounts are ready at once
+          this.#maybeReady(l.id, 'sequencer', { txHash: p.txHash });
+          this.#render();
         },
       });
     }
@@ -330,7 +366,7 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       }
       if (this.#state === 'error') status.textContent = this.#error || 'Something went wrong';
       if (this.#state === 'paid') {
-        status.textContent = this.#wallet() && this.#stage ? `Paid ✓ · ${STAGE_TEXT[this.#stage]} · ` : 'Paid ✓ · ';
+        status.textContent = this.#shipNote ? `${this.#shipNote} · ` : this.#wallet() && this.#stage ? `Paid ✓ · ${STAGE_TEXT[this.#stage]} · ` : 'Paid ✓ · ';
         const a = document.createElement('a');
         a.href = this.#txUrl; a.target = '_blank'; a.rel = 'noreferrer'; a.textContent = 'View tx'; a.setAttribute('part', 'tx');
         status.append(a);
