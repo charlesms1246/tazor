@@ -27,7 +27,7 @@ const link = await createInvoiceLink({
   dueDate: '2026-12-31',
   id: 'BJ-1042',
 });
-// link.url → https://tazor.charlesms.dev/pay/#v1.…   link.amount → '118'
+// link.url → https://app.tazor.charlesms.dev/pay/#v1.…   link.amount → '118'
 
 const stop = watchPayment({
   invoiceHash: link.invoiceHash,
@@ -54,7 +54,7 @@ const attrs: [string, string][] = [
   ['invoice-id', 'Your order number. Defaults to INV-YYYYMMDD-XXXX.'],
   ['tax-rate, tax-label', 'Optional tax, added as a final line the way the app adds it (label defaults to Tax).'],
   ['supplier-account', "Your Tazor account, if it isn't the payee."],
-  ['app-url', 'The Tazor app that opens the link. Defaults to https://tazor.charlesms.dev.'],
+  ['app-url', 'The Tazor app that opens the link. Defaults to https://app.tazor.charlesms.dev.'],
   ['label', 'Button text. Defaults to "Pay with Tazor".'],
   ['target', 'popup opens a small window; anything else opens a new tab.'],
   ['explorer', 'Blockscout base URL. Defaults to the Whitechain testnet explorer.'],

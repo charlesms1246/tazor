@@ -7,7 +7,7 @@ import { buildInvoice, newInvoiceId, parseRate, withTax, type InvoiceForm } from
 
 export { decodeInvoiceLink, type Invoice };
 
-export const DEFAULT_APP_URL = 'https://tazor.charlesms.dev';
+export const DEFAULT_APP_URL = 'https://app.tazor.charlesms.dev';
 export const DEFAULT_EXPLORER = 'https://explorer.testnet.whitechain.io';
 /** PaymentModule v1 and v2 on Whitechain Sepolia: both emit InvoicePaid(account, nonce = invoice hash, payee, amount, viaL1). */
 export const PAYMENT_MODULES: Address[] = ['0xe19ddf1fd417B146137A5dE6eb56c4589431540A', '0x906620D82e2959351c81D731C67EA46DF71E36f3'];

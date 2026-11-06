@@ -127,7 +127,7 @@ async function api(name: string, args: Record<string, string>, c: Ctx = {}): Pro
 }
 
 /** Tazor's own app domains: a link to any of them opens on this one, because passkeys only work on the domain that made them. */
-const APP_HOSTS = ['tazor-app.vercel.app', 'tazor.charlesms.dev', 'taz0r.eth.limo'];
+const APP_HOSTS = ['tazor-app.vercel.app', 'app.tazor.charlesms.dev', 'tazor.charlesms.dev', 'taz0r.eth.limo'];
 
 function navigate(url: string): boolean {
   let next = new URL(url, location.href);
