@@ -20,6 +20,7 @@ import {
 import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { NoLink } from './no-link.tsx';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -30,7 +31,7 @@ const day = (ts: number | bigint) => new Date(Number(ts) * 1000).toISOString().s
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function PayPage() {
-  const [state, setState] = useState<'loading' | 'invalid' | Loaded>('loading');
+  const [state, setState] = useState<'loading' | 'none' | 'invalid' | Loaded>('loading');
   const [guard, setGuard] = useState<Guard>({ status: 'checking' });
   const [mine, setMine] = useState<Approval | null>(null);
   const [pasted, setPasted] = useState('');
@@ -44,13 +45,13 @@ export default function PayPage() {
   const [v2, setV2] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const load = () =>
+    const load = () => (location.hash.length <= 1 ? Promise.resolve(setState('none')) :
       decodeInvoiceLink(location.href)
         .then((invoice) => {
           const { nonce, expiry } = defaultAuthParams(invoice);
           setState({ invoice, auth: buildInvoiceAuth(invoice, nonce, expiry) });
         })
-        .catch(() => setState('invalid'));
+        .catch(() => setState('invalid')));
     load();
     addEventListener('hashchange', load);
     return () => removeEventListener('hashchange', load);
@@ -116,6 +117,7 @@ export default function PayPage() {
   }, [l1, state, v2]);
 
   if (state === 'loading') return <div className="page"><PageHeader title="Invoice" subtitle="Decrypting invoice…" /></div>;
+  if (state === 'none') return <NoLink />;
   if (state === 'invalid') {
     return (
       <div className="page">
