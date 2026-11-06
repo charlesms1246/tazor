@@ -11,6 +11,8 @@ import { FreezeDevice } from '../settings/freeze.tsx';
 import { Card, Empty, PageHeader, Pill } from '../_ui/index.tsx';
 import { HEALTH_KEYS, healthRows } from './rows.ts';
 import { ContractsList, RelayerSettings } from './relayer-settings.tsx';
+import { TrustModel } from './trust.tsx';
+import { RelayerOffBanner, RelayerOffSwitch } from './relayer-off.tsx';
 import { AddrChip } from '../_human/chip.tsx';
 import { plain } from '@/lib/human.ts';
 import './security.css';
@@ -66,7 +68,10 @@ export default function SecurityPage() {
 
   return (
     <div className="page">
+      <RelayerOffBanner />
       <PageHeader title="Security & settings" subtitle="Live health of everything a payment depends on, the relayer this device uses, recent removals, and the controls for a lost device." />
+
+      <TrustModel />
 
       <div data-tour="health">
         <Card title="System health" subtitle={health ? `Checked at ${time(health.checkedAt)} from this device.` : 'Checking from this device…'} flush
@@ -89,7 +94,9 @@ export default function SecurityPage() {
       </div>
 
       <div data-tour="fallback">
-      <Card title="If our servers go down">
+      <Card title="If our servers go down" testId="servers-down">
+        <RelayerOffSwitch onChange={refresh} />
+        <hr />
         <p className="muted">
           A signed payment doesn&apos;t need Tazor: anyone can submit it, and if the relayer or the sequencer stops it, it can be
           sent through Ethereum and still lands on Whitechain. <a href="/docs/censorship-resistance/">How the fallback works</a>

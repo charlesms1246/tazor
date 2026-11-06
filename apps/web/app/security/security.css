@@ -9,3 +9,22 @@
   .health-table tr > td:nth-child(3) { grid-column: 1 / -1; padding-top: 4px !important; }
   .health-table .pill { white-space: normal; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; line-height: 16px; text-align: right; }
 }
+
+/* Trust model */
+.trust-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.trust-list li { display: grid; gap: 4px; }
+.trust-tag { display: inline-block; min-width: 46px; padding: 0 6px; margin-right: 4px; border-radius: var(--radius-chip); background: var(--pill-positive-bg); color: var(--pill-positive-ink); font-size: 11px; line-height: 18px; font-weight: 600; text-align: center; }
+.trust-tag-not { background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); }
+.trust-still { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+
+/* Relayer off */
+.relayer-off-switch { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.relayer-off-switch > div { flex: 1 1 260px; min-width: 0; }
+.relayer-off-switch .btn { min-height: 44px; }
+.relayer-off-banner {
+  position: sticky; top: 28px; z-index: 29;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px;
+  padding: 12px 16px; background: var(--pill-warning-bg); color: var(--pill-warning-ink);
+  border-bottom: 1px solid var(--warning-border); font-size: 15px;
+}
+.relayer-off-banner .btn { min-height: 40px; }
