@@ -20,7 +20,7 @@ function fakeFetch(reply: Reply): typeof fetch {
   }) as typeof fetch;
 }
 
-test('checkHealth: chains up, EnsGate deployed → fallback ready; relayer not configured in node', async () => {
+test('checkHealth: chains up, EnsGate deployed → fallback ready; default relayer configured, fake fetch has no route for it', async () => {
   const now = Math.floor(Date.now() / 1000);
   const h = await checkHealth(fakeFetch((m) => {
     if (m === 'eth_getBlockByNumber') return { number: '0xbc614e', timestamp: `0x${(now - 3).toString(16)}` };
@@ -34,7 +34,9 @@ test('checkHealth: chains up, EnsGate deployed → fallback ready; relayer not c
   assert.deepEqual(h.ethereum, { ok: true, block: 12_074_179 });
   assert.equal(h.fallback.ready, true);
   assert.match(h.fallback.reason, /EnsGate is deployed/);
-  assert.deepEqual(h.relayer, { configured: false, ok: false, url: '' });
+  assert.equal(h.relayer.configured, true);
+  assert.equal(h.relayer.url, 'https://tazor-relayer.vercel.app');
+  assert.equal(h.relayer.ok, false);
 });
 
 test('checkHealth never throws: everything down, or EnsGate without code', async () => {
