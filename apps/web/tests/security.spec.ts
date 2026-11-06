@@ -9,7 +9,7 @@ test('security page: four health rows, relayer up, fallback Ready', async ({ pag
     contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id, result }),
   });
   await page.route('http://relayer.test/health', (route) => route.fulfill({
-    contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true, relayer: '0x000000000000000000000000000000000000beef' }),
+    contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: true, relayer: '0x000000000000000000000000000000000000beef', roleSync: true, watchRegistries: ['0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1'] }),
   }));
   await page.route(WC, async (route) => {
     const { id, method } = route.request().postDataJSON();
@@ -24,11 +24,12 @@ test('security page: four health rows, relayer up, fallback Ready', async ({ pag
   });
 
   await page.goto('/security/');
-  await expect(page.getByTestId('health-row')).toHaveCount(4);
+  await expect(page.getByTestId('health-row')).toHaveCount(5);
   await expect(page.getByTestId('health-relayer')).toHaveText('Up');
   await expect(page.getByTestId('health-whitechain')).toHaveText('Up');
   await expect(page.getByTestId('health-ethereum')).toHaveText('Up');
   await expect(page.getByTestId('health-fallback')).toHaveText('Ready');
+  await expect(page.getByTestId('health-rolesync')).toHaveText('Enabled · 1 registry');
   await expect(page.getByTestId('health-row').filter({ hasText: 'Whitechain Sepolia' })).toContainText('block 12,345,678');
   await expect(page.locator('[data-tour="health"]')).toBeVisible();
   await expect(page.getByRole('link', { name: 'How the fallback works' })).toHaveAttribute('href', '/docs/censorship-resistance/');

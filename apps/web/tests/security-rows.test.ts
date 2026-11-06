@@ -13,7 +13,7 @@ const base: Health = {
 
 test('health rows: four rows with status and detail text', () => {
   const r = healthRows(base);
-  assert.deepEqual(r.map((x) => x.key), ['relayer', 'whitechain', 'ethereum', 'fallback']);
+  assert.deepEqual(r.map((x) => x.key), ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync']);
   assert.equal(r[0].detail, 'https://relayer.example · 120 ms');
   assert.equal(r[1].detail, 'block 12,345,678 · 3 s ago');
   assert.equal(r[2].detail, 'block 12,074,179');
@@ -26,4 +26,12 @@ test('health rows: not set, unreachable and not ready', () => {
   assert.equal(r[1].status, 'Unreachable');
   assert.deepEqual([r[3].status, r[3].tone], ['Not ready', 'warning']);
   assert.equal(healthRows({ ...base, relayer: { configured: true, ok: false, url: 'https://r' } })[0].status, 'Unreachable');
+});
+
+test('role sync row: unknown, not enabled, enabled with registry count', () => {
+  assert.equal(healthRows(base)[4].status, 'Unknown');
+  assert.equal(healthRows({ ...base, relayer: { ...base.relayer, roleSync: false } })[4].status, 'Not enabled');
+  const on = healthRows({ ...base, relayer: { ...base.relayer, roleSync: true, watchRegistries: ['0x1', '0x2'] } })[4];
+  assert.deepEqual([on.status, on.tone], ['Enabled · 2 registries', 'positive']);
+  assert.equal(healthRows({ ...base, relayer: { ...base.relayer, roleSync: true, watchRegistries: ['0x1'] } })[4].status, 'Enabled · 1 registry');
 });

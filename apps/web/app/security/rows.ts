@@ -1,6 +1,6 @@
 import type { Health } from '@/lib/health.ts';
 
-export type HealthKey = 'relayer' | 'whitechain' | 'ethereum' | 'fallback';
+export type HealthKey = 'relayer' | 'whitechain' | 'ethereum' | 'fallback' | 'rolesync';
 export type HealthRow = { key: HealthKey; name: string; tone: 'positive' | 'negative' | 'warning' | 'neutral'; status: string; detail: string };
 
 const n = (v: number) => v.toLocaleString('en-US');
@@ -19,7 +19,20 @@ export function healthRows(h: Health): HealthRow[] {
       ? { key: 'ethereum', name: 'Ethereum Sepolia', tone: 'positive', status: 'Up', detail: `block ${n(h.ethereum.block ?? 0)}` }
       : { key: 'ethereum', name: 'Ethereum Sepolia', tone: 'negative', status: 'Unreachable', detail: 'The Ethereum Sepolia RPC did not answer from this device.' },
     { key: 'fallback', name: 'Ethereum fallback', tone: h.fallback.ready ? 'positive' : 'warning', status: h.fallback.ready ? 'Ready' : 'Not ready', detail: h.fallback.reason },
+    roleSyncRow(h),
   ];
 }
 
-export const HEALTH_KEYS: HealthKey[] = ['relayer', 'whitechain', 'ethereum', 'fallback'];
+export const HEALTH_KEYS: HealthKey[] = ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync'];
+
+function roleSyncRow(h: Health): HealthRow {
+  const name = 'Role sync';
+  if (!h.relayer.configured || !h.relayer.ok || h.relayer.roleSync === undefined) {
+    return { key: 'rolesync', name, tone: 'neutral', status: 'Unknown', detail: 'No relayer report. Anyone can still sync roles by submitting a proof to the role cache.' };
+  }
+  if (!h.relayer.roleSync) {
+    return { key: 'rolesync', name, tone: 'warning', status: 'Not enabled', detail: 'This relayer doesn’t sync ENS roles. Anyone can still submit the proof to the role cache.' };
+  }
+  const n = h.relayer.watchRegistries?.length ?? 0;
+  return { key: 'rolesync', name, tone: 'positive', status: `Enabled · ${n} ${n === 1 ? 'registry' : 'registries'}`, detail: 'The relayer syncs ENS role changes to Whitechain on demand, plus a daily sweep.' };
+}
