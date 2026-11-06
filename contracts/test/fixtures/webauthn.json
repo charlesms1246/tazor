@@ -1,0 +1,42 @@
+{
+  "x": "0x5c324e72c96949335cb63308f0749970b0ae7d88c3e2401b462197f866a92657",
+  "y": "0xa760695d6d1b2abfeaca93df16a38ca558b49014a4e6f2711c067ef7570ef126",
+  "credentialId": "0x06da1b93715c330ca3672747699ba4f182c8c80af8b2aac671ebe7de625be167",
+  "rpId": "localhost",
+  "origin": "http://localhost:4175",
+  "assertions": [
+    {
+      "challenge": "0xb7399b5d83c93cf90a0e136bc1f0b4817ff78004f1bcba9ea9c07f645e7b707b",
+      "authenticatorData": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000002",
+      "clientDataJSON": "{\"type\":\"webauthn.get\",\"challenge\":\"tzmbXYPJPPkKDhNrwfC0gX_3gATxvLqeqcB_ZF57cHs\",\"origin\":\"http://localhost:4175\",\"crossOrigin\":false}",
+      "messageHash": "0xfcbf401935523a04d0824563595f8c85095b8f3f2d2fced8cdfd49f178f89504",
+      "r": "0x0c8e98018caf5fb1fbb79e06d3a1d4f2cdc760c6af0d2975388c96053f0ee421",
+      "s": "0x786ae0c59eac279109d8220ff04ceec817d6688db6d1cc8f77ffb5e7e5339364",
+      "rawS": "0x87951f396153d86ff627ddf00fb31137a510921ff045d1f57bba14db172f91ed",
+      "typeIndex": 1,
+      "challengeIndex": 23
+    },
+    {
+      "challenge": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "authenticatorData": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000003",
+      "clientDataJSON": "{\"type\":\"webauthn.get\",\"challenge\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE\",\"origin\":\"http://localhost:4175\",\"crossOrigin\":false,\"other_keys_can_be_added_here\":\"do not compare clientDataJSON against a template. See https://goo.gl/yabPex\"}",
+      "messageHash": "0xf19979c43d6e291eaa0b0e47adf7bf8477607a3962394097e1a7444549cfb04f",
+      "r": "0x7b6dbc0ceed60019c8edda44f37e1a12e1dadad44cae358849293fbc34145de5",
+      "s": "0x6fb3c86f62a38b28367cc52f803201061576cca79d64bbeaa147a38162931c44",
+      "rawS": "0x904c378f9d5c74d8c9833ad07fcdfef9a7702e0609b2e29a5272274199d0090d",
+      "typeIndex": 1,
+      "challengeIndex": 23
+    },
+    {
+      "challenge": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "authenticatorData": "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000004",
+      "clientDataJSON": "{\"type\":\"webauthn.get\",\"challenge\":\"ERERERERERERERERERERERERERERERERERERERERERE\",\"origin\":\"http://localhost:4175\",\"crossOrigin\":false}",
+      "messageHash": "0xd522e6e78bb51df1c6b23fa4c10a1f3417ee851d5b22a68d02e9a441616130bd",
+      "r": "0xb01440f9b61e94b29feadb038d428437c6df4c3eb0eb4b3e6c0d659d04c6c20b",
+      "s": "0x771873a52cc6cb42b64cdda2f941ba2de457c8286e9a8a3f38569ebcd3d73c5b",
+      "rawS": "0x771873a52cc6cb42b64cdda2f941ba2de457c8286e9a8a3f38569ebcd3d73c5b",
+      "typeIndex": 1,
+      "challengeIndex": 23
+    }
+  ]
+}

@@ -8,7 +8,8 @@
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "serve": "node scripts/serve.mjs",
     "test:passkey": "NEXT_TELEMETRY_DISABLED=1 next build && playwright test",
-    "test:unit": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning tests/*.test.ts"
+    "test:unit": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning tests/*.test.ts",
+    "fixture:webauthn": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/webauthn-fixture.ts"
   },
   "dependencies": {
     "next": "16.4.5",
