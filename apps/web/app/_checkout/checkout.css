@@ -1,0 +1,23 @@
+/* receipts and the merchant Checkout console */
+.finality { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.finality li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); min-width: 0; }
+.finality .fin-n { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 999px; border: 2px solid var(--control); font-size: 13px; font-weight: 700; color: var(--muted); }
+.finality li[data-state="done"] .fin-n { border-color: var(--positive); background: var(--positive); color: #ffffff; }
+.finality li[data-state="active"] { border-color: var(--wc-blue); }
+.finality li[data-state="active"] .fin-n { border-color: var(--wc-blue); color: var(--wc-blue); }
+.finality .fin-text { display: flex; flex-direction: column; min-width: 0; }
+.finality .fin-title { font-weight: 600; line-height: 18px; }
+.finality .fin-sub { font-size: 12px; color: var(--muted); }
+.receipt-hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.receipt-hero h2 { margin: 0; font-size: 28px; line-height: 34px; font-variant-numeric: tabular-nums; }
+.receipt-share { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.receipt-share .ip-qr { width: 120px; height: 120px; }
+.co-tabs { padding: 0 var(--card-pad); }
+.co-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.co-form .input { min-width: 0; flex: 1 1 260px; }
+.co-inline { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.co-code { margin: 0; padding: 12px; border-radius: var(--radius-inner); background: var(--raised); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .finality { grid-template-columns: minmax(0, 1fr); }
+  .co-tabs { padding: 0 16px; overflow-x: auto; }
+}
