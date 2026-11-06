@@ -1,9 +1,10 @@
 <!doctype html>
 <!--
   Bluejay Logistics: a separate merchant site that takes payment through Tazor.
-  Tazor integration: 16 lines (between "tazor:begin" and "tazor:end" below):
+  Tazor integration: 15 lines (between "tazor:begin" and "tazor:end" below):
   one <script>, one <tazor-pay-button>, one 'tazor-paid' listener. No build step, no framework.
-  The merchant dashboard on the right is optional and uses the same SDK (window.TazorPay).
+  The customer pays from any wallet holding USDT (one signature, no gas, no WBT) or by plain transfer from WhiteBIT or any exchange.
+  The subscription plan and the merchant dashboard on the right are optional and use the same SDK (window.TazorPay).
 -->
 <html lang="en">
 <head>
@@ -25,23 +26,23 @@
       <table class="items">
         <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
         <tbody>
-          <tr><td>Freight Mumbai → Pune, 20 ft container</td><td class="num">1</td><td class="num">1.20</td></tr>
-          <tr><td>Customs handling</td><td class="num">2</td><td class="num">0.30</td></tr>
-          <tr><td>Cargo insurance</td><td class="num">1</td><td class="num">0.05</td></tr>
+          <tr><td>Freight Mumbai → Pune, 20 ft container</td><td class="num">1</td><td class="num">0.12</td></tr>
+          <tr><td>Customs handling</td><td class="num">1</td><td class="num">0.05</td></tr>
+          <tr><td>Cargo insurance</td><td class="num">1</td><td class="num">0.03</td></tr>
         </tbody>
-        <tfoot><tr><td colspan="2">Total</td><td class="num">1.55 <span class="unit">USDT</span></td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td class="num">0.20 <span class="unit">USDT</span></td></tr></tfoot>
       </table>
       <p class="status">Status: <b id="order-status">Awaiting payment</b> <a id="order-tx" target="_blank" rel="noreferrer" hidden>View transaction</a></p>
+      <p class="status" id="order-refund" hidden></p>
 
       <!-- tazor:begin -->
       <script src="./tazor-pay.js"></script>
       <tazor-pay-button
-        supplier-name="Bluejay Logistics"
-        payee="0xc1dce946D192e344251972470237F1471C93876c"
-        buyer="0xb99A12652BEe98429ae31EA0529A0b63f1073721"
-        lines='[{"description":"Freight Mumbai → Pune, 20 ft container","unitPrice":"1.20"},{"description":"Customs handling","quantity":2,"unitPrice":"0.15"},{"description":"Cargo insurance","unitPrice":"0.05"}]'
-        memo="Order BJ-1042"
-        label="Pay 1.55 USDT with Tazor"></tazor-pay-button>
+        mode="wallet"
+        merchant="0xc1dce946D192e344251972470237F1471C93876c"
+        amount="0.20"
+        order-ref="BJ-1042"
+        label="Pay 0.20 USDT"></tazor-pay-button>
       <script>
         document.querySelector('tazor-pay-button').addEventListener('tazor-paid', (e) => {
           document.querySelector('#order-status').textContent = 'Paid';
@@ -52,18 +53,44 @@
       </script>
       <!-- tazor:end -->
 
-      <p class="hint">Your company approves in the Tazor app with a passkey; USDT settles on Whitechain in seconds.</p>
+      <p class="hint">Pay with any wallet that holds USDT on Whitechain: you sign one message, Tazor's relayer pays the gas. Or choose "Pay from WhiteBIT or any exchange" and send a plain transfer (on testnet, any USDT transfer on Whitechain Sepolia stands in for the WhiteBIT withdrawal).</p>
+
+      <div class="plan" aria-labelledby="plan-h">
+        <h2 id="plan-h">Subscription: Weekly freight lane</h2>
+        <p class="muted">0.10 USDT a week × 4 weeks. The first week is paid now; the rest are pulled weekly under a permit you sign once. Cancel anytime.</p>
+        <div class="row">
+          <button type="button" id="sub-start" class="btn">Subscribe with your wallet</button>
+          <button type="button" id="sub-cancel" class="btn btn-ghost" hidden>Cancel subscription</button>
+        </div>
+        <p class="status small" id="sub-status" role="status"></p>
+      </div>
     </section>
 
     <section class="card" aria-labelledby="merchant-h">
       <p class="eyebrow">Merchant view</p>
       <h2 id="merchant-h">Orders</h2>
-      <p class="muted">Every checkout creates a Tazor invoice. This list watches Whitechain for its payment, on any device.</p>
+      <p class="muted">Read straight from Whitechain (TazorCheckout events for this merchant), on any device.</p>
+      <div class="row">
+        <span class="small">Merchant <span class="mono" id="merchant-addr"></span></span>
+        <button type="button" id="merchant-connect" class="btn btn-sm">Use my wallet as the merchant</button>
+        <button type="button" id="export-csv" class="btn btn-sm btn-ghost">Accountant export (CSV)</button>
+      </div>
+      <p class="muted small" id="merchant-note"></p>
       <table class="items" id="orders">
-        <thead><tr><th>Invoice</th><th class="num">Amount</th><th>Status</th></tr></thead>
+        <thead><tr><th>Order</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <p class="muted small" id="orders-empty">No orders yet: the checkout on the left creates one.</p>
+
+      <h2>Subscriptions</h2>
+      <table class="items" id="subs">
+        <thead><tr><th>Customer</th><th>Plan</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h2>Webhooks</h2>
+      <p class="muted small">Deliveries from Tazor to this merchant. Each is checked here with verifyWebhook and the demo's <b>test secret</b> (public on purpose; a real shop keeps its secret on its server).</p>
+      <ul class="hooks" id="hooks"></ul>
     </section>
   </main>
 

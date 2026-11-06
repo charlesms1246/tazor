@@ -26,3 +26,16 @@ h1, h2 { margin: 0 0 16px; font-size: 22px; }
 .pill.paid { background: #ddf8ee; color: #064a33; font-weight: 600; }
 tazor-pay-button { --tazor-bg: var(--navy); --tazor-accent: var(--lime); }
 @media (max-width: 800px) { .grid { grid-template-columns: minmax(0, 1fr); margin: 16px auto; padding: 0 16px; } .top { padding: 12px 16px; } }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.btn { min-height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--navy); background: var(--navy); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: .6; cursor: default; }
+.btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn-ghost { background: #fff; color: var(--navy); border-color: #c7d0dc; }
+.plan { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.plan h2, .card h2 + .muted { margin-bottom: 8px; }
+.card h2 { font-size: 18px; margin-top: 24px; }
+.card h2:first-of-type { margin-top: 0; }
+.hooks { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
+.hooks .ok { color: #0b7350; font-weight: 600; }
+.hooks .bad { color: #c4342c; }
+.hooks a, .items a { color: var(--blue); }
