@@ -265,3 +265,24 @@ test('routes: checkout off → 503; guard keys per payer and merchant; /health l
   assert.deepEqual(keys, [['/checkout/pay', [PAYER, MERCHANT]]]);
   srv.close();
 });
+
+test('GET /watch (Bearer CRON_SECRET) runs the subscription cron: 401 without the bearer; with it, a due subscription is charged', async () => {
+  let now = NOW * 1000;
+  const { s, chain } = fake();
+  const c = createCheckout({ address: C, chain, now: () => now, fromBlock: 0n });
+  await c.subscribe({ plan: { merchant: MERCHANT, amount: '100000', period: 86400, cycles: 2, ref: `0x${'03'.repeat(32)}` }, payer: PAYER, validAfter: String(NOW - 10), validBefore: String(NOW + 600), firstSig: SIG, permitValue: '100000', permitDeadline: String(NOW + 9e6), permitSig: SIG });
+  let budget = 0;
+  const guard = { check: async () => {}, checkBudget: async () => { budget++; }, health: async () => ({}), limits: {} };
+  const srv = createServer(createHandler({ checkout: c, cronSecret: 'cron-test', guard: guard as never }));
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+  srv.unref();
+  const base = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
+  assert.equal((await fetch(`${base}/watch`)).status, 401);
+  now = (NOW + 86400) * 1000;
+  const r = await (await fetch(`${base}/watch`, { headers: { authorization: 'Bearer cron-test' } })).json();
+  assert.equal(r.subscriptions.subscriptions, 1);
+  assert.equal(r.subscriptions.results[0].action, 'charged');
+  assert.equal(s.sent.at(-1)!.fn, 'charge');
+  assert.equal(budget, 1, 'the gas budget is checked before the charge');
+  srv.close();
+});
