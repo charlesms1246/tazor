@@ -479,6 +479,8 @@ export function createSandbox(o: {
     if (typeof params.account === 'string' && (!isAddress(params.account) || !isAddressEqual(params.account, c.account))) {
       throw new SandboxRefused('the sandbox only acts on the sandbox company');
     }
+    // empty strings (an id the client couldn't read) fall back to the setup's mandate and claim
+    for (const k of ['mandateId', 'mandate', 'tokenId', 'claimId']) if (params[k] === '') delete params[k];
     params.mandateId ??= params.mandate ?? c.mandateId ?? undefined;
     params.tokenId ??= params.claimId ?? c.claimId ?? undefined;
     const r = await handlers[b.action as Action](params);

@@ -360,6 +360,7 @@ test('counterparty: flat bodies, account must be the sandbox, setup mandate/clai
   const withIds = sandboxFromEnv({ ...ENV, SANDBOX_MANDATE_ID: GOOD_MANDATE, SANDBOX_CLAIM_ID: '7', SANDBOX_COMPANY_ID: 'sbx' }).config!;
   sandbox = createSandbox({ config: withIds, ports: chain.ports });
   assert.equal((await post('/sandbox/counterparty', { action: 'collect' })).body.status, 'sent');
+  assert.equal((await post('/sandbox/counterparty', { action: 'collect', mandate: '' })).body.status, 'sent', 'an empty id uses the setup mandate');
   assert.equal((await post('/sandbox/counterparty', { action: 'finance-buy' })).body.status, 'sent');
   assert.equal((await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER })).body.companyId, 'sbx');
 });

@@ -1,35 +1,35 @@
 {
-  "id": "SDK-LIVE-20261106-MW4ZNAQ0",
-  "at": "2026-11-06T13:06:25.560Z",
-  "link": "https://tazor-app.vercel.app/pay/#v1.6XglAGomWTlzuQEmKwo758vyrrAleTO1P4SrmeiLBOoGP7Hvc8zYDIahhh5snYRIsjA76k7NxBtfOgT6xWUPHf2uvHthDKmJ3Q8G1i38RIJur1H_PeUT0e4j5oMMAXdAW78JyLrujq0Nit_ABwHRgOg0_Mrb0j3NKExfDWVddfjUT9VRMeEZ47U-9nHXLnW4Bo_nObzoCJxl9zUHx5-K4QCUys36p2C9PkiWa4Yp-W-yLTmop8PqOvZgB9KlkknP1y__2L6HlADPOlO4AtQy0plByt-CFy5VQ0s6g_HXawTyXztJvV-3NjmYKsJ01rvbg7RebKLlUAwlhxQm7723KC6bx51gVV71x1erkTWyc_cD6ygaV4ty12pfG8C_GkJEykqp1GBavF1OzvwuBVhvfV87XKAJnCbxbPPniQzg0h-jI53fI9PXHZDfqzt8HbSolB1HYNIr1tjlza7EVfP2PB31J_HBZFaDLapozMl4eHJ5VR6o65RZ43dWhLdG_ECfBOJatOsI9miuro6KncWeElxOldc4JzwlgGPTRuF7eskEOpXpVXQhqAh46DL7ffqaWxBNTPOi7g3T78ByqnDXV4h8SKDwrWrJW7Su1LQp4mGQonsYLUz6l7Lt2s0trd0ev3DqFDxJja2kRM2oDJI.Sqw__DAdQ69xVH4JdCjK8oJI_MZ-fBKb5cxwCiHkH8M",
-  "invoiceHash": "0xc56bb0347131d9a5c098d4f6e70e393fecdadb5a0a72d36a8b76d5053f0fd4ac",
-  "amount": "0.05",
+  "id": "SDK-LIVE-20261106-MW54B75E",
+  "at": "2026-11-06T15:16:59.094Z",
+  "link": "https://tazor-app.vercel.app/pay/#v1.1ivqV6bBUyDZdw518_goPbsS5giq_eEKBpomi80mtQXMh67eYTWSVQtYbEbiSUmaTxN4LIyWsTxTVi_k3utwVlVyItTGuyeSvoS1HB-1j3uBzJUgCuGVsLuz-r2wJn_B-jG3PrsOYaum6-23Mi9IA5haVLEEURKWEDQoV-TRPdb8h4-YM20g1qPhaVZEg1XiBaPgMJaNzWYJ5J47lXTa0G2yWu0OwecDKhUR22nMeM_fi1xqOz5Mw90maiSsk5-WjhbEvOIMyi4EW5MsuhZnBo9B7_lZP3GXkvjUCz5G9zGoYE4qwiQD9nSVHzjirj5UWomFf9LORDDKTf2kc4u2RA-73URIKnEvhrUrUPWV7Ycdc0ydfBICs7ZsAFjM2iuuVT_RTroEUOBmObn21UP7bxQhkVkyStMwTE8USZXSWUOzSfEQH3n1cT_rOlgP6Ub8VPwVen4Vala6I5ej2aDEeMmnrq_Z5V5iBuNhkZ_MmMrbSZ8_ee_2zCOff7aei8Gs19vR3M3m4kSUpMD2ygQqNLkuMcS70oN11AJT9Llo7-tL8e5ohn5Z7Ct94q1pSZRJha2gtU2DJ5mqELbvtxhvGlw5NrYMsn27PSlFv8L6Xutw2I3Ux_ywZa9S435r4b6QxUc0MaqloLHQwPdPBXV1ww.scjl1VtddbqfTYuU2VJrTGTGdyncDoFhT2HM5nSKDp8",
+  "invoiceHash": "0xf66779630c3663fc0f1914d97fe2bbac6a0762e38c1915381b4f50e02f225696",
+  "amount": "0.2",
   "relayer": "https://tazor-relayer.vercel.app",
   "relayed": {
-    "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+    "txHash": "0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53",
     "paymentModule": "0x906620D82e2959351c81D731C67EA46DF71E36f3",
     "deployTxs": []
   },
-  "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
-  "block": "12374020",
-  "gasUsed": "178984",
-  "explorer": "https://explorer.testnet.whitechain.io/tx/0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+  "txHash": "0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53",
+  "block": "12381853",
+  "gasUsed": "179002",
+  "explorer": "https://explorer.testnet.whitechain.io/tx/0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53",
   "onPaid": {
-    "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
-    "amount": "0.05",
-    "amountBaseUnits": "50000",
-    "at": 1793970388000,
-    "payer": "0xb99A12652BEe98429ae31EA0529A0b63f1073721",
-    "payee": "0xc1dce946D192e344251972470237F1471C93876c",
+    "txHash": "0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53",
+    "amount": "0.2",
+    "amountBaseUnits": "200000",
+    "at": 1793978221000,
+    "payer": "0xE6eE20A68d9053d8Bc3F8bb99Dc255c1de5b7116",
+    "payee": "0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6",
     "viaL1": false,
-    "invoiceHash": "0xc56bb0347131d9a5c098d4f6e70e393fecdadb5a0a72d36a8b76d5053f0fd4ac",
-    "explorerUrl": "https://explorer.testnet.whitechain.io/tx/0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+    "invoiceHash": "0xf66779630c3663fc0f1914d97fe2bbac6a0762e38c1915381b4f50e02f225696",
+    "explorerUrl": "https://explorer.testnet.whitechain.io/tx/0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53"
   },
   "timings": {
-    "submitToReceiptMs": 3038,
-    "submitToBlockTimeMs": 2440,
-    "receiptToOnPaidMs": -174,
-    "submitToOnPaidMs": 2864
+    "submitToReceiptMs": 2926,
+    "submitToBlockTimeMs": 1906,
+    "receiptToOnPaidMs": 2122,
+    "submitToOnPaidMs": 5048
   },
   "checks": [
     {
@@ -39,17 +39,17 @@
     {
       "name": "buyer is a PaymentModuleV2 company",
       "ok": true,
-      "detail": "registry 0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1"
+      "detail": "registry 0xaa0F1d232e0464dCCBeB2D6470387e507e818840"
     },
     {
       "name": "on-chain runDigest matches the local digest",
       "ok": true,
-      "detail": "0xfe42bc41cb24607d4bd2ac37c2ad56c49446a3a336868ccefb0326ec53dcabca"
+      "detail": "0x741f7ec32b1a952cd72fd585689d68da69d8795d91122c510567dc33d59d66e4"
     },
     {
       "name": "buyer holds enough USDT",
       "ok": true,
-      "detail": "10.4 USDT"
+      "detail": "14.8 USDT"
     },
     {
       "name": "relayer /health ok",
@@ -59,7 +59,7 @@
     {
       "name": "relayer accepted the payment",
       "ok": true,
-      "detail": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+      "detail": "0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53"
     },
     {
       "name": "relayer chose PaymentModuleV2",
@@ -69,7 +69,7 @@
     {
       "name": "transaction succeeded",
       "ok": true,
-      "detail": "block 12374020"
+      "detail": "block 12381853"
     },
     {
       "name": "receipt has InvoicePaid(nonce = invoiceHash) for the amount",
@@ -82,12 +82,12 @@
     {
       "name": "onPaid tx hash equals the submitted tx",
       "ok": true,
-      "detail": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+      "detail": "0x7690d35b359cfce4584c52d435e9399be10b1f87b58f73020d6bd990bc941b53"
     },
     {
       "name": "onPaid amount equals the invoice amount",
       "ok": true,
-      "detail": "0.05 USDT"
+      "detail": "0.2 USDT"
     },
     {
       "name": "isPaid(invoiceHash) is true",
