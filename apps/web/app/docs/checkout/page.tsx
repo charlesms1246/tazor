@@ -24,11 +24,19 @@ export default function Page() {
         <li>The relayer submits it; the TazorCheckout contract takes the USDT and pays you in the same transaction, about a second later.</li>
         <li>The customer gets a public receipt link they can check themselves.</li>
       </Steps>
+      <h2 id="exchange">Paying from an exchange</h2>
+      <p>
+        A customer whose USDT sits on an exchange (for example WhiteBIT) can pay without a wallet signature. Each order gets its own
+        deposit address; a plain USDT transfer or withdrawal to it is enough. Tazor&apos;s relayer settles the order as soon as the
+        transfer lands, and anything sent above the order amount goes back. Refunds go to the refund address set for the order.
+        Checkout shows these orders as <b>Sent from an exchange or wallet</b>.
+      </p>
       <h2>Receipts and finality</h2>
       <p>
         A receipt (<a href="/receipt/">/receipt/?order=…</a>) is read straight from Whitechain, so it works even if Tazor is offline. It
         shows three stages: <b>confirmed by Whitechain</b> (about a second), <b>posted to Ethereum</b> (Whitechain&apos;s safe head
-        has passed the block) and <b>final</b> (Ethereum finalized it). It updates by itself.
+        has passed the block, usually about 10 minutes after paying) and <b>final</b> (Ethereum finalized it, usually about 30 minutes
+        later). It updates by itself.
       </p>
       <h2>Refunds</h2>
       <p>

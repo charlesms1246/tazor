@@ -24,7 +24,7 @@ import { approvalRows, chainPaidMap, companyLedger, summarize } from '@/lib/ledg
 import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
 import { INR_RATE_NOTE, inrText, usdtNumber } from '@/lib/money.ts';
-import { GetPaid } from './_home/get-paid.tsx';
+import { StoryStrip } from './_home/get-paid.tsx';
 import './_invoice/touch.css';
 import { allCheckoutLogs, checkoutAddress, checkoutTotals, decodeCheckoutLogs, depositCheckoutAddress, merchantView } from '@/lib/checkout.ts';
 
@@ -220,7 +220,7 @@ export default function Home() {
         </Card>
       </div>
 
-      <GetPaid />
+      <StoryStrip />
 
       <section className="lanes" aria-label="Overview" data-tour="lanes">
         <a className="lane" href="/invoices/" data-testid="lane-receivables">

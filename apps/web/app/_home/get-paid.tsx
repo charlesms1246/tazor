@@ -1,28 +1,39 @@
 import './get-paid.css';
 
-const ITEMS: { title: string; benefit: string; href: string; external?: boolean; testId: string }[] = [
-  { title: 'Checkout', benefit: 'Customers pay with one signature: no WBT, no gas', href: 'https://bluejay-shop.vercel.app', external: true, testId: 'getpaid-checkout' },
-  { title: 'Refunds & receipts', benefit: 'Refund in one click; every order has a public receipt', href: '/checkout/', testId: 'getpaid-refunds' },
-  { title: 'Subscriptions', benefit: 'Charge every period without asking again', href: '/checkout/#subscriptions', testId: 'getpaid-subscriptions' },
-  { title: 'AI agents (x402)', benefit: 'Let software pay for your API per request', href: '/checkout/#agents', testId: 'getpaid-agents' },
-  { title: 'Invoice financing', benefit: 'Get paid now on invoices due later', href: '/financing/', testId: 'getpaid-financing' },
+const STEPS: { n: string; title: string; benefit: string; href: string; cta: string; external?: boolean; testId: string }[] = [
+  { n: '1', title: 'Customer pays', benefit: 'One signature, no gas, no WBT', href: 'https://bluejay-shop.vercel.app', cta: 'Try the demo shop', external: true, testId: 'story-pay' },
+  { n: '2', title: 'Merchant refunds part of it', benefit: 'Only to the payer, never more than was paid', href: '/checkout/', cta: 'Open Checkout', testId: 'story-refund' },
+  { n: '3', title: 'Accountant gets the export', benefit: 'Every payment and refund, as a CSV', href: '/export/#checkout', cta: 'Open Reports', testId: 'story-export' },
 ];
 
-/** Home: what a business gets for selling on Whitechain, each linking to where it lives. */
-export function GetPaid() {
+const ALSO: { label: string; href: string }[] = [
+  { label: 'subscriptions', href: '/checkout/#subscriptions' },
+  { label: 'pay from an exchange', href: '/docs/checkout/#exchange' },
+  { label: 'AI agents (x402)', href: '/docs/agents-x402/' },
+  { label: 'B2B approvals with verified people', href: '/approvals/' },
+  { label: 'Ethereum fallback', href: '/docs/censorship-resistance/' },
+];
+
+/** Home: the one story Tazor tells on Whitechain, each step linking to where it happens. */
+export function StoryStrip() {
   return (
-    <section className="getpaid" aria-label="Get paid on Whitechain" data-testid="getpaid">
-      <div className="getpaid-head">Get paid on Whitechain</div>
-      <ul className="getpaid-list">
-        {ITEMS.map((i) => (
-          <li key={i.title}>
-            <a className="getpaid-item" href={i.href} data-testid={i.testId} {...(i.external ? { target: '_blank', rel: 'noreferrer' } : {})}>
-              <span className="getpaid-title">{i.title}{i.external && <span className="getpaid-ext" aria-label="opens in a new tab"> ↗</span>}</span>
-              <span className="getpaid-benefit">{i.benefit}</span>
+    <section className="getpaid" aria-label="Get paid on Whitechain" data-testid="story">
+      <div className="getpaid-head">Get paid on Whitechain, in three steps</div>
+      <ol className="getpaid-list story-list">
+        {STEPS.map((s) => (
+          <li key={s.n}>
+            <a className="getpaid-item" href={s.href} data-testid={s.testId} {...(s.external ? { target: '_blank', rel: 'noreferrer' } : {})}>
+              <span className="story-n" aria-hidden="true">{s.n}</span>
+              <span className="getpaid-title">{s.title}</span>
+              <span className="getpaid-benefit">{s.benefit}</span>
+              <span className="story-cta">{s.cta}{s.external ? ' ↗' : ' →'}</span>
             </a>
           </li>
         ))}
-      </ul>
+      </ol>
+      <p className="story-also" data-testid="story-also">
+        Also built: {ALSO.map((a, i) => <span key={a.href}>{i > 0 && ', '}<a href={a.href}>{a.label}</a></span>)}.
+      </p>
     </section>
   );
 }
