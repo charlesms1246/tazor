@@ -1,0 +1,30 @@
+{
+  "name": "@tazor/pay",
+  "version": "0.1.0",
+  "description": "Tazor payment links, payment watching and a <tazor-pay-button> web component for USDT on Whitechain.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "import": "./dist/index.js" },
+    "./tazor-pay.js": "./dist/tazor-pay.js"
+  },
+  "files": ["dist", "src"],
+  "sideEffects": ["./src/iife.ts", "./dist/tazor-pay.js"],
+  "scripts": {
+    "build": "rm -rf dist && esbuild src/index.ts --bundle --format=esm --platform=browser --target=es2022 --alias:viem=./node_modules/viem --outfile=dist/index.js && esbuild src/iife.ts --bundle --format=iife --platform=browser --target=es2020 --minify --alias:viem=./node_modules/viem --outfile=dist/tazor-pay.js",
+    "build:example": "pnpm build && cp dist/tazor-pay.js ../../examples/merchant-demo/tazor-pay.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts"
+  },
+  "dependencies": {
+    "viem": "2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "0.25.12",
+    "typescript": "7.0.2"
+  }
+}
