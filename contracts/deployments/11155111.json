@@ -1,0 +1,12 @@
+{
+  "chainId": 11155111,
+  "OptimismPortal": "0xFF9b597b0781457ae6aa7256Ca5ed5839bF7D0C3",
+  "ENS": {
+    "ETHRegistry": "0xd4ebcbbdf463c9c45784603db0ddd499bc44a8b4",
+    "UniversalResolverV2": "0x24e1d8e068620b647ca097f961a61055f4f42d72",
+    "VerifiableFactory": "0xda70306c98e97ece36f997a21368e53298572991",
+    "UserRegistryImpl": "0x9bd8a88719068d09ecee662f36c0e3856708366a",
+    "taz0rSubregistry": "0x44007108C0Cca53498F19F259E73E70C2ebE900a",
+    "taz0rResolver": "0x9a268461Cd084FD5F973C465E3E0131Aa02AB673"
+  }
+}
