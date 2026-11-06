@@ -19,12 +19,14 @@ import {
 } from '@/lib/payment.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
+import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
 type Guard = { status: 'checking' } | { status: 'ok'; digest: Hex } | { status: 'refused'; reason: string };
 
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
+const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
+const day = (ts: number | bigint) => new Date(Number(ts) * 1000).toISOString().slice(0, 10);
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function PayPage() {
@@ -113,8 +115,14 @@ export default function PayPage() {
     return () => clearInterval(t);
   }, [l1, state, v2]);
 
-  if (state === 'loading') return <main>Decrypting invoice…</main>;
-  if (state === 'invalid') return <main><h1 data-testid="invalid">Invalid or tampered link</h1></main>;
+  if (state === 'loading') return <div className="page"><PageHeader title="Invoice" subtitle="Decrypting invoice…" /></div>;
+  if (state === 'invalid') {
+    return (
+      <div className="page">
+        <PageHeader title={<span data-testid="invalid">Invalid or tampered link</span>} subtitle="This payment link could not be decrypted. Ask the supplier to send it again." />
+      </div>
+    );
+  }
 
   const { invoice: i, auth } = state;
   const approvals = (() => {
@@ -198,100 +206,148 @@ export default function PayPage() {
     await navigator.clipboard?.writeText(data).catch(() => undefined);
   });
 
+  const pm = (v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)';
+  const explorer = (a: string) => `${config.explorer}/address/${a}`;
+
   return (
-    <main>
-      <h1>Invoice {i.id}</h1>
-      {v2 && <p data-testid="v2-account">v2 company: signed for PaymentModuleV2 {configV2.paymentModule} (EIP-712 domain version 2).</p>}
-      <table>
-        <tbody>
-          <tr><td>From</td><td>{i.supplierName} ({i.supplierAccount}){' '}
-            {supplier === 'checking' ? <span data-testid="supplier-checking">checking…</span>
-              : typeof supplier === 'object' && supplier.verified
-                ? <strong data-testid="supplier-verified" style={{ color: 'green' }} title={`admin ${supplier.admin}, soul ${supplier.soulId}`}>✓ Verified by WhiteBIT (simulated on testnet)</strong>
-                : <span data-testid="supplier-unverified" style={{ color: '#666' }}>Not verified</span>}
-          </td></tr>
-          <tr><td>Pay to</td><td>{i.payee}</td></tr>
-          <tr><td>Buyer account</td><td>{i.buyerAccount}</td></tr>
-          <tr><td>Token</td><td>{i.token}</td></tr>
-          <tr><td>Amount</td><td data-testid="amount">{usdt(i.amount)}</td></tr>
-          <tr><td>Due</td><td>{new Date(i.dueDate * 1000).toISOString().slice(0, 10)}</td></tr>
-          <tr><td>Memo</td><td>{i.memo}</td></tr>
-          <tr><td>invoiceHash</td><td data-testid="invoice-hash" style={{ wordBreak: 'break-all' }}>{auth.invoiceHash}</td></tr>
-          <tr><td>Approval valid until</td><td>{new Date(Number(auth.expiry) * 1000).toISOString().slice(0, 10)}</td></tr>
-        </tbody>
-      </table>
-      <h2>Lines</h2>
-      <table>
-        <thead><tr><th>Description</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead>
-        <tbody>
-          {i.lines.map((l, n) => (
-            <tr key={n}><td>{l.description}</td><td>{l.quantity.toString()}</td><td>{usdt(l.unitPrice)}</td><td>{usdt(l.quantity * l.unitPrice)}</td></tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="page">
+      <PageHeader
+        title={`Invoice ${i.id}`}
+        subtitle={<>From {i.supplierName}. Check what you are paying, then approve it with your passkey.</>}
+      />
+      {v2 && <Notice tone="info" testId="v2-account">v2 company: signed for PaymentModuleV2 <span className="mono break">{configV2.paymentModule}</span> (EIP-712 domain version 2).</Notice>}
 
-      <h2>Approve</h2>
-      {guard.status === 'checking' && <p data-testid="guard-checking">Checking what you will sign against the contract…</p>}
-      {guard.status === 'refused' && <p data-testid="guard-refused" style={{ color: 'crimson' }}>Refusing to sign: {guard.reason}</p>}
-      {guard.status === 'ok' && <p data-testid="guard-ok">The contract digest matches this invoice: <code>{guard.digest}</code></p>}
-      <button data-testid="approve" onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with Face ID</button>
-      {mine && (
-        <p>Your approval (send this to the second approver if needed):<br /><code data-testid="my-approval" style={{ wordBreak: 'break-all' }}>{serializeApproval(mine)}</code></p>
-      )}
-      <p>
-        <label>Approvals from other approvers (JSON)<br />
-          <textarea data-testid="pasted" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={4} cols={80} />
-        </label>
-      </p>
-      {approvals === null && <p style={{ color: 'crimson' }}>Pasted approvals are not valid JSON {'{approver, signature}'}.</p>}
-      <p>Approvals collected: <span data-testid="approval-count">{approvals?.length ?? 0}</span></p>
+      <div className="grid-2">
+        <div className="stack">
+          <Card title="Invoice" subtitle="Decrypted from the link on this device; nothing was sent to a server.">
+            <dl className="kv">
+              <dt>From</dt>
+              <dd>
+                <span className="stack" style={{ gap: 4 }}>
+                  <span>{i.supplierName}</span>
+                  <Addr value={i.supplierAccount} href={explorer(i.supplierAccount)} />
+                  <span>
+                    {supplier === 'checking' ? <Pill testId="supplier-checking">checking…</Pill>
+                      : typeof supplier === 'object' && supplier.verified
+                        ? <span title={`admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT (simulated on testnet)</Pill></span>
+                        : <Pill testId="supplier-unverified">Not verified</Pill>}
+                  </span>
+                </span>
+              </dd>
+              <dt>Pay to</dt><dd><Addr value={i.payee} href={explorer(i.payee)} /></dd>
+              <dt>Buyer account</dt><dd><Addr value={i.buyerAccount} href={explorer(i.buyerAccount)} /></dd>
+              <dt>Token</dt><dd><Addr value={i.token} href={explorer(i.token)} /></dd>
+              <dt>Amount</dt><dd className="num" data-testid="amount">{amt(i.amount)}</dd>
+              <dt>Due</dt><dd className="num">{day(i.dueDate)}</dd>
+              <dt>Memo</dt><dd>{i.memo || <span className="faint">None</span>}</dd>
+              <dt>invoiceHash</dt><dd><span className="mono break" data-testid="invoice-hash">{auth.invoiceHash}</span></dd>
+              <dt>Approval valid until</dt><dd className="num">{day(auth.expiry)}</dd>
+            </dl>
+          </Card>
 
-      <h2>Pay</h2>
-      <button data-testid="pay" onClick={onPay} disabled={busy || !approvals?.length}>Pay</button>{' '}
-      <button data-testid="calldata" onClick={onCopyCalldata} disabled={busy || !approvals?.length}>Copy calldata</button>
-      {v2 && <>{' '}<button data-testid="pay-as-agent" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button></>}
-      {error && <p data-testid="error" style={{ color: 'crimson' }}>{error}</p>}
-      {tx && (
-        <p data-testid="tx">
-          Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.hash}</a>{' '}
-          {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
-          {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
-        </p>
-      )}
-
-      <h2>Send via Ethereum</h2>
-      <p>
-        Works with Tazor&apos;s relayer and Whitechain&apos;s sequencer down: the payment goes to EnsGate on Ethereum, which
-        checks the approvers&apos; ENS roles and delivers it to Whitechain through the OptimismPortal (about a minute).
-      </p>
-      <p><label>Company name <input data-testid="label" value={label} onChange={(e) => setLabel(e.target.value)} size={16} />.taz0r.eth</label></p>
-      <button data-testid="prepare-l1" onClick={onPrepareL1} disabled={busy || !approvals?.length}>Prepare Ethereum transaction</button>
-      {l1 && (
-        <div data-testid="l1">
-          <p>To EnsGate {gate} on Sepolia. {l1.fee !== undefined
-            ? <span data-testid="l1-fee">Estimated fee: {formatEther(l1.fee)} ETH ({l1.gas?.toString()} gas)</span>
-            : l1.feeError ? <span data-testid="l1-fee-error">Fee estimate failed: {l1.feeError}</span> : 'Estimating fee…'}</p>
-          <p>
-            <button data-testid="send-l1" onClick={onSendL1} disabled={busy || !!l1.hash}>Send with your wallet</button>{' '}
-            <button data-testid="copy-l1" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>{' '}
-            <button data-testid="watch-l1" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
-          </p>
-          <p>Calldata for any wallet or Etherscan (to {gate}):<br /><code data-testid="l1-data" style={{ wordBreak: 'break-all' }}>{l1.data}</code></p>
-          {l1.hash && <p>Ethereum tx <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer">{l1.hash}</a></p>}
-          {l1.started && (
-            <p data-testid="l1-status">{l1.l2Tx
-              ? <>Delivered on Whitechain in {l1.seconds?.toFixed(0)} s: <a href={`${config.explorer}/tx/${l1.l2Tx}`} target="_blank" rel="noreferrer">{l1.l2Tx}</a></>
-              : 'Waiting for the deposit to reach Whitechain…'}</p>
-          )}
+          <Card title="Lines" flush>
+            <div className="table-wrap"><table className="table table-stack">
+              <thead><tr><th>Description</th><th className="num">Qty</th><th className="num">Unit price</th><th className="num">Total</th></tr></thead>
+              <tbody>
+                {i.lines.map((l, n) => (
+                  <tr key={n}>
+                    <td>{l.description}</td>
+                    <td className="num">{l.quantity.toString()}</td>
+                    <td className="num">{amt(l.unitPrice)}</td>
+                    <td className="num">{amt(l.quantity * l.unitPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          </Card>
         </div>
-      )}
-      {(calldata || l1) && pendingDeploys.map((u) => (
-        <p key={u.factoryCalldata} data-testid="deploy-first">Not deployed yet: first send to the ApproverAccountFactory {u.factory}: <code style={{ wordBreak: 'break-all' }}>{u.factoryCalldata}</code></p>
-      ))}
-      {calldata && (
-        <p>Send this calldata to PaymentModule {(v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)'} from any wallet on Whitechain:<br />
-          <code data-testid="calldata-out" style={{ wordBreak: 'break-all' }}>{calldata}</code></p>
-      )}
-    </main>
+
+        <div className="stack">
+          <Card title="Approve and pay" subtitle="Approvers sign the invoice digest; anyone can submit the payment.">
+            <div className="stack">
+              {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
+              {guard.status === 'refused' && <Notice tone="negative" testId="guard-refused">Refusing to sign: {guard.reason}</Notice>}
+              {guard.status === 'ok' && <Notice tone="positive" testId="guard-ok">The contract digest matches this invoice: <span className="mono break">{guard.digest}</span></Notice>}
+              <div className="row">
+                <button data-testid="approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with Face ID</button>
+              </div>
+              {mine && (
+                <div className="well">
+                  <p className="small muted">Your approval (send this to the second approver if needed)</p>
+                  <code data-testid="my-approval" className="mono break">{serializeApproval(mine)}</code>
+                </div>
+              )}
+              <Field label="Approvals from other approvers (JSON)">
+                <textarea data-testid="pasted" className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={4} />
+              </Field>
+              {approvals === null && <Notice tone="negative">Pasted approvals are not valid JSON {'{approver, signature}'}.</Notice>}
+              <p className="muted">Approvals collected: <span className="num" data-testid="approval-count">{approvals?.length ?? 0}</span></p>
+              <div className="row">
+                <button data-testid="pay" className={mine ? 'btn btn-primary' : 'btn'} onClick={onPay} disabled={busy || !approvals?.length}>Pay</button>
+                <button data-testid="calldata" className="btn" onClick={onCopyCalldata} disabled={busy || !approvals?.length}>Copy calldata</button>
+                {v2 && <button data-testid="pay-as-agent" className="btn" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button>}
+              </div>
+              {error && <Notice tone="negative" testId="error">{error}</Notice>}
+              {tx && (
+                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx">
+                  Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="mono break">{tx.hash}</a>{' '}
+                  {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
+                  {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
+                </Notice>
+              )}
+              {(calldata || l1) && pendingDeploys.map((u) => (
+                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first">Not deployed yet: first send to the ApproverAccountFactory <span className="mono">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></Notice>
+              ))}
+              {calldata && (
+                <div className="well">
+                  <p className="small muted">Send this calldata to PaymentModule <span className="mono">{pm}</span> from any wallet on Whitechain</p>
+                  <code data-testid="calldata-out" className="mono break">{calldata}</code>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card title="Send via Ethereum" subtitle="Works with Tazor's relayer and Whitechain's sequencer down.">
+            <div className="stack">
+              <p className="muted">
+                The payment goes to EnsGate on Ethereum, which checks the approvers&apos; ENS roles and delivers it to Whitechain
+                through the OptimismPortal (about a minute).
+              </p>
+              <Field label="Company name">
+                <span className="input-affix">
+                  <input data-testid="label" className="input" value={label} onChange={(e) => setLabel(e.target.value)} />
+                  <span>.taz0r.eth</span>
+                </span>
+              </Field>
+              <div className="row">
+                <button data-testid="prepare-l1" className="btn" onClick={onPrepareL1} disabled={busy || !approvals?.length}>Prepare Ethereum transaction</button>
+              </div>
+              {l1 && (
+                <div data-testid="l1" className="stack">
+                  <p className="muted">To EnsGate <span className="mono">{gate}</span> on Sepolia. {l1.fee !== undefined
+                    ? <span data-testid="l1-fee">Estimated fee: {formatEther(l1.fee)} ETH ({l1.gas?.toString()} gas)</span>
+                    : l1.feeError ? <span data-testid="l1-fee-error">Fee estimate failed: {l1.feeError}</span> : 'Estimating fee…'}</p>
+                  <div className="row">
+                    <button data-testid="send-l1" className="btn" onClick={onSendL1} disabled={busy || !!l1.hash}>Send with your wallet</button>
+                    <button data-testid="copy-l1" className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>
+                    <button data-testid="watch-l1" className="btn" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
+                  </div>
+                  <div className="well">
+                    <p className="small muted">Calldata for any wallet or Etherscan (to <span className="mono">{gate}</span>)</p>
+                    <code data-testid="l1-data" className="mono break">{l1.data}</code>
+                  </div>
+                  {l1.hash && <p>Ethereum tx <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer" className="mono break">{l1.hash}</a></p>}
+                  {l1.started && (
+                    <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status">{l1.l2Tx
+                      ? <>Delivered on Whitechain in {l1.seconds?.toFixed(0)} s: <a href={`${config.explorer}/tx/${l1.l2Tx}`} target="_blank" rel="noreferrer" className="mono break">{l1.l2Tx}</a></>
+                      : 'Waiting for the deposit to reach Whitechain…'}</Notice>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
