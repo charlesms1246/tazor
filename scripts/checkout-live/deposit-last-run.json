@@ -1,0 +1,24 @@
+{
+  "ranAt": "2026-11-06T18:07:32.060Z",
+  "contract": "0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab",
+  "orderId": "0xb6619be527a178450516346aabdadd2dc803f1cc57472024c48fe17d1ecfe44b",
+  "depositAddress": "0x32940D9F43bcE1287dD8E578a0AC222FA68bF9f6",
+  "refundTo": "0xd6A1DBC7947C1eF0A45Df030bEEA4b94D0C9391f",
+  "merchant": "0x6B4E065d08D2cC7723635c6df0CC5268C706cD93",
+  "merchantReceived": "200000",
+  "excessReturned": "50000",
+  "steps": [
+    {
+      "step": "plain transfer 0.25 USDT (0.05 extra)",
+      "tx": "0xf4b8e6dafefb85a3f2b39abbcd9bf8b738ca0554c72e203048606ef9f2f4e596",
+      "url": "https://explorer.testnet.whitechain.io/tx/0xf4b8e6dafefb85a3f2b39abbcd9bf8b738ca0554c72e203048606ef9f2f4e596",
+      "ms": 2289
+    },
+    {
+      "step": "settle (anyone)",
+      "tx": "0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d",
+      "url": "https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d",
+      "ms": 3739
+    }
+  ]
+}
