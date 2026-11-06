@@ -26,7 +26,11 @@ export const TIMINGS: Timing[] = [
     proof: [{ label: 'first collection', url: wc('0x593e6ac94971ca40c6ee3b8c67f0064a43044ba6bfeabe88181906d4c46210b2') }],
   },
   {
-    action: 'Change who may approve', bank: '7–10 working days', tazor: '~2 min (Ethereum confirmation + ~1 min L1 lag + sync)', status: 'estimate',
+    action: 'Change who may approve', bank: '7–10 working days', tazor: '100 s (ENS change on Ethereum to role synced on Whitechain)', status: 'measured',
+    proof: [
+      { label: 'ENS grant', url: sep('0xc6de52196314c651b27cfb769f37855d12b6eb30b24061a3b7a4cdc8baa67516') },
+      { label: 'Whitechain sync', url: wc('0x2798c3911a6b494b0bb5dc65a00c61219d8fda339a182346d84c82bab465bc7e') },
+    ],
   },
   {
     action: 'Remove a person', bank: '7–10 working days', tazor: '3.06 s', status: 'measured',

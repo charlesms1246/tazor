@@ -85,5 +85,7 @@ test('timings table holds the measured values with proof links', () => {
   assert.equal(byAction['Pay with our servers down (Ethereum fallback)'].tazor, '69 s via Ethereum');
   for (const t of TIMINGS.filter((x) => x.status === 'measured')) assert.ok(t.proof?.length, t.action);
   assert.equal(byAction['Remove a person'].tazor, '3.06 s');
+  assert.match(byAction['Change who may approve'].tazor, /^100 s/);
+  assert.equal(TIMINGS.filter((t) => t.status !== 'measured').length, 0);
   assert.ok(byAction['Remove a person'].proof?.[0].url.endsWith('0x027e1cfd06b86adaadab600b98b9444c98178c56ff038ef09daacb3df6ecd6ef'));
 });

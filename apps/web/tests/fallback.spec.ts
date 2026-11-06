@@ -106,5 +106,8 @@ test('home page shows the bank vs Tazor timing card with proof links', async ({ 
   await expect(card).toContainText('3.6 s (measured)');
   await expect(card).toContainText('69 s via Ethereum (measured)');
   await expect(card).toContainText('3.06 s (measured)');
+  await expect(card).toContainText('100 s');
   await expect(card.locator('a[href*="0x027e1cfd"]')).toHaveCount(1);
+  await expect(page.getByTestId('host')).toHaveText('localhost:4173');
+  await expect(page.getByTestId('build')).toHaveText('unversioned');
 });
