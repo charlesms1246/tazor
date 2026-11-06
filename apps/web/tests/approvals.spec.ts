@@ -66,3 +66,30 @@ test('/approvals/: a seeded paid item shows under Paid, not under Needs approval
   await expect(row).toContainText('2 of 2 approvals');
   await expect(row.getByTestId('approval-status')).toHaveText('Paid');
 });
+
+test('/approvals/: Hold needs a reason, moves the item to "On hold / rejected" marked local, and Release brings it back', async ({ page }) => {
+  await mockRpc(page);
+  const path = (await encodeInvoiceLink(invoice, 'http://x')).replace('http://x', '');
+  await page.goto(path);
+  await expect(page.locator('h1')).toContainText('Invoice INV-20261106-A1B2');
+  await page.goto('/approvals/');
+  await expect(page.getByTestId('approvals-count-needs-approval')).toHaveText('1');
+
+  await page.getByTestId('approval-hold').click();
+  await page.getByTestId('approval-decide-save').click();
+  await expect(page.getByTestId('approval-reason-error')).toHaveText('Say why you are holding it.');
+  await page.getByTestId('approval-reason').fill('Waiting for the PO from procurement');
+  await page.getByTestId('approval-decide-save').click();
+
+  await expect(page.getByTestId('approvals-count-needs-approval')).toHaveText('0');
+  await expect(page.getByTestId('approvals-count-held')).toHaveText('1');
+  await page.getByTestId('approvals-tab-held').click();
+  await expect(page.getByTestId('approval-decision')).toHaveText('On hold · local');
+  await expect(page.getByTestId('approval-reason-text')).toHaveText('“Waiting for the PO from procurement”');
+  await page.reload();
+  await page.getByTestId('approvals-tab-held').click();
+  await expect(page.getByTestId('approval-decision')).toHaveText('On hold · local');
+  await page.getByTestId('approval-release').click();
+  await expect(page.getByTestId('approvals-count-held')).toHaveText('0');
+  await expect(page.getByTestId('approvals-count-needs-approval')).toHaveText('1');
+});

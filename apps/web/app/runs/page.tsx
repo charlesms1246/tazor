@@ -21,6 +21,11 @@ import { loadPasskey } from '@/lib/storage.ts';
 import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { Timeline } from '../_ui/timeline.tsx';
 import '../_invoice/touch.css';
+import { useCompany } from '@/lib/company.ts';
+import { useHistory } from '@/lib/chain-history.ts';
+import { INBOX_CHANGED, loadInbox, type InboxItem } from '@/lib/inbox.ts';
+import { chainPaidMap, companyLedger, type LedgerRow } from '@/lib/ledger.ts';
+import { Inr } from '../_invoice/inr.tsx';
 import { ApprovalNames, MyApproval } from '../_invoice/approvals-ui.tsx';
 import { parseApprovalInput } from '@/lib/approval-code.ts';
 import { hasHex } from '@/lib/hex-text.ts';
@@ -46,6 +51,20 @@ export default function RunsPage() {
     setLinks(c.links.join('\n'));
     setFillNote(`${c.links.length} unpaid invoice${c.links.length === 1 ? '' : 's'} for ${partyName(c.buyer)} from this device.${c.links.length < 2 ? ' A run needs at least two.' : ''}`);
   };
+  const company = useCompany();
+  const chainHistory = useHistory(company.account);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [deviceInvoices, setDeviceInvoices] = useState<ReturnType<typeof loadInvoices>>([]);
+  const [devicePayments, setDevicePayments] = useState<ReturnType<typeof loadPayments>>([]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [vendor, setVendor] = useState('');
+  const [due, setDue] = useState<'all' | 'overdue' | 'week'>('all');
+  useEffect(() => {
+    const sync = () => { setInbox(loadInbox()); setDeviceInvoices(loadInvoices()); setDevicePayments(loadPayments()); };
+    sync();
+    addEventListener(INBOX_CHANGED, sync);
+    return () => removeEventListener(INBOX_CHANGED, sync);
+  }, []);
   const [run, setRun] = useState<Run | null>(null);
   const [rows, setRows] = useState<{ line: number; error: string }[]>([]);
   const [mine, setMine] = useState<Approval | null>(null);
@@ -96,10 +115,10 @@ export default function RunsPage() {
     try { await fn(); } catch (e) { setError(msg(e)); } finally { setBusy(false); }
   };
 
-  const onPrepare = run$(async () => {
+  /** Decrypts and checks a run exactly as /pay checks one invoice; refuses the whole run on any problem. */
+  const prepareRun = async (lines: string[], min: number): Promise<Run> => {
     setRun(null); setMine(null); setTx(null); setCalldata('');
-    const lines = links.split(/\s+/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length < 2) throw new Error('Paste at least two invoice links (one per line).');
+    if (lines.length < min) throw new Error(min === 1 ? 'Pick at least one bill.' : 'Paste at least two invoice links (one per line).');
     if (lines.length > MAX) throw new Error(`At most ${MAX} invoices per run.`);
     const invoices: Invoice[] = [];
     const bad: { line: number; error: string }[] = [];
@@ -124,17 +143,19 @@ export default function RunsPage() {
     const local = runDigest(auths, { chainId: config.chainId, verifyingContract: module, version: v2 ? '2' : '1' });
     const onchain = decodeRunDigest(await ethCall(module, encodeRunDigestCall(auths)));
     if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: on-chain run digest ${onchain} does not match the invoices shown (${local}).`);
-    setRun({ account, module, v2, invoices, auths, digest: local });
+    const prepared = { account, module, v2, invoices, auths, digest: local };
+    setRun(prepared);
     upsertInbox({
       id: local, kind: 'run', title: `Payment run · ${invoices.length} invoices`, href: '/runs/', account,
       counterparty: [...new Set(invoices.map((x) => x.supplierName))].join(', '),
       amount: auths.reduce((s, a) => s + a.amount, 0n).toString(),
       dueDate: Math.min(...invoices.map((x) => x.dueDate)),
     });
-  });
+    return prepared;
+  };
+  const onPrepare = run$(async () => { await prepareRun(links.split(/\s+/).map((l) => l.trim()).filter(Boolean), 2); });
 
-  const onApprove = run$(async () => {
-    if (!run) return;
+  const approveRun = async (run: Run) => {
     const key = loadPasskey();
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
     setMine({ approver: key.approverAccount, signature: await counterfactualApproval(key, await signDigestWithPasskey(key.credentialId, run.digest, key)) });
@@ -142,6 +163,24 @@ export default function RunsPage() {
     const who = shortAddr(key.approverAccount);
     story(run, 'approved', `approved by ${who}`, { actor: who, detail: 'one passkey signature for the whole run' });
     upsertInbox({ id: run.digest, status: 'approved', approvals: 1 + (pastedParse.list?.length ?? 0) });
+  };
+  const onApprove = run$(async () => { if (run) await approveRun(run); });
+
+  // the bills table: this company's unpaid bills from the shared ledger (device invoices, opened links, chain payments)
+  const ledger = companyLedger({ company, invoices: deviceInvoices, payments: devicePayments, inbox, chainPaid: chainPaidMap(chainHistory.events) });
+  const unpaid = ledger.bills.filter((r) => r.status !== 'paid' && r.link);
+  const vendorOf = (r: LedgerRow) => r.counterpartyName ?? (r.counterparty ? partyName(r.counterparty) : 'Unknown supplier');
+  const vendors = [...new Set(unpaid.map(vendorOf))].sort();
+  const nowS = Math.floor(Date.now() / 1000);
+  const visible = unpaid.filter((r) => (!vendor || vendorOf(r) === vendor)
+    && (due === 'all' || (due === 'overdue' ? r.status === 'overdue' : r.dueDate <= nowS + 7 * 86400)));
+  const selected = unpaid.filter((r) => picked.has(r.key));
+  const selectedTotal = selected.reduce((s, r) => s + r.amount, 0n);
+  const allVisiblePicked = visible.length > 0 && visible.every((r) => picked.has(r.key));
+  const toggle = (k: string) => setPicked((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const onApproveSelected = run$(async () => {
+    const r = await prepareRun(selected.map((b) => b.link), 1);
+    await approveRun(r);
   });
 
   const onPay = run$(async () => {
@@ -178,8 +217,61 @@ export default function RunsPage() {
     <div className="page tz-touch">
       <PageHeader title="Payment runs" subtitle="Approve many invoices with one signature; each link is decrypted and checked exactly as on the Pay page." />
 
-      <Card title="Invoices in this run" subtitle="Paste one payment link per line. Every invoice must be paid by the same buyer account.">
+      <Card title={`Bills to pay · ${company.name}`} subtitle="Pick the bills to pay together; one passkey approval covers them all." flush testId="run-bills">
+        {unpaid.length === 0 ? (
+          <div style={{ padding: '0 24px 24px' }}>
+            <p className="muted" data-testid="run-bills-empty" style={{ margin: 0 }}>No unpaid bills for {company.name} on this device. Open a supplier&apos;s payment link (Approvals) or add bills by link below.</p>
+          </div>
+        ) : (
+          <>
+            <div className="list-bar run-filters">
+              <div className="row" style={{ gap: 8, padding: '8px 0' }}>
+                <select data-testid="run-filter-vendor" className="select" value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Supplier">
+                  <option value="">All suppliers</option>
+                  {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select data-testid="run-filter-due" className="select" value={due} onChange={(e) => setDue(e.target.value as typeof due)} aria-label="Due">
+                  <option value="all">Any due date</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="week">Due within 7 days</option>
+                </select>
+              </div>
+            </div>
+            <div className="table-wrap"><table className="table table-stack">
+              <thead><tr>
+                <th style={{ width: 44 }}><input type="checkbox" data-testid="run-select-all" aria-label="Select all shown" checked={allVisiblePicked}
+                  onChange={() => setPicked((p) => { const n = new Set(p); for (const r of visible) { if (allVisiblePicked) n.delete(r.key); else n.add(r.key); } return n; })} /></th>
+                <th>Supplier</th><th>Invoice</th><th>Due</th><th className="num">Amount</th>
+              </tr></thead>
+              <tbody>
+                {visible.map((r) => (
+                  <tr key={r.key} data-testid="run-bill-row" onClick={() => toggle(r.key)} style={{ cursor: 'pointer' }}>
+                    <td><input type="checkbox" data-testid="run-bill-check" aria-label={`Include ${r.id}`} checked={picked.has(r.key)} onChange={() => toggle(r.key)} onClick={(e) => e.stopPropagation()} /></td>
+                    <td>{vendorOf(r)}</td>
+                    <td>{r.id}</td>
+                    <td className="num">{r.dueDate ? new Date(r.dueDate * 1000).toISOString().slice(0, 10) : '—'}{r.status === 'overdue' && <> <Pill tone="negative">Overdue</Pill></>}</td>
+                    <td className="num">{amt(r.amount)}<span className="cell-sub"><Inr v={r.amount} /></span></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={4} style={{ fontWeight: 500 }}>Selected: {selected.length} of {unpaid.length}</td>
+                <td className="num" style={{ fontWeight: 600 }}><span data-testid="run-bills-total">{usdtNumber(selectedTotal)} USDT</span><span className="cell-sub"><Inr v={selectedTotal} /></span></td></tr></tfoot>
+            </table></div>
+            <div className="row" style={{ padding: '12px 24px 20px' }}>
+              <button type="button" data-testid="run-approve-selected" className={run ? 'btn' : 'btn btn-primary'} onClick={onApproveSelected} disabled={busy || selected.length === 0}>
+                {selected.length === 0 ? 'Pick bills to pay' : `Approve ${selected.length} bill${selected.length === 1 ? '' : 's'} · ${usdtNumber(selectedTotal)} USDT with one passkey`}
+              </button>
+              {!run && error && selected.length > 0 && errorNotice}
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card>
+        <details className="tech-details" data-testid="run-add-by-link" open={unpaid.length === 0 || !!links.trim() || undefined}>
+          <summary>Add by link</summary>
         <div className="stack">
+          <p className="small muted" style={{ margin: 0 }}>Paste one payment link per line. Every invoice must be paid by the same buyer account.</p>
           <Field label="Invoice links">
             <textarea data-testid="run-links" className="textarea mono" value={links} onChange={(e) => setLinks(e.target.value)} rows={6} placeholder="https://…/pay/#v1.…" />
           </Field>
@@ -188,15 +280,16 @@ export default function RunsPage() {
             {fillNote && <span className="small muted" data-testid="run-fill-note">{fillNote}</span>}
           </div>
           <div className="row">
-            <button data-testid="run-prepare" className={run ? 'btn' : 'btn btn-primary'} onClick={onPrepare} disabled={busy}>Check run</button>
+            <button data-testid="run-prepare" className={run || unpaid.length > 0 ? 'btn' : 'btn btn-primary'} onClick={onPrepare} disabled={busy}>Check run</button>
           </div>
           {rows.length > 0 && (
             <Notice tone="negative" testId="run-bad">
               <ul style={{ margin: 0, paddingLeft: 18 }}>{rows.map((r) => <li key={r.line}>Link {r.line}: {r.error}</li>)}</ul>
             </Notice>
           )}
-          {!run && errorNotice}
+          {!run && !(selected.length > 0) && errorNotice}
         </div>
+        </details>
       </Card>
 
       {run && (
