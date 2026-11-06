@@ -49,7 +49,7 @@ async function setup(page: Page, userop: { status: number; body: unknown }) {
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
   await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
-  await page.goto('/team/');
+  await page.goto('/company/');
   await page.getByTestId('eoa').fill(BACKUP);
   return seen;
 }

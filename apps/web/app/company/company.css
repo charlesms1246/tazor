@@ -1,0 +1,15 @@
+.drawer-overlay { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--wc-ink) 40%, transparent); }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: 480px; max-width: 100vw;
+  display: flex; flex-direction: column; background: var(--ground); border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px color-mix(in srgb, var(--wc-ink) 12%, transparent); overflow: hidden;
+}
+.drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 20px; }
+.drawer-section h3 { margin-bottom: 8px; }
+.drawer-links { display: flex; flex-direction: column; gap: 6px; }
+.person-row-click { cursor: pointer; }
+.person-row-click:focus-visible td { background: var(--raised); }
+@media (max-width: 900px) {
+  .drawer { width: 100vw; border-left: 0; }
+}

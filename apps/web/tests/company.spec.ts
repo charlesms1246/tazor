@@ -27,6 +27,11 @@ const CACHE: Record<string, [bigint, bigint]> = {
 const REVOKED = new Set([MEERA]);
 
 async function mock(page: Page) {
+  // Real WB Soul is read from Whitechain mainnet; the demo people have no mainnet Soul.
+  await page.route('https://rpc.whitechain.io/', async (route) => {
+    const { id } = route.request().postDataJSON();
+    await route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id, result: enc(['uint256'], [0n]) }) });
+  });
   const reply = (id: number, result?: Hex) => ({
     contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
     body: JSON.stringify(result === undefined ? { jsonrpc: '2.0', id, error: { code: 3, message: 'execution reverted' } } : { jsonrpc: '2.0', id, result }),
@@ -69,7 +74,29 @@ test('company page: profile, people with roles, WB Soul and Whitechain status', 
   await expect(row(RAVI).getByRole('link', { name: 'How to sync' })).toHaveAttribute('href', '/docs/company-on-ens/#how-a-role-change-reaches-whitechain');
   await expect(row(CFO).getByTestId('person-sync-note')).toHaveCount(0);
   await expect(row(MEERA).getByTestId('person-status')).toHaveText('Revoked');
-  await expect(row(MEERA)).toContainText('Not verified');
-  await expect(row(PRIYA)).toContainText('Verified');
+  await expect(row(MEERA).getByTestId('soul-mirror-pill')).toHaveText('Not in the mirror');
+  await expect(row(PRIYA).getByTestId('soul-mirror-pill')).toHaveText('Verified (simulated)');
+  await expect(row(PRIYA).getByTestId('soul-mainnet-pill')).toHaveText('No Soul on mainnet');
   await expect(page.locator('[data-tour="people"]')).toBeVisible();
+});
+
+test('person drawer: ENS bitmap, ENS explorer link, registry events, Escape closes', async ({ page }) => {
+  await mock(page);
+  await page.goto('/company/');
+  await expect(page.getByTestId('company-ens-links').getByRole('link', { name: 'Roles in ENS' })).toHaveAttribute('href', 'https://sepolia.explorer.ens.domains/acme.taz0r.eth/roles');
+  await expect(page.getByTestId('registry-contract-link')).toHaveAttribute('href', `https://sepolia.etherscan.io/address/0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1#events`);
+  await page.locator(`[data-testid="person-row"][data-address="${PRIYA}"]`).click();
+  const drawer = page.getByTestId('person-drawer');
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText('Priya (Finance)');
+  await expect(drawer.getByTestId('person-ens-bitmap')).toHaveText(`0x${(ROLE_APPROVER | ROLE_TAZOR_ADMIN).toString(16)}`);
+  await expect(drawer.getByTestId('person-ens-link')).toHaveAttribute('href', 'https://sepolia.explorer.ens.domains/0x00aBed5bDddf794c415eE746d3E4De5332cC5450');
+  await expect(drawer.getByTestId('person-registry-events')).toHaveAttribute('href', /0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1#events$/);
+  await expect(drawer.getByTestId('revoke-target')).toHaveValue('0x00aBed5bDddf794c415eE746d3E4De5332cC5450');
+  await expect(drawer.getByTestId('soul-mirror-pill')).toHaveText('Verified (simulated)');
+  await expect(drawer.getByRole('link', { name: 'Check any address against the real registry' })).toHaveAttribute('href', '/docs/wb-soul/');
+  await expect(page.getByTestId('manage-access')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByTestId('manage-access')).toBeVisible();
 });

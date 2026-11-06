@@ -14,6 +14,9 @@ export type Person = {
   cachedAt?: number;
   /** Approximate age of that cache entry, from Whitechain's L1Block view of Ethereum. */
   cacheAgeSec?: number;
+  /** Raw role bitmaps: live ENS (source of truth) and Whitechain's role cache; undefined if unreadable. */
+  ensBits?: bigint;
+  cacheBits?: bigint;
 };
 
 /** Ethereum (Sepolia) block time used to turn L1 block distance into seconds. */
@@ -160,6 +163,7 @@ export async function loadPeople(account: Address): Promise<Person[]> {
     return {
       address: v.approver, label: labelOf(v.approver), roles: rolesFor(v), soul, whitechain: whitechainStatus(v, l1Now),
       ...(v.cachedAt !== null ? { cachedAt: Number(v.cachedAt) } : {}), ...(age !== null ? { cacheAgeSec: age } : {}),
+      ...(v.ens !== null ? { ensBits: v.ens } : {}), ...(v.cached !== null ? { cacheBits: v.cached } : {}),
     };
   }));
 }
