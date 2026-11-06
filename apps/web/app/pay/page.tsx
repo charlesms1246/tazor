@@ -15,6 +15,8 @@ import {
   decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals, parseApprovals,
   relayerBody, serializeApproval, type Approval,
 } from '@/lib/payment.ts';
+import { configV2 } from '@/lib/config-v2.ts';
+import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -35,6 +37,7 @@ export default function PayPage() {
   const [label, setLabel] = useState('acme');
   const [l1, setL1] = useState<L1 | null>(null);
   const [supplier, setSupplier] = useState<CompanyVerification | 'checking' | 'error'>('checking');
+  const [v2, setV2] = useState<boolean | null>(null);
 
   useEffect(() => {
     const load = () =>
@@ -51,10 +54,16 @@ export default function PayPage() {
 
   useEffect(() => {
     if (typeof state !== 'object') return;
-    const pm = config.paymentModule;
+    setV2(null);
+    isV2Account(state.auth.account).then(setV2);
+  }, [state]);
+
+  useEffect(() => {
+    if (typeof state !== 'object' || v2 === null) return;
+    const pm = v2 ? configV2.paymentModule : config.paymentModule;
     if (!pm) return setGuard({ status: 'refused', reason: 'PaymentModule address is not configured.' });
     setGuard({ status: 'checking' });
-    const local = invoiceAuthDigest(state.auth, { chainId: config.chainId, verifyingContract: pm });
+    const local = v2 ? v2Digest(state.auth, config.chainId) : invoiceAuthDigest(state.auth, { chainId: config.chainId, verifyingContract: pm });
     ethCall(pm, encodeInvoiceDigestCall(state.auth))
       .then((res) => {
         const onchain = decodeInvoiceDigest(res);
@@ -63,7 +72,7 @@ export default function PayPage() {
           : { status: 'refused', reason: `On-chain digest ${onchain} does not match the invoice shown (${local}).` });
       })
       .catch((e) => setGuard({ status: 'refused', reason: `Could not read the on-chain digest: ${msg(e)}` }));
-  }, [state]);
+  }, [state, v2]);
 
   useEffect(() => {
     if (typeof state !== 'object') return;
@@ -91,8 +100,8 @@ export default function PayPage() {
   }, [tx, state]);
 
   useEffect(() => {
-    if (!l1?.started || l1.seconds !== undefined || typeof state !== 'object' || !config.paymentModule) return;
-    const pm = config.paymentModule;
+    const pm = v2 ? configV2.paymentModule : config.paymentModule;
+    if (!l1?.started || l1.seconds !== undefined || typeof state !== 'object' || !pm) return;
     const t = setInterval(async () => {
       try {
         const hit = await findInvoicePaidViaL1(pm, state.auth.account, state.auth.nonce, l1.fromBlock ?? 0n);
@@ -100,7 +109,7 @@ export default function PayPage() {
       } catch { /* keep polling */ }
     }, 3000);
     return () => clearInterval(t);
-  }, [l1, state]);
+  }, [l1, state, v2]);
 
   if (state === 'loading') return <main>Decrypting invoice…</main>;
   if (state === 'invalid') return <main><h1 data-testid="invalid">Invalid or tampered link</h1></main>;
@@ -126,6 +135,7 @@ export default function PayPage() {
 
   const onPay = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
+    if (v2) throw new Error('The relayer submits v1 payments only; for this v2 company use "Copy calldata" (PaymentModuleV2) or "Send via Ethereum".');
     if (!config.relayerUrl) throw new Error('Relayer URL is not configured; use "Copy calldata" or "Send via Ethereum".');
     const started = Date.now();
     const res = await fetch(`${config.relayerUrl}/pay`, {
@@ -139,7 +149,7 @@ export default function PayPage() {
     setTx({ hash: body.txHash, started });
   });
 
-  const gate = config.sepolia.ensGate;
+  const gate = v2 ? configV2.ensGateV2 : config.sepolia.ensGate;
 
   const onPrepareL1 = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
@@ -170,7 +180,14 @@ export default function PayPage() {
 
   const onCopyCalldata = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
-    const data = encodePayOne(auth, approvals);
+    const data = v2 ? encodePayOneV2(auth, approvals) : encodePayOne(auth, approvals);
+    setCalldata(data);
+    await navigator.clipboard?.writeText(data).catch(() => undefined);
+  });
+
+  const onPayAsAgent = run(async () => {
+    if (!mine) throw new Error('Approve first: the agent signs the same invoice digest.');
+    const data = encodePayAsAgent(auth, mine.approver, mine.signature);
     setCalldata(data);
     await navigator.clipboard?.writeText(data).catch(() => undefined);
   });
@@ -178,6 +195,7 @@ export default function PayPage() {
   return (
     <main>
       <h1>Invoice {i.id}</h1>
+      {v2 && <p data-testid="v2-account">v2 company: signed for PaymentModuleV2 {configV2.paymentModule} (EIP-712 domain version 2).</p>}
       <table>
         <tbody>
           <tr><td>From</td><td>{i.supplierName} ({i.supplierAccount}){' '}
@@ -225,6 +243,7 @@ export default function PayPage() {
       <h2>Pay</h2>
       <button data-testid="pay" onClick={onPay} disabled={busy || !approvals?.length}>Pay</button>{' '}
       <button data-testid="calldata" onClick={onCopyCalldata} disabled={busy || !approvals?.length}>Copy calldata</button>
+      {v2 && <>{' '}<button data-testid="pay-as-agent" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button></>}
       {error && <p data-testid="error" style={{ color: 'crimson' }}>{error}</p>}
       {tx && (
         <p data-testid="tx">
@@ -261,7 +280,7 @@ export default function PayPage() {
         </div>
       )}
       {calldata && (
-        <p>Send this calldata to PaymentModule {config.paymentModule ?? '(not configured)'} from any wallet on Whitechain:<br />
+        <p>Send this calldata to PaymentModule {(v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)'} from any wallet on Whitechain:<br />
           <code data-testid="calldata-out" style={{ wordBreak: 'break-all' }}>{calldata}</code></p>
       )}
     </main>
