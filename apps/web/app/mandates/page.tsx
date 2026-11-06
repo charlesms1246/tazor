@@ -13,10 +13,15 @@ import { mergeApprovals, parseApprovals, serializeApproval, type Approval } from
 import { ethCall } from '@/lib/rpc.ts';
 import { loadMandates, loadPasskey, saveMandate, type StoredMandate } from '@/lib/storage.ts';
 import { Addr, Card, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
+import { recordEvent } from '@/lib/events.ts';
+import { usdt2dp } from '@/lib/export.ts';
+import { companyByAccount } from '@/lib/company.ts';
 
 const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const days = (s: bigint) => `${Number(s) / 86400} days`;
+const partyName = (a: string) => companyByAccount(a)?.ens ?? `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 async function relay(path: string, body: unknown): Promise<Hex> {
   const relayerUrl = getRelayerUrl();
@@ -80,7 +85,13 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
 
   const onSubmit = run(async () => {
     if (!m || !approvals?.length) throw new Error('No approvals yet.');
-    setTx(await relay('/mandate', mandateRelayerBody(m.mandate, approvals)));
+    const hash = await relay('/mandate', mandateRelayerBody(m.mandate, approvals));
+    setTx(hash);
+    recordEvent({
+      subject: m.digest, kind: 'mandate-created', at: Date.now(),
+      title: `Mandate to ${partyName(m.mandate.payee)} set up: up to ${formatUnits(m.mandate.capPerPeriod, 6)} USDT ${period}`,
+      actor: partyName(m.mandate.account), tx: hash, chain: 'whitechain',
+    });
     const stored = { id: m.digest, label: `${usdt(m.mandate.capPerPeriod)} / ${period} to ${m.mandate.payee}` };
     saveMandate(stored);
     onCreated(stored);
@@ -158,14 +169,25 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
       const amt = parseUnits(amount || '0', 6);
       if (amt === 0n) throw new Error('Enter an amount.');
       if (row.available !== undefined && amt > row.available) throw new Error(`Only ${usdt(row.available)} available this period.`);
-      if (viaRelayer) { setOut({ tx: await relay('/pull', { mandateId: row.id, amount: amt.toString() }) }); onRefresh(); }
+      if (viaRelayer) {
+        const hash = await relay('/pull', { mandateId: row.id, amount: amt.toString() });
+        setOut({ tx: hash });
+        recordEvent({
+          subject: row.id, kind: 'collected', at: Date.now(),
+          title: `Mandate to ${s ? partyName(s.payee) : 'payee'} collected ${usdt2dp(amt)} USDT`,
+          actor: s ? partyName(s.payee) : undefined, tx: hash, chain: 'whitechain',
+        });
+        onRefresh();
+      }
       else setOut({ calldata: encodePull(row.id, amt) });
     } catch (e) { setOut({ error: msg(e) }); } finally { setBusy(false); }
   };
 
   const expired = s ? Number(s.expiry) * 1000 < Date.now() : false;
+  const [open, setOpen] = useState(false);
 
   return (
+    <>
     <tr data-testid="mandate-row">
       <td>
         {s ? <span className="mono break">{s.payee}</span> : <span className="faint">{row.label}</span>}
@@ -186,8 +208,17 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
         {out.tx && <span className="cell-sub">Collected: <TxLink hash={out.tx} /></span>}
         {out.calldata && <span className="cell-sub"><code className="break">{out.calldata}</code></span>}
         {out.error && <div style={{ marginTop: 8 }}><Notice tone="negative">{out.error}</Notice></div>}
+        <div style={{ marginTop: 6, textAlign: 'right' }}>
+          <button className="btn btn-sm btn-ghost" data-testid="mandate-activity" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide activity' : 'Activity'}</button>
+        </div>
       </td>
     </tr>
+    {open && (
+      <tr data-testid="mandate-detail">
+        <td colSpan={5}><Timeline subject={row.id} testId="mandate-timeline" /></td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -224,7 +255,7 @@ export default function MandatesPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Mandates" subtitle="Direct debits: a supplier collects up to a fixed amount each period, within limits your approvers signed." />
+      <PageHeader title="Collect" subtitle="Mandates (direct debits): a supplier collects up to a fixed amount each period, within limits your approvers signed." />
 
       <Card title="Mandates" subtitle="Tracked on this device, with live terms and what can be collected now." flush>
         {rows.length === 0 ? (
