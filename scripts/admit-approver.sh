@@ -116,6 +116,11 @@ send() {   # <chain> <label> <to> <sig> [args...] -> LAST_TX
   record $chain "$label" $LAST_TX
   info "$label  $([[ $chain == sepolia ]] && print $SEP_TX || print $WC_TX)/$LAST_TX"
 }
+mirror_send() {   # <label> <sig> [args...]: a mirror write, direct or through MirrorOperator.execute
+  local label=$1 sig=$2; shift 2
+  if [[ -n $MIRROR_VIA ]]; then send whitechain "$label via MirrorOperator" $MIRROR_VIA "execute(bytes)" $(cast calldata "$sig" "$@")
+  else send whitechain "$label" $MIRROR "$sig" "$@"; fi
+}
 relayer() {   # <path> <json> -> RELAYER_BODY, RELAYER_STATUS
   local out
   out=$(curl -sS -m 120 -X POST "$RELAYER_URL$1" -H 'content-type: application/json' -d "$2" -w '\n%{http_code}' 2>&1) || die "relayer $1 unreachable at $RELAYER_URL: ${out[1,200]}"
@@ -132,7 +137,14 @@ step 0 "preflight (testnet only)"
 [[ $(cast chain-id -r $SEPOLIA_RPC) == 11155111 ]] || die "SEPOLIA_RPC is not Ethereum Sepolia (11155111)"
 [[ -n $MIRROR && -n $FACTORY && -n $ROLE_CACHE ]] || die "missing addresses in $WC_JSON"
 owner=$(cast call $MIRROR "owner()(address)" -r $WC_RPC)
-[[ ${owner:l} == ${DEPLOYER:l} ]] || die "deployer $DEPLOYER does not own the WB Soul mirror ($owner)"
+# the mirror is owned by the deployer, or (after setup-sandbox.sh) by a MirrorOperator the deployer owns: then writes go through execute(bytes)
+MIRROR_VIA=""
+if [[ ${owner:l} != ${DEPLOYER:l} ]]; then
+  op_owner=$(cast call $owner "owner()(address)" -r $WC_RPC 2>/dev/null)
+  [[ ${op_owner:l} == ${DEPLOYER:l} ]] || die "deployer $DEPLOYER does not own the WB Soul mirror ($owner) nor its MirrorOperator"
+  MIRROR_VIA=$owner
+  info "WB Soul mirror is owned by MirrorOperator $owner (owned by the deployer); writing through execute(bytes)"
+fi
 droles=$(cast call $REGISTRY "roles(uint256,address)(uint256)" 0 $DEPLOYER -r $SEPOLIA_RPC | first)
 has_bit $droles 192 || die "deployer $DEPLOYER is not an APPROVER admin on $REGISTRY"
 info "deployer $DEPLOYER: $(cast balance $DEPLOYER --ether -r $WC_RPC) WBT, $(cast balance $DEPLOYER --ether -r $SEPOLIA_RPC) Sepolia ETH"
@@ -175,14 +187,14 @@ fi
 step 2 "WB Soul MIRROR: register and set IsVerified (simulated KYC, not WhiteBIT)"
 sid=$(cast call $MIRROR "soulOf(address)(uint256)" $ACCOUNT -r $WC_RPC | first)
 if [[ $sid == 0 ]]; then
-  send whitechain "registerSoul (mirror, simulated)" $MIRROR "registerSoul(address)" $ACCOUNT
+  mirror_send "registerSoul (mirror, simulated)" "registerSoul(address)" $ACCOUNT
   sid=$(cast call $MIRROR "soulOf(address)(uint256)" $ACCOUNT -r $WC_RPC | first)
 fi
 if [[ $sid == 0 ]]; then
   [[ $DRY_RUN == 1 ]] && info "DRY RUN would setAttribute(<new soul>, IsVerified, 1)" || die "no soul after registerSoul"
 else
   v=$(cast call $MIRROR "soulAttributeValue(uint256,address)(bytes20)" $sid $IS_VERIFIED -r $WC_RPC)
-  [[ ${v:l} == $VERIFIED ]] || send whitechain "setAttribute IsVerified (mirror, simulated)" $MIRROR "setAttribute(uint256,address,bytes20)" $sid $IS_VERIFIED $VERIFIED
+  [[ ${v:l} == $VERIFIED ]] || mirror_send "setAttribute IsVerified (mirror, simulated)" "setAttribute(uint256,address,bytes20)" $sid $IS_VERIFIED $VERIFIED
 fi
 pass "soul ${sid/#0/(new)} verified in the mirror (simulated)"
 

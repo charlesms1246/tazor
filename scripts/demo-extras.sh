@@ -103,6 +103,10 @@ send_wc() {   # <key> <to> <sig> [args...] -> LAST_TX
   [[ $(print -r -- $out | jq -r .status) == 0x1 ]] || die "tx reverted: $(print -r -- $out | jq -r .transactionHash)"
   LAST_TX=$(print -r -- $out | jq -r .transactionHash)
 }
+mirror_wc() {   # <sig> [args...]: a WB Soul mirror write as the deployer, direct or through MirrorOperator.execute
+  local sig=$1; shift
+  if [[ -n $MIRROR_VIA ]]; then send_wc $DEPLOYER_KEY $MIRROR_VIA "execute(bytes)" $(cast calldata "$sig" "$@"); else send_wc $DEPLOYER_KEY $MIRROR "$sig" "$@"; fi
+}
 relayer() {   # <path> <json> -> RELAYER_BODY, RELAYER_STATUS
   local out
   out=$(curl -sS -m 120 -X POST "$RELAYER_URL$1" -H 'content-type: application/json' -d "$2" -w '\n%{http_code}' 2>&1) || die "relayer $1 unreachable at $RELAYER_URL: ${out[1,200]}"
@@ -171,7 +175,12 @@ info "relayer sender $(print -r -- $health | jq -r .relayer), paymentModule $(pr
 [[ ${(L)$(print -r -- $health | jq -r .paymentModule)} == ${(L)PM1} ]] || die "relayer must run with PAYMENT_MODULE=$PM1 (v1)"
 [[ $(cast call $PRIYA "isSigner(bytes)(bool)" $PRIYA_EOA -r $WC_RPC) == true ]] || die "PRIYA_KEY is not a signer of $PRIYA"
 for v in PM1 PM2 FACTORY MIRROR USDT; do [[ -n ${(P)v} ]] || die "$v missing from deployments"; done
-[[ ${(L)$(cast call $MIRROR "owner()(address)" -r $WC_RPC)} == ${(L)DEPLOYER} ]] || die "deployer is not the WB Soul mirror owner"
+MIRROR_OWNER=$(cast call $MIRROR "owner()(address)" -r $WC_RPC)
+MIRROR_VIA=""
+if [[ ${(L)MIRROR_OWNER} != ${(L)DEPLOYER} ]]; then   # after setup-sandbox.sh a MirrorOperator owned by the deployer owns the mirror
+  [[ ${(L)$(cast call $MIRROR_OWNER "owner()(address)" -r $WC_RPC 2>/dev/null)} == ${(L)DEPLOYER} ]] || die "deployer is not the WB Soul mirror owner nor its MirrorOperator's owner"
+  MIRROR_VIA=$MIRROR_OWNER
+fi
 pass "relayer up; Priya's key matches; deployer owns the mirror"
 
 # ---- 1. payment run v1
@@ -261,9 +270,9 @@ CF_KEY=$(fresh_key); CF_EOA=$(cast wallet address --private-key $CF_KEY)
 CF=$(cast call $FACTORY "predictAddress(bytes[])(address)" "[$CF_EOA]" -r $WC_RPC)
 [[ $(cast code $CF -r $WC_RPC) == 0x ]] || die "$CF already deployed"
 info "counterfactual approver $CF (not deployed)"
-send_wc $DEPLOYER_KEY $MIRROR "registerSoul(address)" $CF; row "registerSoul (counterfactual)" $LAST_TX
+mirror_wc "registerSoul(address)" $CF; row "registerSoul (counterfactual)" $LAST_TX
 soul=$(cast call $MIRROR "soulOf(address)(uint256)" $CF -r $WC_RPC | awk '{print $1}')
-send_wc $DEPLOYER_KEY $MIRROR "setAttribute(uint256,address,bytes20)" $soul $IS_VERIFIED 0x0000000000000000000000000000000000000001
+mirror_wc "setAttribute(uint256,address,bytes20)" $soul $IS_VERIFIED 0x0000000000000000000000000000000000000001
 row "IsVerified (counterfactual)" $LAST_TX
 info "bound to soul $soul and verified (simulated WB Soul mirror)"
 vu=$(( $(wc_now) + 540 )); dl=$(( $(wc_now) + 3600 ))
