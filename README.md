@@ -311,12 +311,16 @@ We claim **C (censorship resistance)** and **S (security)** as the lead properti
 | Tazor relayer | refuse to submit | change or forge a payment; anyone else can submit it |
 | Sandbox demo keys (testnet only) | act as demo counterparties in the sandbox company | touch any other company |
 
-## Roadmap to mainnet
+## Roadmap to mainnet (and the Builders Program milestones we'd propose)
 
-- **WB Soul for real:** read WhiteBIT's registry directly on Whitechain mainnet (already exercised in a mainnet-fork test); bind smart accounts or use EIP-7702 for already-bound wallets.
-- **Super-root proofs:** Whitechain mainnet uses super-root dispute games, which Unruggable Gateways doesn't verify yet; we'd contribute a super-root verifier.
-- **Cheaper role sync:** batch several accounts per proof and sync only on change (already event-driven).
-- **Company verification (KYB)** and ENS-native admin wallets per company.
+1. **Mainnet checkout (week 1–2):**
+   - Deploy `TazorCheckout` and `TazorDepositCheckout` to Whitechain mainnet. They are ownerless, and mainnet's 16.7M per-tx gas cap is far above our largest checkout tx, about 0.3M.
+   - Switch to mainnet USDT once it has supply. We checked tonight: `0xF956…9cb8` uses the same EIP-712 domain shape.
+2. **Pay with WhiteBIT (week 2–4):** a WhiteBIT deep link or QR that pre-fills the withdrawal (network Whitechain, the order's deposit address, the amount), so WhiteBIT's 10M+ users pay a merchant from their exchange balance without a wallet.
+3. **Merchant plugins (month 2):** WooCommerce and Shopify-style plugins on `@tazor/pay`; a hosted payment-link page; persistent webhooks (queue + dashboard); settlement reports by finality stage.
+4. **Agents (month 2):** an x402 facilitator listed for Whitechain, with on-chain agent budgets enforced by the company account's policy (as PaymentModuleV2's agent cap already does for B2B), not just a client-side cap.
+5. **B2B and financing (month 3):** read WB Soul directly on mainnet for approvers and financiers (already exercised in a mainnet-fork test); add KYB for companies; open the financing marketplace to verified funders.
+6. **Proof upgrades:** Whitechain mainnet uses super-root dispute games, which Unruggable Gateways doesn't verify yet, so we'd contribute a super-root verifier for the ENS-role proofs.
 
 ## Current limitations
 
