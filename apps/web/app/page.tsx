@@ -8,12 +8,18 @@ import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { loadMandates, loadPayments } from '@/lib/storage.ts';
 import { usdt2dp, type PaymentRecord } from '@/lib/export.ts';
-import { Addr, Card, KpiStrip, PageHeader, Pill } from './_ui/index.tsx';
+import { Addr, Card, KpiStrip, Notice, PageHeader, Pill, short } from './_ui/index.tsx';
+import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 
 const ACCOUNT: Address = configV2.demoAccount;
 const COMPANY = process.env.NEXT_PUBLIC_COMPANY_ENS || 'acme.taz0r.eth';
 
-const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
+const when = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay ? `Today, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : d.toISOString().slice(0, 10);
+};
 
 export default function Home() {
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -21,6 +27,13 @@ export default function Home() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [mandates, setMandates] = useState(0);
   const [stamp, setStamp] = useState('');
+  const [activity, setActivity] = useState<Transfer[] | null>(null);
+  const [activityError, setActivityError] = useState(false);
+
+  const loadActivity = () => {
+    setActivityError(false);
+    fetchTransfers(config.explorer, ACCOUNT, configV2.usdt).then(setActivity).catch(() => setActivityError(true));
+  };
 
   const refresh = () => {
     setBalanceError(false);
@@ -31,6 +44,7 @@ export default function Home() {
 
   useEffect(() => {
     refresh();
+    loadActivity();
     setPayments(loadPayments().sort((a, b) => b.blockTimestamp - a.blockTimestamp));
     setMandates(loadMandates().length);
   }, []);
@@ -62,23 +76,32 @@ export default function Home() {
       ]} />
 
       <div className="grid-2 stretch">
-        <Card title="Recent payments" flush className="card-fill" actions={payments.length > 0 ? <a href="/export/" className="small">View all</a> : undefined}>
-          {payments.length === 0 ? (
-            <div className="card-fill" style={{ padding: '0 24px 24px', flex: 1 }}>
-              <p className="muted">No payments from this device yet. Paid invoices appear here with the amount, the supplier and their Whitechain transaction.</p>
-              <div className="card-foot"><a className="btn btn-sm" href="/pay/">Pay an invoice</a></div>
-            </div>
-          ) : (
+        <Card title="Account activity" subtitle="USDT in and out of this account, from the Whitechain explorer." flush className="card-fill" testId="activity"
+          actions={<a href={`${config.explorer}/address/${ACCOUNT}?tab=token_transfers`} target="_blank" rel="noreferrer" className="small">View all</a>}>
+          {activity === null && !activityError && (
+            <div style={{ padding: '0 24px 24px' }}>{[0, 1, 2, 3, 4].map((i) => <div key={i} style={{ height: 52, display: 'flex', alignItems: 'center' }}><span className="skeleton" style={{ width: '100%' }} /></div>)}</div>
+          )}
+          {activityError && (
+            <div style={{ padding: '0 24px 24px' }}><Notice tone="negative">Couldn&apos;t load activity from the explorer. <button className="btn btn-sm" onClick={loadActivity}>Retry</button></Notice></div>
+          )}
+          {activity && activity.length === 0 && (
+            <div style={{ padding: '0 24px 24px' }}><p className="muted">No USDT has moved through this account yet.</p></div>
+          )}
+          {activity && activity.length > 0 && (
             <div className="table-wrap"><table className="table table-stack">
-              <thead><tr><th>Invoice</th><th className="num">Amount</th></tr></thead>
+              <thead><tr><th>Counterparty</th><th className="num">Amount</th></tr></thead>
               <tbody>
-                {payments.slice(0, 5).map((p) => (
-                  <tr key={p.txHash}>
-                    <td>{p.invoice.supplierName}<span className="cell-sub">{p.invoice.id} · {day(p.blockTimestamp)}</span></td>
-                    <td className="num">{usdt2dp(p.invoice.amount)} <span className="faint">USDT</span>
-                      <span className="cell-sub"><a href={`${config.explorer}/tx/${p.txHash}`} target="_blank" rel="noreferrer">Transaction</a></span></td>
-                  </tr>
-                ))}
+                {activity.slice(0, 5).map((t) => {
+                  const other = t.incoming ? t.from : t.to;
+                  return (
+                    <tr key={t.id}>
+                      <td>{nameOf(other) ?? <span className="mono">{short(other)}</span>}
+                        <span className="cell-sub">{t.incoming ? 'Received' : 'Paid'} · {when(t.time)}</span></td>
+                      <td className="num"><span className={t.incoming ? 'in' : undefined}>{t.incoming ? '+' : '−'}{usdt2dp(t.amount)}</span> <span className="faint">USDT</span>
+                        <span className="cell-sub"><a href={`${config.explorer}/tx/${t.txHash}`} target="_blank" rel="noreferrer">Transaction</a></span></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table></div>
           )}
