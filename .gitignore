@@ -30,3 +30,4 @@ vendor/
 .DS_Store
 .taste-skill/
 examples/.deploy/
+!WHITECHAIN_FEEDBACK.md
