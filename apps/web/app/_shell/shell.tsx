@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { COMPANIES, setCompany, useCompany } from '@/lib/company.ts';
+import { CommandPalette, openPalette } from '../_cmdk/palette.tsx';
+import { Tour } from '../_tour/tour.tsx';
 
 const ICONS: Record<string, ReactNode> = {
   home: <path d="M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H9.5v-4h-3v4H3a.5.5 0 0 1-.5-.5z" />,
@@ -163,9 +165,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <div className="mobile-bar">
         <a href="/" className="brand" aria-label="Tazor home"><Mark size={28} /><Wordmark /></a>
+        <span className="row" style={{ gap: 4 }}>
+        <button type="button" className="btn btn-ghost btn-sm" aria-label="Search" onClick={() => openPalette()}>
+          <svg className="icon-16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>
+        </button>
         <button type="button" className="btn btn-ghost btn-sm" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen((o) => !o)}>
           <span className="nav-item" style={{ margin: 0, padding: 0, height: 'auto', color: 'inherit', background: 'none' }}><Icon name={open ? 'close' : 'menu'} /></span>
         </button>
+        </span>
       </div>
       <div className="mobile-sheet" data-open={open}>
         <Switcher />
@@ -175,6 +182,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside className="sidebar">
           <a href="/" className="brand" aria-label="Tazor home"><Mark /><Wordmark /></a>
           <Switcher />
+          <button type="button" className="search-btn" data-testid="open-search" onClick={() => openPalette()}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>
+            <span>Search</span><kbd>⌘K</kbd>
+          </button>
           <NavLinks path={path} />
           <div className="sidebar-meta">Built on Whitechain · roles on ENS</div>
         </aside>
@@ -186,6 +197,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
         <a href="#" onClick={(e) => { e.preventDefault(); setOpen(true); window.scrollTo(0, 0); }}><Icon name="menu" />More</a>
       </nav>
+      <CommandPalette />
+      <Tour />
     </>
   );
 }

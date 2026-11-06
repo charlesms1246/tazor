@@ -452,3 +452,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .lane-pill { position: absolute; top: 18px; right: 18px; }
 @media (max-width: 1100px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lane:nth-child(3) { border-left: 0; } .lane:nth-child(n+3) { border-top: 1px solid var(--border); } }
 @media (max-width: 480px) { .lane-pill { position: static; align-self: flex-start; margin-top: 4px; } .lane { padding: 16px; } .lane-value { font-size: 20px; } }
+
+.search-btn { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; margin: -6px 0 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--faint); font: inherit; font-size: 13px; cursor: pointer; }
+.search-btn:hover { border-color: var(--control); color: var(--muted); }
+.search-btn svg, .icon-16 { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.search-btn span { flex: 1; text-align: left; }
+.search-btn kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; color: var(--faint); }

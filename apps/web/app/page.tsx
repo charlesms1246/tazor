@@ -13,6 +13,7 @@ import { dailyFlows, niceMax, sumFlows, type DayFlow } from '@/lib/dashboard.ts'
 import { TIMINGS } from '@/lib/timings.ts';
 import { Card, CopyButton, Notice, PageHeader, short } from './_ui/index.tsx';
 import { Timeline } from './_ui/timeline.tsx';
+import { startTour } from './_tour/tour.tsx';
 import { useCompany } from '@/lib/company.ts';
 import { pendingInbox, loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
 import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
@@ -145,7 +146,8 @@ export default function Home() {
 
   return (
     <div className="page">
-      <PageHeader title="Home" subtitle={<>{COMPANY} · Whitechain Sepolia</>} />
+      <PageHeader title="Home" subtitle={<>{COMPANY} · {company.role} · Whitechain Sepolia</>}
+        actions={<button type="button" className="btn" data-testid="start-tour" onClick={() => startTour()}>Take the tour</button>} />
 
       <div className="home-top">
         <section className="hero-card" aria-label="Balance" data-tour="balance">
