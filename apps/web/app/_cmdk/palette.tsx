@@ -17,19 +17,16 @@ export function openPalette(): void {
 
 const PAGES: { href: string; title: string; keywords: string[] }[] = [
   { href: '/', title: 'Home', keywords: ['dashboard', 'balance', 'overview'] },
-  { href: '/invoices/', title: 'Invoices', keywords: ['bill', 'send', 'create'] },
+  { href: '/invoices/', title: 'Invoices', keywords: ['bill', 'send', 'create', 'receive'] },
   { href: '/mandates/', title: 'Collect', keywords: ['mandates', 'direct debit', 'recurring', 'subscription'] },
   { href: '/financing/', title: 'Financing', keywords: ['invoice financing', 'factoring', 'advance'] },
-  { href: '/approvals/', title: 'Approvals', keywords: ['approve', 'sign', 'face id', 'passkey'] },
-  { href: '/pay/', title: 'Pay an invoice', keywords: ['payment link', 'pay', 'fallback', 'ethereum'] },
+  { href: '/approvals/', title: 'Approvals', keywords: ['approve', 'sign', 'passkey', 'pay an invoice', 'payment link', 'scan qr', 'paid'] },
   { href: '/runs/', title: 'Payment runs', keywords: ['batch', 'payroll', 'many invoices'] },
-  { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'profile', 'team', 'roles', 'approvers', 'backup signer', 'remove'] },
-
+  { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'team', 'roles', 'profile'] },
   { href: '/policies/', title: 'Policies', keywords: ['limits', 'spending', 'rules', 'payees'] },
-  { href: '/security/', title: 'Security', keywords: ['health', 'status', 'freeze', 'revoke'] },
-  { href: '/onboard/', title: 'Approver setup', keywords: ['passkey', 'onboarding', 'wb soul'] },
-  { href: '/export/', title: 'Reports', keywords: ['export', 'csv', 'statement', 'accounting'] },
-  { href: '/settings/', title: 'Settings', keywords: ['preferences', 'logo', 'backup'] },
+  { href: '/security/', title: 'Security & settings', keywords: ['settings', 'relayer', 'freeze', 'lost device', 'health', 'status', 'revoke', 'contracts'] },
+  { href: '/onboard/', title: 'Approver setup', keywords: ['passkey', 'onboarding', 'join', 'add me', 'wb soul'] },
+  { href: '/export/', title: 'Reports', keywords: ['export', 'csv', 'statement', 'accounting', 'books'] },
   { href: '/docs/', title: 'Docs', keywords: ['help', 'guide', 'documentation'] },
 ];
 
@@ -41,6 +38,7 @@ function buildCommands(companyId: 'acme' | 'bluejay'): Command[] {
   const other = COMPANIES.find((c) => c.id !== companyId) ?? COMPANIES[0];
   const actions: Command[] = [
     { id: 'act:create-invoice', group: 'Actions', title: 'Create invoice', keywords: ['new invoice', 'bill'], href: '/invoices/' },
+    { id: 'act:open-link', group: 'Actions', title: 'Open a payment link', keywords: ['pay', 'paste', 'scan', 'qr'], href: '/approvals/' },
     { id: `act:switch:${other.id}`, group: 'Actions', title: `Switch to ${other.name.split(' ')[0]} (${other.role.toLowerCase()})`, subtitle: other.ens, keywords: ['company', 'switch', other.ens], action: `switch:${other.id}` },
     { id: 'act:tour', group: 'Actions', title: 'Take the product tour', keywords: ['tour', 'walkthrough', 'help', 'guide'], action: 'tour' },
   ];

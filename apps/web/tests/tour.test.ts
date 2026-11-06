@@ -5,7 +5,7 @@ import { STEPS, endTour, nextStep, normalizePath, parseState, placeCard, prevSte
 test('nine steps, each with a data-tour selector and at most two sentences', () => {
   assert.equal(STEPS.length, 9);
   const names = STEPS.map((s) => /^\[data-tour="([a-z-]+)"\]$/.exec(s.selector)?.[1]);
-  assert.deepEqual(names, ['balance', 'lanes', 'invoice-form', 'invoice-paper', 'approvals', 'pay-fallback', 'people', 'health', 'reports']);
+  assert.deepEqual(names, ['balance', 'lanes', 'invoice-form', 'invoice-paper', 'approvals', 'people', 'fallback', 'health', 'reports']);
   for (const s of STEPS) {
     assert.ok(s.path.startsWith('/') && s.path.endsWith('/'), s.path);
     assert.ok((s.body.match(/[.!?](\s|$)/g) ?? []).length <= 2, s.title);
@@ -25,6 +25,7 @@ test('next stays on the page when the step is here, navigates when it is not', (
   assert.deepEqual(nextStep({ step: 0, active: true }, '/'), { state: { step: 1, active: true }, navigate: null });
   assert.deepEqual(nextStep({ step: 1, active: true }, '/'), { state: { step: 2, active: true }, navigate: '/invoices/' });
   assert.deepEqual(nextStep({ step: 2, active: true }, '/invoices'), { state: { step: 3, active: true }, navigate: null }, 'path without trailing slash');
+  assert.deepEqual(nextStep({ step: 6, active: true }, '/security/'), { state: { step: 7, active: true }, navigate: null }, 'fallback and health share the Security page');
   assert.deepEqual(nextStep({ step: 8, active: true }, '/export/'), { state: { step: 0, active: false }, navigate: null }, 'finish ends');
 });
 

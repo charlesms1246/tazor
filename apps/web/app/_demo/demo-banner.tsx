@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { DEMO_CHANGED, clearDemo, demoCounts, isDemoLoaded, seedDemo } from '../../lib/demo-seed.ts';
 import { DEMO_RUN_DATE } from '../../lib/demo-data.ts';
+import './demo.css';
 
 /** Loads or clears the live testnet history on this device. */
 export function DemoControls() {
@@ -24,6 +25,8 @@ export function DemoControls() {
     setError(null);
     try {
       if (!(await seedDemo())) setError('This browser would not save the demo data.');
+      // Every card on the page reads its stores once, so reload to show the history everywhere.
+      else location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -31,12 +34,12 @@ export function DemoControls() {
       setLoaded(isDemoLoaded());
     }
   };
-  const onClear = () => { clearDemo(); setLoaded(isDemoLoaded()); };
+  const onClear = () => { clearDemo(); setLoaded(isDemoLoaded()); location.reload(); };
 
   if (loaded === null) return null;
 
   return (
-    <section className="card" data-testid="demo-controls" data-loaded={loaded ? 'true' : 'false'}>
+    <section className="card demo-controls" data-testid="demo-controls" data-loaded={loaded ? 'true' : 'false'}>
       <div className="card-head">
         <div>
           <h2>{loaded ? 'Demo data loaded' : 'Live testnet history'}</h2>
