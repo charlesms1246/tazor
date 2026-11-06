@@ -2,16 +2,19 @@
   "name": "@tazor/web",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "serve": "node scripts/serve.mjs",
-    "test:passkey": "NEXT_TELEMETRY_DISABLED=1 next build && playwright test"
+    "test:passkey": "NEXT_TELEMETRY_DISABLED=1 next build && playwright test",
+    "test:unit": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning tests/*.test.ts"
   },
   "dependencies": {
     "next": "16.4.5",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "viem": "2.57.16"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0",

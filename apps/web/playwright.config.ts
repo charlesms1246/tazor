@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'tests',
+  testMatch: '*.spec.ts',
   timeout: 600_000,
   reporter: 'list',
   outputDir: '/tmp/tazor-web-test-results',
