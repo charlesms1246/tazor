@@ -31,6 +31,52 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 - The refund rule ("only to the payer, never more than paid") is enforced by the contract that moves the money, not by a processor's goodwill.
 - The accountant's ledger is the chain itself, so the export can't disagree with the money.
 
+## Who it's for: B2B2C, and how it reaches them
+
+**B2B2C:** Tazor serves the **business**. The business serves **its customers**, who are other businesses, clinics or consumers, and they pay without gas, a seed phrase or a chain choice. A business starts in about a minute at [`/start/`](https://tazor-app.vercel.app/start/). It gets:
+- a 15-line snippet for its site;
+- a hosted payment link and QR if it has no site;
+- its dashboard and accountant export.
+
+**Beachhead: cross-border SMEs.** Small exporters and importers lose 1–3 business days, a 1–3% FX spread and wire fees on every SWIFT payment. With Tazor they settle in USDT in seconds, with refunds and books built in.
+
+**First design partner (in discussion): Healthsoft, India.** Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
+
+| Healthsoft needs to… | Tazor flow |
+|---|---|
+| Get paid by overseas distributors and hospitals | Payment links, invoices and checkout in USDT, with **partial refunds** for returned kits |
+| Bill clinics monthly for the monitoring service (the "C" end) | **Subscriptions** that renew without anyone clicking, and can be cancelled anytime |
+| Pay its Chinese component suppliers | **B2B payment runs** approved by verified people with Face ID or fingerprint |
+| Keep export and tax records | The **accountant export**: every payment and refund with date, gross, refund, net and transaction |
+
+**Pricing:** 0.5% per payment, gas included, no monthly fee. Cards charge 2–3%, and SWIFT costs a 1–3% FX spread plus wire fees.
+
+**Go-to-market, in three phases** (each a Builders Program milestone):
+1. **One real merchant (months 0–3):** Healthsoft live on Whitechain mainnet. Then its supply chain: each merchant brings its suppliers and distributors, who start receiving and paying in USDT on Whitechain. Target: 10 cross-border SMEs.
+2. **Ride WhiteBIT's distribution (months 3–6):**
+   - "Pay with WhiteBIT" for WhiteBIT's 10M+ ecosystem users, once withdrawals to deposit addresses are confirmed;
+   - co-marketing through Whitechain and WhiteBIT channels;
+   - USDT on- and off-ramp through WhiteBIT for merchants who need local currency.
+3. **Scale through partners (months 6–12):**
+   - **Plugins:** WooCommerce and Shopify-style plugins.
+   - **Accounting software:** Tally, Zoho Books and Xero, which the export already maps to.
+   - **Trade intermediaries:** freight forwarders and export associations that reach SMEs in bulk.
+   - **API sellers:** they charge AI agents per request over x402.
+
+**Why it grows Whitechain:**
+- Every merchant brings its counterparties onto the chain.
+- Every payment settles in USDT on Whitechain.
+- Tazor buys WBT for gas.
+
+**Metrics:**
+- merchants live;
+- monthly USDT volume;
+- repeat payers;
+- time from sign-up to first payment (target under 10 minutes);
+- refund rate.
+
+**Compliance:** businesses only, with KYB at onboarding and WB Soul-verified approvers. Each market launches where cross-border USDT settlement fits local rules (in India: FEMA and the tax treatment of digital assets), with the partner's own counsel.
+
 ## Trust model, in a few lines
 
 - **Tazor can't take or redirect money.** The contracts have no owner and no upgrade key. A payment signature names the merchant and amount, and a refund can only go to the payer.
@@ -365,7 +411,7 @@ I claim **C (censorship resistance)** and **S (security)** as the lead propertie
 
 I plan to apply. The milestone that makes the strongest case is **one real merchant on Whitechain mainnet**:
 1. **Mainnet checkout:** deploy `TazorCheckout` (ownerless, about 0.3M gas per payment, far below mainnet's 16.7M per-tx cap) once mainnet USDT is confirmed with the Whitechain team.
-2. **One real merchant:** their shop takes live USDT payments with the 15-line button, issues refunds, and their accountant uses the export, with webhooks into their order system.
+2. **One real merchant: Healthsoft (design partner in discussion).** It takes live USDT payments from overseas buyers through payment links and checkout, issues refunds, bills clinics through subscriptions, pays suppliers through approved payment runs, and its accountant uses the export.
 3. **Pay with WhiteBIT:** if WhiteBIT withdrawals can target a per-order deposit address (being checked by the Whitechain team), WhiteBIT users pay from their exchange balance.
 4. **Then:** merchant plugins (WooCommerce and Shopify-style), persistent webhook delivery, and WB Soul read directly on mainnet for verified B2B approvers.
 
