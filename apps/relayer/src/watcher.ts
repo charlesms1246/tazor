@@ -1,23 +1,10 @@
 import { execFile } from 'node:child_process';
+import { getAddress, isHex, type Address, type Hex, type PublicClient } from 'viem';
 import {
-  encodeFunctionData, getAddress, isHex, parseAbi, parseAbiItem,
-  type Address, type Hex, type PublicClient,
-} from 'viem';
+  L1_BLOCK, MAX_RANGE, l1BlockAbi, proveAndSend, readRoleChanges, roleCacheAbi, type Prover, type RoleChange,
+} from './sync.ts';
 
-export const rolesChanged = parseAbiItem(
-  'event EACRolesChanged(uint256 indexed resource, address indexed account, uint256 oldRoleBitmap, uint256 newRoleBitmap)',
-);
-const l1BlockAbi = parseAbi(['function number() view returns (uint64)']);
-export const roleCacheAbi = parseAbi([
-  'function rolesOf(address registry, address account) view returns (uint256 roles, uint64 l1Block)',
-  'function syncRoles(address registry, address account, bytes proof)',
-]);
-
-export const L1_BLOCK = '0x4200000000000000000000000000000000000015' as const;
-const ROOT_RESOURCE = 0n;
-const MAX_RANGE = 500n;
-
-export type Prover = (registry: Address, account: Address) => Promise<Hex>;
+export { L1_BLOCK, roleCacheAbi, rolesChanged, type Prover } from './sync.ts';
 
 /** Runs `cmd registry account`; the proof is the last line of stdout. */
 export function commandProver(cmd: string, timeoutMs = 180_000): Prover {
@@ -32,7 +19,7 @@ export function commandProver(cmd: string, timeoutMs = 180_000): Prover {
   });
 }
 
-type Pending = { registry: Address; account: Address; block: bigint; roles: bigint };
+type Pending = RoleChange;
 
 export function createWatcher(opts: {
   l1: PublicClient;
@@ -57,18 +44,7 @@ export function createWatcher(opts: {
     const from = last === undefined ? (head > (opts.lookback ?? 50n) ? head - (opts.lookback ?? 50n) : 0n) : last + 1n;
     if (from > head) return;
     const to = from + MAX_RANGE - 1n < head ? from + MAX_RANGE - 1n : head;
-    const logs = await opts.l1.getLogs({
-      address: registries, event: rolesChanged, args: { resource: ROOT_RESOURCE }, fromBlock: from, toBlock: to,
-    });
-    for (const l of logs) {
-      const registry = getAddress(l.address);
-      const account = getAddress(l.args.account!);
-      const key = `${registry}:${account}`;
-      const prev = pending.get(key);
-      if (!prev || l.blockNumber! >= prev.block) {
-        pending.set(key, { registry, account, block: l.blockNumber!, roles: l.args.newRoleBitmap! });
-      }
-    }
+    await readRoleChanges(opts.l1, registries, from, to, pending);
     last = to;
   }
 
@@ -81,9 +57,7 @@ export function createWatcher(opts: {
       pending.delete(key);
       return;
     }
-    const proof = await opts.prove(p.registry, p.account);
-    const data = encodeFunctionData({ abi: roleCacheAbi, functionName: 'syncRoles', args: [p.registry, p.account, proof] });
-    const tx = await opts.send(opts.roleCache, data);
+    const tx = await proveAndSend(opts, p.registry, p.account);
     pending.delete(key);
     const { timestamp } = await opts.l1.getBlock({ blockNumber: p.block });
     const lag = Math.max(0, Math.round(now() / 1000 - Number(timestamp)));
