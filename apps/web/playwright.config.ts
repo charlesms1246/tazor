@@ -6,6 +6,7 @@ export default defineConfig({
   timeout: 600_000,
   reporter: 'list',
   outputDir: '/tmp/tazor-web-test-results',
-  use: { baseURL: 'http://localhost:4173', browserName: 'chromium' },
+  // every spec starts with the ENS directory cached (tests/directory-fixture.ts); the app has no built-in companies
+  use: { baseURL: 'http://localhost:4173', browserName: 'chromium', storageState: 'tests/ens-directory.state.json' },
   webServer: { command: 'node scripts/serve.mjs', url: 'http://localhost:4173', reuseExistingServer: false },
 });

@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:4173",
+      "localStorage": [
+        {
+          "name": "tazor.ens-directory.v2",
+          "value": "{\"source\":\"ens\",\"fetchedAt\":4102444800000,\"companies\":[{\"label\":\"acme\",\"ens\":\"acme.taz0r.eth\",\"registry\":\"0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1\",\"owner\":\"0xce4389ACb79463062c362fACB8CB04513fA3D8D8\",\"expiry\":0,\"name\":\"Acme Industries\",\"role\":\"Buyer\",\"account\":\"0xb99A12652BEe98429ae31EA0529A0b63f1073721\",\"aliases\":[\"0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6\",\"0x18d15B034C645dbbFCb9c68238A14D059f632513\"],\"roleBits\":{\"APPROVER\":64,\"TAZOR_ADMIN\":68,\"AGENT\":72},\"fallback\":[]},{\"label\":\"bluejay\",\"ens\":\"bluejay.taz0r.eth\",\"registry\":\"0x2A582b9cFD4C20921C467512B7ebA41204d9a16b\",\"owner\":\"0xce4389ACb79463062c362fACB8CB04513fA3D8D8\",\"expiry\":0,\"name\":\"Bluejay Logistics\",\"role\":\"Supplier\",\"account\":\"0xc1dce946D192e344251972470237F1471C93876c\",\"aliases\":[],\"roleBits\":{\"APPROVER\":64,\"TAZOR_ADMIN\":68,\"AGENT\":72},\"fallback\":[]}],\"members\":{\"acme\":[{\"address\":\"0x00aBed5bDddf794c415eE746d3E4De5332cC5450\",\"label\":\"Priya (Finance)\",\"ens\":\"priya.acme.taz0r.eth\",\"source\":\"ens-text\"},{\"address\":\"0x20BA842dc15CBcF4e02d8Ce77e07391a949bB967\",\"label\":\"CFO (Finance)\",\"ens\":\"cfo.acme.taz0r.eth\",\"source\":\"ens-text\"},{\"address\":\"0xeD7335f5aD5E60691B0d88A4b8921a65c7e4c3Cb\",\"label\":\"Ravi (Operations)\",\"ens\":\"ravi.acme.taz0r.eth\",\"source\":\"ens-text\"},{\"address\":\"0x03C291d446b870e0B8F128681937a9eCEDa97763\",\"label\":\"Meera (EIP-7702 wallet)\",\"ens\":\"meera.acme.taz0r.eth\",\"source\":\"ens-text\"}],\"bluejay\":[]}}"
+        }
+      ]
+    }
+  ]
+}

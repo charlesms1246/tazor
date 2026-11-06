@@ -19,7 +19,7 @@ export type Person = {
   ensBits?: bigint;
   cacheBits?: bigint;
   /** Where the label came from: ENS (a member's name text, subname or primary name), the static fallback, or the address. */
-  labelSource?: 'ens' | 'fallback' | 'address';
+  labelSource?: 'ens' | 'address';
   /** The person's ENS subname under the company, if any. */
   ensName?: string;
 };
@@ -48,31 +48,14 @@ export const peopleAbi = parseAbi([
 
 export const L1_BLOCK: Address = '0x4200000000000000000000000000000000000015';
 
-export const KNOWN_PEOPLE: Record<string, string> = {
-  '0x00abed5bdddf794c415ee746d3e4de5332cc5450': 'Priya (Finance)',
-  '0x20ba842dc15cbcf4e02d8ce77e07391a949bb967': 'CFO (Finance)',
-  '0xed7335f5ad5e60691b0d88a4b8921a65c7e4c3cb': 'Ravi (Operations)',
-  '0x03c291d446b870e0b8f128681937a9eceda97763': 'Meera (EIP-7702 wallet)',
-};
-
-/** Demo people tracked for a company in addition to its signers. */
-export const DEMO_PEOPLE: Record<string, Address[]> = {
-  [configV2.demoAccount.toLowerCase()]: [
-    '0x00aBed5bDddf794c415eE746d3E4De5332cC5450', '0x20BA842dc15CBcF4e02d8Ce77e07391a949bB967',
-    '0xeD7335f5aD5E60691B0d88A4b8921a65c7e4c3Cb', '0x03C291d446b870e0B8F128681937a9eCEDa97763',
-  ],
-};
-
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const isShort = (label: string) => /^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/.test(label);
 
-/** A person's label and its source: ENS first, then the static demo labels, then the short address. */
-export function labelInfo(a: Address, member?: DirectoryMember | null, d: Directory | null = cachedDirectory()): { label: string; source: 'ens' | 'fallback' | 'address' } {
+/** A person's label and its source: ENS (member name, subname or primary name), else the short address. */
+export function labelInfo(a: Address, member?: DirectoryMember | null, d: Directory | null = cachedDirectory()): { label: string; source: 'ens' | 'address' } {
   const fromMember = member && !isShort(member.label) ? member.label : null;
   const ens = fromMember ?? ensLabelOf(a, d);
   if (ens && !isShort(ens)) return { label: ens, source: 'ens' };
-  const fb = KNOWN_PEOPLE[a.toLowerCase()];
-  if (fb) return { label: fb, source: 'fallback' };
   return { label: shortAddr(a), source: 'address' };
 }
 
@@ -164,15 +147,15 @@ export async function companyRegistry(account: Address): Promise<{ registry: Add
   return null;
 }
 
-/** Everyone who acts for a company: its admin signers plus the known demo people, with roles and status. */
+/** Everyone who acts for a company: its admin signers plus its ENS members, with roles and status. */
 export async function loadPeople(account: Address): Promise<Person[]> {
   const admins = await adminSigners(account).catch(() => [] as Address[]);
   const dir = await refreshDirectory().catch(() => null);
   const company = dir?.companies.find((c) => c.account?.toLowerCase() === account.toLowerCase());
   const members = (company && dir?.members[company.label]) || [];
   const memberOf = (a: Address) => members.find((m) => m.address.toLowerCase() === a.toLowerCase()) ?? null;
-  // ENS members are the source of truth; the demo list only fills in when ENS lists nobody for this company.
-  const candidates = members.length ? members.map((m) => m.address) : DEMO_PEOPLE[account.toLowerCase()] ?? [];
+  // ENS members are the only source of people (plus the account's own admin signers)
+  const candidates = members.map((m) => m.address);
   const all = uniqueAddresses([...admins, ...candidates]);
   const [reg, l1Now] = await Promise.all([companyRegistry(account), l1BlockNumber()]);
   const views: ApproverView[] = reg

@@ -89,41 +89,50 @@ export async function fetchLogs(address: Address, f: typeof fetch = globalThis.f
   return out;
 }
 
-export type CompanyRecords = { name?: string; description?: string; url?: string; avatar?: string; role?: string; account?: Address };
+export type CompanyRecords = {
+  name?: string; description?: string; url?: string; avatar?: string; role?: string; account?: Address;
+  /** `tazor.aliases`: earlier Whitechain accounts of the same company (comma-separated). */
+  aliases?: Address[];
+  /** `tazor.roles`: the role bit positions this company's registry uses, e.g. {"APPROVER":64,"TAZOR_ADMIN":68,"AGENT":72}. */
+  roleBits?: Record<string, number>;
+};
 export type DirectoryCompany = {
   label: string; ens: string; registry: Address | null; owner: Address; expiry: number;
   name: string; description?: string; url?: string; avatar?: string; role: string | null; account: Address | null;
-  /** Fields that came from the static fallback because ENS had no record. */
+  aliases: Address[];
+  roleBits: Record<string, number> | null;
+  /** Kept for older callers: always empty (no field comes from anywhere but ENS). */
   fallback: string[];
 };
 export type DirectoryMember = { address: Address; label: string; ens?: string; expiry?: number; source: 'ens-text' | 'ens-subname' | 'ens-owner' | 'primary-name' | 'role'; roles?: bigint };
 export type Directory = { companies: DirectoryCompany[]; members: Record<string, DirectoryMember[]>; fetchedAt: number; source: 'ens' | 'fallback' };
 
-/** The demo values, used only for fields ENS has no record for. */
-export const FALLBACK_COMPANIES: Record<string, { name: string; role: string; account: Address }> = {
-  acme: { name: 'Acme Industries', role: 'Buyer', account: '0xb99A12652BEe98429ae31EA0529A0b63f1073721' },
-  bluejay: { name: 'Bluejay Logistics', role: 'Supplier', account: '0xc1dce946D192e344251972470237F1471C93876c' },
-};
-
-/** Applies ENS records over the fallback; records which fields still come from the fallback. */
+/** A company exactly as ENS describes it; a missing record stays missing (name falls back to the ENS label). */
 export function mergeCompany(s: Subname, registry: Address | null, r: CompanyRecords): DirectoryCompany {
-  const fb = FALLBACK_COMPANIES[s.label];
-  const fallback: string[] = [];
   const role = r.role ? (r.role.toLowerCase() === 'buyer' ? 'Buyer' : r.role.toLowerCase() === 'supplier' ? 'Supplier' : r.role) : null;
-  const pick = <T,>(key: string, ens: T | undefined, fbv: T | undefined): T | undefined => {
-    if (ens !== undefined && ens !== '' && ens !== null) return ens;
-    if (fbv !== undefined) fallback.push(key);
-    return fbv;
-  };
   return {
     label: s.label, ens: `${s.label}.${TAZ0R_NAME}`, registry, owner: s.owner, expiry: s.expiry,
-    name: pick('name', r.name, fb?.name) ?? s.label,
+    name: r.name || s.label,
     description: r.description || undefined, url: r.url || undefined, avatar: r.avatar || undefined,
-    role: pick('role', role ?? undefined, fb?.role) ?? null,
-    account: pick('account', r.account, fb?.account) ?? null,
-    fallback,
+    role, account: r.account ?? null, aliases: r.aliases ?? [], roleBits: r.roleBits ?? null,
+    fallback: [],
   };
 }
+
+/** Parses `tazor.roles` ({"APPROVER":64,...}); null if absent or malformed. */
+export function parseRoleBits(text: string | null | undefined): Record<string, number> | null {
+  if (!text) return null;
+  try {
+    const o = JSON.parse(text) as unknown;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(o)) if (/^[A-Z_]{1,32}$/.test(k) && Number.isInteger(v) && (v as number) >= 0 && (v as number) < 256) out[k] = v as number;
+    return Object.keys(out).length ? out : null;
+  } catch { return null; }
+}
+
+export const parseAliases = (text: string | null | undefined): Address[] =>
+  (text ?? '').split(/[\s,]+/).filter((a) => isAddress(a, { strict: false })).map((a) => getAddress(a));
 
 type Ens = {
   text: (name: string, key: string) => Promise<string | null>;
@@ -144,11 +153,14 @@ export function ensClient(rpcUrl = config.sepolia.rpcUrl): Ens {
 }
 
 export async function companyRecords(ens: Ens, name: string): Promise<CompanyRecords> {
-  const [n, description, url, avatar, role, account] = await Promise.all([
+  const [n, description, url, avatar, role, account, aliases, roles] = await Promise.all([
     ens.text(name, 'name'), ens.text(name, 'description'), ens.text(name, 'url'), ens.text(name, 'avatar'), ens.text(name, 'tazor.role'),
-    ens.addr(name, WHITECHAIN_SEPOLIA_COIN_TYPE),
+    ens.addr(name, WHITECHAIN_SEPOLIA_COIN_TYPE), ens.text(name, 'tazor.aliases'), ens.text(name, 'tazor.roles'),
   ]);
-  return { name: n ?? undefined, description: description ?? undefined, url: url ?? undefined, avatar: avatar ?? undefined, role: role ?? undefined, account: account ?? undefined };
+  return {
+    name: n ?? undefined, description: description ?? undefined, url: url ?? undefined, avatar: avatar ?? undefined, role: role ?? undefined, account: account ?? undefined,
+    aliases: parseAliases(aliases), roleBits: parseRoleBits(roles) ?? undefined,
+  };
 }
 
 /**
@@ -199,7 +211,7 @@ export async function loadDirectory(opts: { ens?: Ens; f?: typeof fetch } = {}):
   return { companies, members, fetchedAt: Date.now(), source: 'ens' };
 }
 
-const KEY = 'tazor.ens-directory.v1';
+const KEY = 'tazor.ens-directory.v2'; // v2: no static fallback values
 export const DIRECTORY_EVENT = 'tazor:ens-directory';
 export const DIRECTORY_TTL_MS = 5 * 60_000;
 
@@ -221,14 +233,29 @@ function storeDirectory(d: Directory) {
 }
 
 let inflight: Promise<Directory | null> | null = null;
+let lastFailed = false;
 
 /** Refreshes the cached directory from ENS at most every DIRECTORY_TTL_MS; never throws. */
 export function refreshDirectory(force = false): Promise<Directory | null> {
   const cached = cachedDirectory();
   if (!force && cached && Date.now() - cached.fetchedAt < DIRECTORY_TTL_MS) return Promise.resolve(cached);
-  inflight ??= loadDirectory().then((d) => { storeDirectory(d); return d; }, () => cached).finally(() => { inflight = null; });
+  if (!inflight) globalThis.dispatchEvent?.(new Event(DIRECTORY_EVENT)); // "loading" for listeners
+  inflight ??= loadDirectory()
+    .then((d) => { lastFailed = false; storeDirectory(d); return d; }, () => { lastFailed = true; globalThis.dispatchEvent?.(new Event(DIRECTORY_EVENT)); return cached; })
+    .finally(() => { inflight = null; });
   return inflight;
 }
+
+export type DirectoryStatus = 'loading' | 'ready' | 'error';
+
+/** ready: a directory from ENS is cached; loading: the first read is in flight; error: ENS couldn't be read and nothing is cached. */
+export function directoryStatus(): DirectoryStatus {
+  if (cachedDirectory()) return 'ready';
+  return lastFailed && !inflight ? 'error' : 'loading';
+}
+
+/** Retry after "Couldn't read ENS". */
+export const retryDirectory = () => refreshDirectory(true);
 
 /** ENS name or member label for an address, from the cached directory (companies first, then members). */
 export function ensLabelOf(a: string, d: Directory | null = cachedDirectory()): string | null {
@@ -236,6 +263,8 @@ export function ensLabelOf(a: string, d: Directory | null = cachedDirectory()): 
   const l = a.toLowerCase();
   const c = d.companies.find((x) => x.account?.toLowerCase() === l);
   if (c) return c.ens;
+  const earlier = d.companies.find((x) => (x.aliases ?? []).some((a) => a.toLowerCase() === l));
+  if (earlier) return `${earlier.ens} (earlier account)`;
   for (const list of Object.values(d.members)) {
     const m = list.find((x) => x.address.toLowerCase() === l && x.source !== 'role');
     if (m) return m.source === 'ens-owner' ? m.ens ?? m.label : m.label;

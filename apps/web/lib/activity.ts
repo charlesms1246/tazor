@@ -36,13 +36,5 @@ export async function fetchTransfers(explorer: string, account: Address, token: 
   return parseTransfers(await res.json(), account, token);
 }
 
-/** Names for the demo's known accounts on Whitechain Sepolia, matched on the full address only. */
-export const KNOWN: Record<string, string> = {
-  '0xc1dce946d192e344251972470237f1471c93876c': 'bluejay.taz0r.eth',
-  '0xea5a4be313e05eb254900b6adbb7d655c55242f6': 'acme.taz0r.eth (v1)',
-  '0x18d15b034c645dbbfcb9c68238a14d059f632513': 'acme-v2.taz0r.eth',
-  '0xb99a12652bee98429ae31ea0529a0b63f1073721': 'acme.taz0r.eth',
-  '0xce4389acb79463062c362facb8cb04513fa3d8d8': 'Tazor test treasury',
-};
-/** ENS name from the cached directory (company names and member labels), then the static demo names. */
-export const nameOf = (a: string): string | null => ensLabelOf(a) ?? KNOWN[a.toLowerCase()] ?? null;
+/** A name for an address, from ENS only (company names, earlier company accounts, member labels). */
+export const nameOf = (a: string): string | null => ensLabelOf(a);

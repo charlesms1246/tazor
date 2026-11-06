@@ -1,43 +1,36 @@
 import { useEffect, useState } from 'react';
-import type { Address } from 'viem';
-import { configV2 } from './config-v2.ts';
-import { DIRECTORY_EVENT, cachedDirectory, refreshDirectory, type Directory } from './ens-directory.ts';
+import { zeroAddress, type Address } from 'viem';
+import {
+  DIRECTORY_EVENT, cachedDirectory, directoryStatus, refreshDirectory, retryDirectory, type Directory, type DirectoryStatus,
+} from './ens-directory.ts';
 
 export type Company = {
-  /** ENS label under taz0r.eth. Typed as the demo labels until every caller accepts any label; ENS may add others. */
-  id: 'acme' | 'bluejay';
+  /** ENS label under taz0r.eth (e.g. 'acme', 'sandbox'). Every company comes from ENS; nothing is hard-coded. */
+  id: string;
   ens: string;
   name: string;
   account: Address;
   role: string;
-  /** Earlier accounts of the same company (the v1 account, the mandate test account). */
+  /** Earlier accounts of the same company, from its `tazor.aliases` text record. */
   aliases: Address[];
+  /** 'ready' for a company read from ENS; a blank placeholder is 'loading' or 'error' (ENS unreachable). */
+  status?: DirectoryStatus;
 };
 
-/** Static demo companies: the first render and the fallback when ENS has no data. Replaced in place from ENS. */
-const STATIC_COMPANIES: Company[] = [
-  { id: 'acme', ens: 'acme.taz0r.eth', name: 'Acme Industries', account: configV2.demoAccount, role: 'Buyer', aliases: ['0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6', '0x18d15B034C645dbbFCb9c68238A14D059f632513'] },
-  { id: 'bluejay', ens: 'bluejay.taz0r.eth', name: 'Bluejay Logistics', account: '0xc1dce946D192e344251972470237F1471C93876c', role: 'Supplier', aliases: [] },
-];
+/** What pages get before ENS answers (or when it can't be read): blank, never a made-up company. */
+export const PLACEHOLDER = (status: DirectoryStatus): Company =>
+  ({ id: '', ens: '', name: '', account: zeroAddress, role: '', aliases: [], status });
 
-/**
- * Companies registered under taz0r.eth that have a Whitechain account (ENSIP-11 address, or the labelled fallback).
- * Starts as the static list so static HTML matches, then is updated in place from the ENS directory.
- */
-export const COMPANIES: Company[] = [...STATIC_COMPANIES];
+/** Companies registered under taz0r.eth that have a Whitechain account (ENSIP-11). Empty until ENS answers; updated in place. */
+export const COMPANIES: Company[] = [];
 
-/** Companies from an ENS directory; known demo companies first (keeping their earlier accounts), then any others. */
+/** Companies from an ENS directory: those with a Whitechain account, sorted by label. */
 export function companiesFromDirectory(d: Directory | null): Company[] {
-  if (!d) return [...STATIC_COMPANIES];
-  const list = d.companies
+  if (!d) return [];
+  return d.companies
     .filter((c) => c.account)
-    .map((c): Company => ({
-      id: c.label as Company['id'], ens: c.ens, name: c.name, account: c.account!, role: c.role ?? 'Company',
-      aliases: STATIC_COMPANIES.find((x) => x.id === c.label)?.aliases ?? [],
-    }));
-  if (list.length === 0) return [...STATIC_COMPANIES];
-  const rank = (id: string) => { const i = STATIC_COMPANIES.findIndex((c) => c.id === id); return i < 0 ? STATIC_COMPANIES.length : i; };
-  return list.sort((a, b) => rank(a.id) - rank(b.id) || a.id.localeCompare(b.id));
+    .map((c): Company => ({ id: c.label, ens: c.ens, name: c.name, account: c.account!, role: c.role ?? 'Company', aliases: c.aliases ?? [], status: 'ready' }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function applyDirectory(d: Directory | null): void {
@@ -46,9 +39,22 @@ function applyDirectory(d: Directory | null): void {
   if (!same) COMPANIES.splice(0, COMPANIES.length, ...next);
 }
 
-/** All companies, ENS-backed after mount (static on first render). */
+/** ENS directory state for skeletons and the "Couldn't read ENS" notice; `retry` forces a fresh read. */
+export function useDirectoryStatus(): { status: DirectoryStatus; retry: () => void } {
+  const [status, setStatus] = useState<DirectoryStatus>('loading');
+  useEffect(() => {
+    const sync = () => setStatus(directoryStatus());
+    sync();
+    void refreshDirectory().then(sync);
+    globalThis.addEventListener(DIRECTORY_EVENT, sync);
+    return () => globalThis.removeEventListener(DIRECTORY_EVENT, sync);
+  }, []);
+  return { status, retry: () => { void retryDirectory(); } };
+}
+
+/** All companies from ENS (empty while loading or if ENS is unreachable). */
 export function useCompanies(): Company[] {
-  const [list, setList] = useState<Company[]>(STATIC_COMPANIES);
+  const [list, setList] = useState<Company[]>([]);
   useEffect(() => {
     const sync = () => { applyDirectory(cachedDirectory()); setList([...COMPANIES]); };
     sync();
@@ -62,29 +68,37 @@ export function useCompanies(): Company[] {
 const KEY = 'tazor.company.v1';
 const EVENT = 'tazor:company';
 
+/** The selected company (stored label), else the first from ENS, else a blank placeholder with the directory status. */
 export function currentCompany(): Company {
   try {
     const id = globalThis.localStorage?.getItem(KEY);
     applyDirectory(cachedDirectory());
-    return COMPANIES.find((c) => c.id === id) ?? COMPANIES[0];
+    return COMPANIES.find((c) => c.id === id) ?? COMPANIES[0] ?? PLACEHOLDER(directoryStatus());
   } catch {
-    return COMPANIES[0];
+    return COMPANIES[0] ?? PLACEHOLDER('loading');
   }
 }
 
-export function setCompany(id: Company['id']): void {
+export function setCompany(id: string): void {
   try { globalThis.localStorage?.setItem(KEY, id); } catch { /* storage unavailable */ }
   globalThis.dispatchEvent?.(new Event(EVENT));
 }
 
 export const isCompanyAccount = (c: Company, a: string): boolean =>
-  [c.account, ...c.aliases].some((x) => x.toLowerCase() === a.toLowerCase());
+  c.status !== 'loading' && c.status !== 'error' && [c.account, ...c.aliases].some((x) => x.toLowerCase() === a.toLowerCase());
 
-export const companyByAccount = (a: string): Company | null => COMPANIES.find((c) => isCompanyAccount(c, a)) ?? null;
+let appliedAt = 0;
+/** COMPANIES, refreshed from the cached ENS directory at most once a second (for code outside React hooks). */
+export function companies(): Company[] {
+  if (Date.now() - appliedAt > 1000) { appliedAt = Date.now(); applyDirectory(cachedDirectory()); }
+  return COMPANIES;
+}
 
-/** The selected company; Acme on first render so static HTML matches, then the stored choice. */
+export const companyByAccount = (a: string): Company | null => companies().find((c) => isCompanyAccount(c, a)) ?? null;
+
+/** The selected company; a blank 'loading' placeholder on first render (static HTML names no company), then ENS. */
 export function useCompany(): Company {
-  const [c, setC] = useState<Company>(COMPANIES[0]);
+  const [c, setC] = useState<Company>(PLACEHOLDER('loading'));
   useEffect(() => {
     const sync = () => setC(currentCompany());
     sync();

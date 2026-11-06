@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { DIRECTORY_EVENT, cachedDirectory } from '@/lib/ens-directory.ts';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { DIRECTORY_EVENT, cachedDirectory, type DirectoryCompany } from '@/lib/ens-directory.ts';
+import { compareRoleBits, roleBitsText } from '@/lib/role-bits.ts';
 import type { Address } from 'viem';
 import './company.css';
 import { config } from '@/lib/config.ts';
-import { useCompany } from '@/lib/company.ts';
+import { useCompany, useDirectoryStatus } from '@/lib/company.ts';
 import { agoText, companyRegistry, loadPeople, type Person } from '@/lib/people.ts';
 import { PersonDrawer } from './drawer.tsx';
 import { SubnamesCard } from './subnames.tsx';
@@ -36,13 +37,11 @@ export default function CompanyPage() {
   const [registry, setRegistry] = useState<Address | null>(null);
   const [selected, setSelected] = useState<Person | null>(null);
   const close = useCallback(() => setSelected(null), []);
-  const [fallbackFields, setFallbackFields] = useState<string[]>([]);
+  const dir = useDirectoryStatus();
+  const ready = company.status === 'ready';
+  const [entry, setEntry] = useState<DirectoryCompany | null>(null);
   useEffect(() => {
-    const sync = () => {
-      const d = cachedDirectory();
-      const c = d?.companies.find((x) => x.label === company.id);
-      setFallbackFields(c ? c.fallback : ['name', 'role', 'account']);
-    };
+    const sync = () => setEntry(cachedDirectory()?.companies.find((x) => x.label === company.id) ?? null);
     sync();
     globalThis.addEventListener(DIRECTORY_EVENT, sync);
     return () => globalThis.removeEventListener(DIRECTORY_EVENT, sync);
@@ -51,12 +50,14 @@ export default function CompanyPage() {
   useEffect(() => {
     setRegistry(null);
     setSelected(null);
+    if (!ready) return;
     companyRegistry(company.account).then((r) => setRegistry(r?.registry ?? null), () => setRegistry(null));
   }, [company.account]);
 
   const load = () => {
     setPeople(null);
     setError('');
+    if (!ready) return;
     loadPeople(company.account).then(setPeople, (e) => setError(e instanceof Error ? e.message : String(e)));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,6 +125,20 @@ export default function CompanyPage() {
     );
   };
 
+  if (!ready) {
+    return (
+      <div className="page">
+        <PageHeader title="Company" subtitle="Your company, the people who can approve for it, and how to add or remove them." />
+        {company.status === 'error' || dir.status === 'error'
+          ? <Notice tone="negative"><span data-testid="ens-error">Couldn&apos;t read ENS, so the company can&apos;t be shown. Nothing here is hard-coded; it all comes from ENS.</span>{' '}
+            <button className="btn btn-sm" data-testid="ens-retry" onClick={dir.retry}>Retry</button></Notice>
+          : <Card title={<span className="skeleton" style={{ minWidth: 180 }} />} subtitle="Reading the company from ENS…" testId="company-loading">
+            <dl className="kv">{['ENS name', 'Name', 'Role', 'Account on Whitechain'].map((k) => <Fragment key={k}><dt>{k}</dt><dd><span className="skeleton" /></dd></Fragment>)}</dl>
+          </Card>}
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <PageHeader title="Company" subtitle="Your company, the people who can approve for it, and how to add or remove them." />
@@ -137,9 +152,15 @@ export default function CompanyPage() {
           <dt>ENS name</dt><dd className="mono" data-testid="company-ens">{company.ens}</dd>
           <dt>Name</dt><dd>{company.name}</dd>
           <dt>Source</dt>
-          <dd data-testid="company-source">{fallbackFields.length
-            ? <span className="small muted">From ENS, with demo fallback for {fallbackFields.join(', ')} (no ENS record yet)</span>
-            : <Pill tone="positive">ENS records</Pill>}</dd>
+          <dd data-testid="company-source"><Pill tone="positive">ENS records</Pill>{entry && entry.name === entry.label && <span className="small muted"> (no `name` record: showing the ENS label)</span>}</dd>
+          <dt>Role bits</dt>
+          <dd data-testid="company-role-bits">{(() => {
+            const cmp = compareRoleBits(entry?.roleBits ?? null);
+            if (cmp.status === 'missing') return <span className="small muted">Not published yet (text record <code>tazor.roles</code>)</span>;
+            return <>{roleBitsText(entry!.roleBits!)} {cmp.status === 'match'
+              ? <Pill tone="positive">matches the contracts</Pill>
+              : <Pill tone="negative">{cmp.diffs.join('; ')}</Pill>} <span className="small muted">from <code>tazor.roles</code></span></>;
+          })()}</dd>
           <dt>Role in the demo</dt><dd><Pill tone="info">{company.role}</Pill></dd>
           <dt>Account on Whitechain</dt><dd><Addr value={company.account} href={`${config.explorer}/address/${company.account}`} /></dd>
           <dt>ENS registry</dt>
@@ -180,7 +201,7 @@ export default function CompanyPage() {
                           <span>
                             <span style={{ fontWeight: 500 }}>{p.label}</span>
                             <span className="cell-sub mono">{p.ensName ?? `${p.address.slice(0, 6)}…${p.address.slice(-4)}`}</span>
-                            {p.labelSource === 'fallback' && <span className="cell-sub" data-testid="person-label-fallback">demo label · no ENS name record yet</span>}
+                            {p.labelSource === 'address' && <span className="cell-sub" data-testid="person-label-missing">no ENS name yet</span>}
                           </span>
                         </span>
                       </td>
