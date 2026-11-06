@@ -21,10 +21,13 @@ contract DeployEnsGateV2 is TazorDeployLibV2 {
         a = predictV2(p);
         bytes memory initCode = _ensGateInit(a.paymentModuleV2, p.l2GasLimit);
         console2.log("CREATEX", address(CREATEX));
-        console2.log("CREATEX_CALLDATA");
-        console2.logBytes(abi.encodeCall(CREATEX.deployCreate3, (_ensGateSaltV2(p.deployer), initCode)));
+        console2.log("CREATEX_CALLDATA", vm.toString(abi.encodeCall(CREATEX.deployCreate3, (_ensGateSaltV2(p.deployer), initCode))));
 
-        if (a.ensGateV2.code.length == 0) {
+        // Recording needs the gate to exist on chain already (live, it is deployed with cast send, see above);
+        // otherwise a simulation would record an address that has no code.
+        bool existed = a.ensGateV2.code.length != 0;
+        require(existed || !_recordingEnabled(), "deploy first via CreateX");
+        if (!existed) {
             vm.startBroadcast(pk);
             address deployed = CREATEX.deployCreate3(_ensGateSaltV2(p.deployer), initCode);
             vm.stopBroadcast();

@@ -21,6 +21,16 @@ import {ApproverAccountFactory} from "../src/account/ApproverAccountFactory.sol"
 import {MockExecutor} from "./mocks/Mocks.sol";
 import {ForkBlocks} from "./ForkBlocks.sol";
 
+contract RecordingDeployEnsGateV2 is DeployEnsGateV2 {
+    function _recordingEnabled() internal pure override returns (bool) {
+        return true;
+    }
+
+    function _deploymentsFile() internal pure override returns (string memory) {
+        return "/nonexistent";
+    }
+}
+
 contract DeployV2Test is Test {
     uint256 pk = uint256(keccak256("tazor deploy test key"));
     uint256 whitechain;
@@ -116,5 +126,14 @@ contract DeployV2Test is Test {
         assertEq(stored.monthlyLimit, 20e6);
         assertEq(stored.exitAccounts[0], exits[0]);
         assertEq(stored.maxCacheAge, 300);
+    }
+
+    /// With WRITE_DEPLOYMENTS, the EnsGate v2 script must not record a gate it only simulated.
+    function test_ensGateV2RecordingRequiresExistingCode() public {
+        vm.selectFork(sepolia);
+        RecordingDeployEnsGateV2 de = new RecordingDeployEnsGateV2();
+        assertEq(de.predictV2(_params()).ensGateV2.code.length, 0);
+        vm.expectRevert(bytes("deploy first via CreateX"));
+        de.deploy(pk, _params());
     }
 }
