@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatUnits, isAddressEqual, type Address, type Hex } from 'viem';
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
@@ -12,10 +12,14 @@ import type { Invoice } from '@/lib/invoice.ts';
 import { isV2Account } from '@/lib/pay-v2.ts';
 import { defaultAuthParams, mergeApprovals, parseApprovals, serializeApproval, type Approval } from '@/lib/payment.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
-import { ethCall } from '@/lib/rpc.ts';
+import { ethCall, getReceipt } from '@/lib/rpc.ts';
+import { recordEvent, type EventKind } from '@/lib/events.ts';
+import { upsertInbox } from '@/lib/inbox.ts';
+import { RUN_STEPS, pendingSteps, shortAddr, subjectOf, useEvents } from '@/lib/story.ts';
 import { decodeRunDigest, encodePayRun, encodeRunDigestCall, payRunRelayerBody, runDigest } from '@/lib/runs.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -33,6 +37,37 @@ export default function RunsPage() {
   const [busy, setBusy] = useState(false);
   const [tx, setTx] = useState<Hex | null>(null);
   const [calldata, setCalldata] = useState('');
+  const events = useEvents(run?.digest.toLowerCase());
+
+  /** Records the same step on the run and on each of its invoices, each title naming its own object. */
+  const story = (r: Run, kind: EventKind, what: string, extra: { actor?: string; tx?: string; detail?: string } = {}) => {
+    const at = Date.now();
+    const runName = `Payment run (${r.invoices.length} invoices)`;
+    const chain = extra.tx ? 'whitechain' as const : undefined;
+    recordEvent({ subject: r.digest.toLowerCase(), kind, at, title: `${runName} ${what}`, chain, ...extra });
+    for (const inv of r.invoices) recordEvent({ subject: subjectOf(inv), kind, at, title: `${inv.id} ${what} in a payment run`, chain, ...extra });
+  };
+
+  useEffect(() => {
+    if (!run || !tx) return;
+    const started = Date.now();
+    const t = setInterval(async () => {
+      try {
+        const r = await getReceipt(tx);
+        if (!r) return;
+        clearInterval(t);
+        if (r.status === '0x1') {
+          const secs = ((Date.now() - started) / 1000).toFixed(1);
+          story(run, 'paid', `paid in ${secs} s`, { tx, detail: `settled in ${secs} s` });
+          upsertInbox({ id: run.digest, status: 'paid' });
+        } else {
+          story(run, 'failed', 'reverted', { tx, detail: 'transaction reverted' });
+        }
+      } catch { /* keep polling */ }
+    }, 1000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, tx]);
 
   const approvals = (() => {
     try { return mergeApprovals(mine ? [mine] : [], pasted.trim() ? parseApprovals(pasted) : []); } catch { return null; }
@@ -71,6 +106,12 @@ export default function RunsPage() {
     const onchain = decodeRunDigest(await ethCall(module, encodeRunDigestCall(auths)));
     if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: on-chain run digest ${onchain} does not match the invoices shown (${local}).`);
     setRun({ account, module, v2, invoices, auths, digest: local });
+    upsertInbox({
+      id: local, kind: 'run', title: `Payment run · ${invoices.length} invoices`, href: '/runs/', account,
+      counterparty: [...new Set(invoices.map((x) => x.supplierName))].join(', '),
+      amount: auths.reduce((s, a) => s + a.amount, 0n).toString(),
+      dueDate: Math.min(...invoices.map((x) => x.dueDate)),
+    });
   });
 
   const onApprove = run$(async () => {
@@ -78,6 +119,9 @@ export default function RunsPage() {
     const key = loadPasskey();
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
     setMine({ approver: key.approverAccount, signature: await counterfactualApproval(key, await signDigestWithPasskey(key.credentialId, run.digest, key)) });
+    const who = shortAddr(key.approverAccount);
+    story(run, 'approved', `approved by ${who}`, { actor: who, detail: 'one passkey signature for the whole run' });
+    upsertInbox({ id: run.digest, status: 'approved', approvals: 1 + (pasted.trim() ? (() => { try { return parseApprovals(pasted).length; } catch { return 0; } })() : 0) });
   });
 
   const onPay = run$(async () => {
@@ -91,6 +135,7 @@ export default function RunsPage() {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `relayer returned ${res.status}`);
     setTx(body.txHash);
+    story(run, 'submitted', 'submitted via the relayer', { tx: body.txHash });
   });
 
   const onCopy = run$(async () => {
@@ -170,6 +215,12 @@ export default function RunsPage() {
             </div>
           </Card>
         </div>
+      )}
+
+      {run && (
+        <Card title="Activity" subtitle="Recorded on the run and on each of its invoices.">
+          <Timeline subject={run.digest.toLowerCase()} pending={pendingSteps(events, RUN_STEPS)} testId="run-timeline" />
+        </Card>
       )}
     </div>
   );
