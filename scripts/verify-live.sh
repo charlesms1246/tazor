@@ -2,8 +2,9 @@
 # Read-only check of every live Tazor claim. Needs: cast (Foundry), jq, curl, bc.
 # Env: WC_RPC (Whitechain Sepolia), SEPOLIA_RPC (archive-capable Ethereum Sepolia).
 # Exits non-zero if any check fails. Sends no transactions.
-# Section 7 checks the v2 demo transactions recorded by scripts/demo-v2.sh in scripts/demo-v2/last-run.json
-# (override with DEMO_RUN_JSON); it is skipped with a note if that file does not exist.
+# Sections 7 and 8 check the transactions recorded by scripts/demo-v2.sh (scripts/demo-v2/last-run.json, override
+# DEMO_RUN_JSON) and scripts/demo-extras.sh (scripts/demo-extras/last-run.json, override DEMO_EXTRAS_JSON);
+# each is skipped with a note if its file does not exist.
 set -u
 setopt pipefail
 
@@ -318,6 +319,16 @@ if [[ -f $DEMO_RUN_JSON ]]; then
   verify_demo_run $DEMO_RUN_JSON
 else
   print -r -- "      SKIP: $DEMO_RUN_JSON not found (written by scripts/demo-v2.sh)"
+fi
+
+# ---------------------------------------------------------------------------
+section "8. extras demo transactions (scripts/demo-extras/last-run.json)"
+# Written by scripts/demo-extras.sh: relayer payment runs, sponsored userOp, ERC-6492 deploy + pay.
+DEMO_EXTRAS_JSON=${DEMO_EXTRAS_JSON:-$ROOT/scripts/demo-extras/last-run.json}
+if [[ -f $DEMO_EXTRAS_JSON ]]; then
+  verify_demo_run $DEMO_EXTRAS_JSON
+else
+  print -r -- "      SKIP: $DEMO_EXTRAS_JSON not found (written by scripts/demo-extras.sh)"
 fi
 
 print
