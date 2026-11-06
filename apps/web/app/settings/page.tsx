@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { getRelayerUrl, hasRelayerOverride, normalizeRelayerUrl, setRelayerUrl } from '@/lib/relayer-url.ts';
+import { FreezeDevice } from './freeze.tsx';
 
 type Health = { relayer: string | null; paymentModule: string | null } | { error: string };
 
@@ -73,6 +74,7 @@ export default function SettingsPage() {
       {health && ('error' in health
         ? <p data-testid="relayer-health" style={{ color: 'crimson' }}>Relayer check failed: {health.error}</p>
         : <p data-testid="relayer-health">Relayer OK: sender {health.relayer ?? 'none'}, PaymentModule {health.paymentModule ?? 'none'}</p>)}
+      <FreezeDevice />
       <h2>Contracts</h2>
       <table data-testid="addresses">
         <tbody>{rows.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v ?? 'not configured'}</td></tr>)}</tbody>
