@@ -48,3 +48,24 @@ export function appendPayment(p: PaymentRecord): boolean {
     return false;
   }
 }
+
+const MANDATES = 'tazor.mandates.v1';
+export type StoredMandate = { id: Hex; label: string };
+
+export function loadMandates(): StoredMandate[] {
+  try {
+    return JSON.parse(localStorage.getItem(MANDATES) ?? '[]') as StoredMandate[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveMandate(m: StoredMandate): boolean {
+  try {
+    const list = loadMandates().filter((x) => x.id.toLowerCase() !== m.id.toLowerCase());
+    localStorage.setItem(MANDATES, JSON.stringify([...list, m]));
+    return true;
+  } catch {
+    return false;
+  }
+}

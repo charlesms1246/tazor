@@ -3,6 +3,7 @@ import { BadRequest, encodePayOne, parsePayRequest } from './payment.ts';
 import { SimulationFailed, type Sender } from './sender.ts';
 import { parseSigner, type ApproverDeployer } from './approver.ts';
 import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
+import { encodeCreateMandate, encodePull, parseMandateRequest, parsePullRequest } from './mandate.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -24,6 +25,7 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 export function createHandler(deps: {
   sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer; revocationList?: `0x${string}`;
+  mandateModule?: `0x${string}`;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -36,7 +38,14 @@ export function createHandler(deps: {
         return reply(200, {
           ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null,
           approverAccountFactory: deps.approvers?.factory ?? null, revocationList: deps.revocationList ?? null,
+          mandateModule: deps.mandateModule ?? null,
         });
+      }
+      if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
+        const json = await readJson(req);
+        const data = req.url === '/mandate' ? encodeCreateMandate(parseMandateRequest(json)) : encodePull(parsePullRequest(json));
+        if (!deps.sender || !deps.mandateModule) return reply(503, { error: 'relayer not configured', to: deps.mandateModule ?? null, data });
+        return reply(200, { txHash: await deps.sender.send(deps.mandateModule, data) });
       }
       if (req.method === 'POST' && req.url === '/revoke') {
         const data = encodeRevoke(parseRevokeRequest(await readJson(req)));

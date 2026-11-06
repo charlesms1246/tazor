@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const OUT = join(import.meta.dirname, '..', '..', '..', 'contracts', 'out');
-const NAMES = ['PaymentModule', 'ApproverAccountFactory', 'TazorAccountFactory', 'RevocationList'];
+const NAMES = ['PaymentModule', 'ApproverAccountFactory', 'TazorAccountFactory', 'RevocationList', 'MandateModule', 'EnsGate'];
 const camel = (n) => n[0].toLowerCase() + n.slice(1);
 
 for (const name of NAMES) {

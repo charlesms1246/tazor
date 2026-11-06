@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { TIMINGS } from '@/lib/timings.ts';
 import {
   createPasskey, signChallenge, verifyOnChain, isValidResult, type PasskeyPublicKey, type PasskeySignature, type Hex,
 } from '@/lib/webauthn';
@@ -36,7 +37,25 @@ export default function Page() {
 
   return (
     <main>
-      <nav><a href="/onboard/">Onboard</a> · <a href="/team/">Team</a> · <a href="/export/">Export</a></nav>
+      <nav><a href="/onboard/">Onboard</a> · <a href="/team/">Team</a> · <a href="/export/">Export</a> · <a href="/mandates/">Mandates</a></nav>
+      <section data-testid="timings">
+        <h2>Typical bank vs Tazor</h2>
+        <table>
+          <thead><tr><th>Action</th><th>Typical bank</th><th>Tazor</th></tr></thead>
+          <tbody>
+            {TIMINGS.map((t) => (
+              <tr key={t.action}>
+                <td>{t.action}</td>
+                <td>{t.bank}</td>
+                <td>
+                  {t.tazor}{t.status === 'pending' ? '' : ` (${t.status})`}
+                  {t.proof?.map((p) => <span key={p.url}> · <a href={p.url} target="_blank" rel="noreferrer">{p.label}</a></span>)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
       <h1>Tazor passkey check</h1>
       <p>Signs with a passkey and verifies on Whitechain Sepolia (P-256 precompile 0x…0100).</p>
       <button data-testid="create" onClick={onCreate} disabled={busy}>Create passkey</button>{' '}
