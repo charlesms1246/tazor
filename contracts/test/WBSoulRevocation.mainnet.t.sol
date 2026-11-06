@@ -11,6 +11,7 @@ import {PaymentModule} from "../src/modules/PaymentModule.sol";
 import {IRoleCache, TazorRoles} from "../src/interfaces/IRoleCache.sol";
 import {IWBSoulRegistry, IWBSoulAttributeRegistry} from "../src/interfaces/IWBSoul.sol";
 import {MockERC20, MockRoleCache} from "./mocks/Mocks.sol";
+import {ForkBlocks} from "./ForkBlocks.sol";
 
 interface ISoulRegistryAdmin {
     function owner() external view returns (address);
@@ -25,7 +26,6 @@ interface ISoulRegistryAdmin {
 /// IsVerified soul, a payment it approves succeeds, then the operator revokes the address and the next
 /// payment it approves reverts. USDT is a mock (no USDT on Whitechain mainnet).
 contract WBSoulRevocationMainnetTest is Test {
-    uint256 constant FORK_BLOCK = 51_920_000;
     address constant SOUL_REGISTRY = 0x0000000000000000000000000000000000002000;
     address constant ATTRIBUTE_REGISTRY = 0x0000000000000000000000000000000000002002;
     address constant IS_VERIFIED = 0xd88fa142B67F561C5f2Cbf803bF5AE906a8f1e41;
@@ -43,7 +43,7 @@ contract WBSoulRevocationMainnetTest is Test {
     address payee = makeAddr("payee");
 
     function setUp() public {
-        vm.createSelectFork("whitechain", FORK_BLOCK);
+        vm.createSelectFork("whitechain", ForkBlocks.WHITECHAIN_MAINNET);
         assertEq(block.chainid, 1875);
         assertEq(souls.owner(), OPERATOR, "real WhiteBIT operator");
         assertEq(souls.soulOf(SOUL1_PRIMARY), SOUL);
@@ -83,7 +83,7 @@ contract WBSoulRevocationMainnetTest is Test {
         usdt.mint(company, 100e6);
     }
 
-    function _pay(uint256 nonce) internal returns (InvoiceAuth memory auth, address[] memory ap, bytes[] memory sg) {
+    function _pay(uint256 nonce) internal view returns (InvoiceAuth memory auth, address[] memory ap, bytes[] memory sg) {
         auth = InvoiceAuth({
             invoiceHash: keccak256(abi.encode("invoice", nonce)),
             account: company,

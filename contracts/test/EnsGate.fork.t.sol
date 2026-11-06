@@ -6,6 +6,7 @@ import {EnsGate} from "../src/l1/EnsGate.sol";
 import {IPaymentModule} from "../src/l1/IPaymentModule.sol";
 import {InvoiceAuth} from "../src/libraries/InvoiceAuth.sol";
 import {AddressAlias} from "../src/libraries/AddressAlias.sol";
+import {ForkBlocks} from "./ForkBlocks.sol";
 
 interface IEacRegistry {
     function grantRootRoles(uint256 roleBitmap, address account) external returns (bool);
@@ -15,7 +16,6 @@ interface IEacRegistry {
 
 /// Forwards through the real taz0r.eth sub-registry and the real Whitechain Sepolia portal on a pinned Sepolia fork.
 contract EnsGateForkTest is Test {
-    uint256 constant FORK_BLOCK = 12_074_220;
     address constant PORTAL = 0xFF9b597b0781457ae6aa7256Ca5ed5839bF7D0C3;
     address constant TAZ0R_REGISTRY = 0x44007108C0Cca53498F19F259E73E70C2ebE900a;
     address constant ACME = 0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1;
@@ -30,7 +30,7 @@ contract EnsGateForkTest is Test {
     EnsGate gate;
 
     function setUp() public {
-        vm.createSelectFork("sepolia", FORK_BLOCK);
+        vm.createSelectFork(ForkBlocks.sepoliaRpc(), ForkBlocks.ETH_SEPOLIA);
         assertEq(IEacRegistry(TAZ0R_REGISTRY).getSubregistry("acme"), ACME);
         vm.startPrank(ACME_ADMIN);
         if (IEacRegistry(ACME).roles(0, APPROVER1) & ROLE_APPROVER == 0) {

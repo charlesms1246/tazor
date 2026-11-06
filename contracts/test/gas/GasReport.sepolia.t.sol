@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {EnsGate} from "../../src/l1/EnsGate.sol";
 import {InvoiceAuth} from "../../src/libraries/InvoiceAuth.sol";
 import {GasMeter} from "./GasMeter.sol";
+import {ForkBlocks} from "../ForkBlocks.sol";
 
 interface IEacRegistry {
     function grantRootRoles(uint256 roleBitmap, address account) external returns (bool);
@@ -13,7 +14,6 @@ interface IEacRegistry {
 /// Ethereum Sepolia fork: EnsGate.forward through the real taz0r.eth registry and the real portal.
 /// forge models prague gas rules; Sepolia runs Glamsterdam, so live costs can differ.
 contract GasReportSepoliaTest is GasMeter {
-    uint256 constant FORK_BLOCK = 12074508;
     address constant PORTAL = 0xFF9b597b0781457ae6aa7256Ca5ed5839bF7D0C3;
     address constant TAZ0R_REGISTRY = 0x44007108C0Cca53498F19F259E73E70C2ebE900a;
     address constant ACME = 0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1;
@@ -25,7 +25,7 @@ contract GasReportSepoliaTest is GasMeter {
     address a2 = makeAddr("approver2");
 
     function setUp() public {
-        vm.createSelectFork("sepolia", FORK_BLOCK);
+        vm.createSelectFork(ForkBlocks.sepoliaRpc(), ForkBlocks.ETH_SEPOLIA);
         vm.startPrank(ACME_ADMIN);
         IEacRegistry(ACME).grantRootRoles(ROLE_APPROVER, a1);
         IEacRegistry(ACME).grantRootRoles(ROLE_APPROVER, a2);

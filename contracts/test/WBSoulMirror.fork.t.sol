@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {WBSoulMirror} from "../src/mocks/WBSoulMirror.sol";
+import {ForkBlocks} from "./ForkBlocks.sol";
 
 /// Compares the mirror with WhiteBIT's live registries on a pinned Whitechain mainnet fork.
 contract WBSoulMirrorForkTest is Test {
-    uint256 constant FORK_BLOCK = 51_915_000;
     address constant SOUL_REGISTRY = 0x0000000000000000000000000000000000002000;
     address constant ATTRIBUTE_REGISTRY = 0x0000000000000000000000000000000000002002;
     address constant IS_VERIFIED = 0xd88fa142B67F561C5f2Cbf803bF5AE906a8f1e41;
@@ -15,7 +15,7 @@ contract WBSoulMirrorForkTest is Test {
     WBSoulMirror mirror;
 
     function setUp() public {
-        vm.createSelectFork("whitechain", FORK_BLOCK);
+        vm.createSelectFork("whitechain", ForkBlocks.WHITECHAIN_MAINNET);
         assertEq(block.chainid, 1875);
         mirror = new WBSoulMirror(address(this));
         mirror.registerSoul(SOUL1_PRIMARY);

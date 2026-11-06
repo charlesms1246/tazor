@@ -15,6 +15,7 @@ import {DeployWhitechain} from "../script/DeployWhitechain.s.sol";
 import {DeployEnsGate} from "../script/DeployEnsGate.s.sol";
 import {CreateApprover} from "../script/CreateApprover.s.sol";
 import {CreateCompany} from "../script/CreateCompany.s.sol";
+import {ForkBlocks} from "./ForkBlocks.sol";
 
 contract RecordingDeployWhitechain is DeployWhitechain {
     string public file;
@@ -34,8 +35,6 @@ contract RecordingDeployWhitechain is DeployWhitechain {
 
 /// Runs the real scripts against pinned forks of both chains.
 contract DeployTest is Test {
-    uint256 constant WHITECHAIN_BLOCK = 12_345_336;
-    uint256 constant SEPOLIA_BLOCK = 12_074_402;
 
     uint256 pk = uint256(keccak256("tazor deploy test key"));
     address roleCache = makeAddr("roleCache");
@@ -43,8 +42,8 @@ contract DeployTest is Test {
     uint256 sepolia;
 
     function setUp() public {
-        whitechain = vm.createFork("whitechain_testnet", WHITECHAIN_BLOCK);
-        sepolia = vm.createFork("sepolia", SEPOLIA_BLOCK);
+        whitechain = vm.createFork("whitechain_testnet", ForkBlocks.WHITECHAIN_SEPOLIA);
+        sepolia = vm.createFork(ForkBlocks.sepoliaRpc(), ForkBlocks.ETH_SEPOLIA);
     }
 
     function _params() internal view returns (TazorDeployLib.Params memory) {

@@ -17,3 +17,4 @@ remappings = [
 whitechain_testnet = "https://rpc.testnet.whitechain.io"
 whitechain = "https://rpc.whitechain.io"
 sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+sepolia_archive = "${SEPOLIA_FORK_RPC}"
