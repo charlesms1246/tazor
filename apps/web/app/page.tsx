@@ -19,6 +19,7 @@ import { DemoControls } from './_demo/demo-banner.tsx';
 import { DEMO_CHANGED } from '@/lib/demo-seed.ts';
 import { pendingInbox, loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
 import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
+import { useLatestEvents } from '@/lib/chain-history.ts';
 import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
 
@@ -74,6 +75,7 @@ export default function Home() {
   const COMPANY = company.ens;
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const latest = useLatestEvents(ACCOUNT, 8);
   const [health, setHealth] = useState<Health | null>(null);
   const [people, setPeople] = useState<Person[] | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -266,10 +268,12 @@ export default function Home() {
             </Card>
           )}
           <DemoControls />
-          <Card title="Latest events" subtitle="What happened on this device, step by step" testId="events">
-            {events.length === 0
-              ? <p className="muted">Invoices you create, approvals and payments show up here as a timeline.</p>
-              : <Timeline events={events} testId="home-events" />}
+          <Card title="Latest events" subtitle="From the chain and this device, newest first" testId="events">
+            {latest.loading && latest.events.length === 0 && events.length === 0
+              ? <p className="muted">Reading the chain…</p>
+              : (latest.events.length > 0 ? latest.events : events).length === 0
+                ? <p className="muted">Invoices, approvals and payments show up here as a timeline.</p>
+                : <Timeline events={(latest.events.length > 0 ? latest.events : events).slice(0, 8)} testId="home-events" />}
           </Card>
         </div>
       </div>

@@ -458,3 +458,4 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .search-btn svg, .icon-16 { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
 .search-btn span { flex: 1; text-align: left; }
 .search-btn kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; color: var(--faint); }
+.tl-chain { display: inline-block; margin-left: 8px; padding: 0 7px; height: 18px; line-height: 18px; border-radius: 999px; background: var(--pill-info-bg); color: var(--pill-info-ink); font-size: 11px; font-weight: 500; vertical-align: 1px; }

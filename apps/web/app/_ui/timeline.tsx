@@ -32,7 +32,7 @@ export function Timeline({ subject, events: given, pending, testId = 'timeline' 
         <li key={`${e.kind}-${e.at}-${i}`} data-kind={e.kind} data-tone={TONE[e.kind] ?? 'ok'}>
           <span className="tl-dot" aria-hidden="true" />
           <div className="tl-body">
-            <div className="tl-title">{e.title}</div>
+            <div className="tl-title">{e.title}{(e as { source?: string }).source === 'chain' && <span className="tl-chain" title="Read from the chain">on-chain</span>}</div>
             <div className="tl-meta">
               {time(e.at)}
               {e.actor && <> · {e.actor}</>}
