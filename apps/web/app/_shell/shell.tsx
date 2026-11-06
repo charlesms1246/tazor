@@ -52,7 +52,6 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     label: 'Pay',
     items: [
       { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
-      { href: '/pay/', label: 'Pay an invoice', icon: 'pay' },
       { href: '/runs/', label: 'Payment runs', icon: 'runs' },
     ],
   },
@@ -61,8 +60,7 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     items: [
       { href: '/company/', label: 'Company', icon: 'company' },
       { href: '/policies/', label: 'Policies', icon: 'policy' },
-      { href: '/security/', label: 'Security', icon: 'security' },
-      { href: '/onboard/', label: 'Approver setup', icon: 'onboard' },
+      { href: '/security/', label: 'Security & settings', icon: 'security' },
     ],
   },
   {
@@ -71,14 +69,13 @@ const GROUPS: { label?: string; items: Item[] }[] = [
   },
 ];
 const FOOT: Item[] = [
-  { href: '/settings/', label: 'Settings', icon: 'settings' },
   { href: '/docs/', label: 'Docs', icon: 'docs' },
 ];
 const BOTTOM: Item[] = [
   { href: '/', label: 'Home', icon: 'home' },
   { href: '/invoices/', label: 'Invoices', icon: 'invoice' },
   { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
-  { href: '/pay/', label: 'Pay', icon: 'pay' },
+  { href: '/company/', label: 'Company', icon: 'company' },
 ];
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path.startsWith(href));

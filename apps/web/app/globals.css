@@ -459,3 +459,20 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .search-btn span { flex: 1; text-align: left; }
 .search-btn kbd { font-family: var(--font); font-size: 11px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; color: var(--faint); }
 .tl-chain { display: inline-block; margin-left: 8px; padding: 0 7px; height: 18px; line-height: 18px; border-radius: 999px; background: var(--pill-info-bg); color: var(--pill-info-ink); font-size: 11px; font-weight: 500; vertical-align: 1px; }
+
+/* ---------- UX audit: no sideways scroll, full tables, comfortable taps ---------- */
+.kv > dd .pill, .cell-sub .pill { white-space: normal; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; line-height: 16px; }
+.table td { overflow-wrap: anywhere; }
+.table td.num, .table th { overflow-wrap: normal; }
+.copy { position: relative; }
+.copy::after { content: ""; position: absolute; inset: -10px; }
+main, .page, .card { min-width: 0; }
+@media (max-width: 900px) {
+  .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; overflow: visible; }
+  .tabs .tab { white-space: normal; text-align: left; padding: 10px 4px; min-height: 44px; }
+  .btn-sm { height: auto; min-height: 40px; }
+  .input, .select { min-height: 44px; }
+  .check { min-height: 44px; }
+  .table th, .table td { padding-left: 10px; padding-right: 10px; }
+  pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
+}

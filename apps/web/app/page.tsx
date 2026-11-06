@@ -145,7 +145,7 @@ export default function Home() {
   const steps = [
     { done: hasPasskey, title: 'Create your approver passkey', href: '/onboard/' },
     { done: invoices.length > 0, title: 'Create your first invoice', href: '/invoices/' },
-    { done: payments.length > 0, title: 'Pay an invoice', href: '/pay/' },
+    { done: payments.length > 0, title: 'Pay an invoice', href: '/approvals/' },
     { done: mandates > 0, title: 'Set up a direct debit', href: '/mandates/' },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -175,7 +175,7 @@ export default function Home() {
           </div>
           <div className="hero-actions">
             <a className="btn btn-lime" href="/invoices/">Create invoice</a>
-            <a className="btn btn-on-dark" href="/pay/">Pay</a>
+            <a className="btn btn-on-dark" href="/approvals/">Pay</a>
             <a className="btn btn-on-dark" href="/mandates/">Collect</a>
           </div>
           {PAY_TIME && (
