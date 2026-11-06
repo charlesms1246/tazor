@@ -8,6 +8,7 @@ const STEPS: { n: string; title: string; benefit: string; href: string; cta: str
 
 const ALSO: { label: string; href: string }[] = [
   { label: 'subscriptions', href: '/checkout/#subscriptions' },
+  { label: 'a My payments page for your customers', href: '/me/' },
   { label: 'pay from an exchange', href: '/docs/checkout/#exchange' },
   { label: 'AI agents (x402)', href: '/docs/agents-x402/' },
   { label: 'B2B approvals with verified people', href: '/approvals/' },

@@ -4,7 +4,7 @@ test('sidebar: selling first; B2B folded by default, remembered, and open on a B
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
   const main = page.locator('aside nav[aria-label="Main"] > a.nav-item');
-  await expect(main).toHaveText(['Home', 'Start accepting USDT', 'Checkout', 'Reports', 'Autopilot']);
+  await expect(main).toHaveText(['Home', 'Start accepting USDT', 'Checkout', 'Reports', 'My payments (customer)', 'Autopilot']);
   await expect(page.locator('aside').getByTestId('nav-b2b')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('aside').getByTestId('nav-b2b-items')).toHaveCount(0);
   await expect(page.locator('aside .sidebar-foot a')).toHaveText(['Security & settings', 'Docs']);

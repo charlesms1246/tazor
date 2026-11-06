@@ -20,6 +20,7 @@ const PAGES: { href: string; title: string; keywords: string[] }[] = [
   { href: '/start/', title: 'Start accepting USDT', keywords: ['onboarding', 'merchant', 'pay button', 'payment link', 'snippet', 'setup', 'qr'] },
   { href: '/checkout/', title: 'Checkout', keywords: ['orders', 'refund', 'receipt', 'subscriptions', 'webhooks', 'agents', 'x402', 'sales'] },
   { href: '/export/', title: 'Reports', keywords: ['export', 'csv', 'statement', 'accounting', 'books', 'accountant'] },
+  { href: '/me/', title: 'My payments (customer)', keywords: ['my receipts', 'refunds', 'cancel subscription', 'customer', 'history'] },
   { href: '/autopilot/', title: 'Autopilot', keywords: ['demo', 'story', 'tour', 'walkthrough'] },
   { href: '/invoices/', title: 'Invoices (B2B)', keywords: ['bill', 'send', 'create', 'receive'] },
   { href: '/mandates/', title: 'Collect (B2B)', keywords: ['mandates', 'direct debit', 'recurring'] },

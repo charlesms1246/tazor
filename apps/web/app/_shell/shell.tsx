@@ -15,6 +15,7 @@ const ICONS: Record<string, ReactNode> = {
   invoice: <><path d="M4 2h6l2.5 2.5V14H4z" /><path d="M6.5 7.5h4M6.5 10h4M10 2v2.5h2.5" /></>,
   runs: <><path d="M3 4h10M3 8h10M3 12h6" /><path d="m11.5 11 1.5 1.5L15 10" /></>,
   mandate: <><path d="M13 8a5 5 0 1 1-1.5-3.5" /><path d="M13 2.5V5h-2.5" /><path d="M8 5.5V8l1.5 1.5" /></>,
+  me: <><circle cx="8" cy="5.5" r="2.5" /><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2" /></>,
   start: <><circle cx="8" cy="8" r="6" /><path d="M8 5v6M5 8h6" /></>,
   checkout: <><path d="M2.5 3.5h1.5l1.6 7h7l1.4-5H5" /><circle cx="6.5" cy="13" r="1" /><circle cx="11.5" cy="13" r="1" /></>,
   export: <><path d="M8 2.5v7M5 6.5l3 3 3-3" /><path d="M3 11v2.5h10V11" /></>,
@@ -49,6 +50,7 @@ const MAIN: Item[] = [
   { href: '/start/', label: 'Start accepting USDT', icon: 'start' },
   { href: '/checkout/', label: 'Checkout', icon: 'checkout' },
   { href: '/export/', label: 'Reports', icon: 'export' },
+  { href: '/me/', label: 'My payments (customer)', icon: 'me' },
   { href: '/autopilot/', label: 'Autopilot', icon: 'autopilot' },
 ];
 /** Also built: business-to-business invoices and approvals by verified people. Collapsed by default. */
