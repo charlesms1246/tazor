@@ -2,9 +2,9 @@
 // No signature and no WBT from the customer: anyone settles the order once the address holds the amount; any excess,
 // and everything after the deadline, goes back to the customer's refund address.
 import { decodeFunctionResult, encodeAbiParameters, encodeFunctionData, getAddress, keccak256, parseAbi, toHex, type Address, type Hex } from 'viem';
-import { CHAIN_ID, RELAYER_URL, RPC_URL, USDT, USDT_DOMAIN, RECEIVE_TYPES, window1h, type TypedData } from './checkout.ts';
+import { CHAIN_ID, DEPOSIT_CHECKOUT, RELAYER_URL, RPC_URL, USDT, USDT_DOMAIN, RECEIVE_TYPES, window1h, type TypedData } from './checkout.ts';
 
-export const DEPOSIT_CHECKOUT: Address = '0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab';
+export { DEPOSIT_CHECKOUT };
 
 export const depositAbi = parseAbi([
   'function depositAddress((address merchant,uint256 amount,bytes32 ref,uint64 deadline,address refundTo) o) view returns (address)',

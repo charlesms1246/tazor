@@ -298,17 +298,37 @@ export const explorerTx = (h: string) => `${EXPLORER}/tx/${h}`;
 // ---- a merchant's history, straight from Whitechain logs (no relayer, no database)
 
 export const CHECKOUT_DEPLOY_BLOCK = 12_391_700n;
-export type HistoryRow =
-  | { kind: 'paid'; id: Hex; payer: Address; amount: bigint; ref: Hex; tx: Hex; block: bigint }
-  | { kind: 'refunded'; id: Hex; payer: Address; amount: bigint; totalRefunded: bigint; tx: Hex; block: bigint }
-  | { kind: 'subscribed'; id: Hex; payer: Address; amount: bigint; period: number; cycles: number; ref: Hex; tx: Hex; block: bigint }
-  | { kind: 'charged'; id: Hex; cycle: number; amount: bigint; tx: Hex; block: bigint }
-  | { kind: 'cancelled'; id: Hex; by: Address; tx: Hex; block: bigint };
+/** TazorDepositCheckout (pay by plain transfer); kept here too so the history needs no import cycle. */
+export const DEPOSIT_CHECKOUT: Address = '0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab';
+const depositEventsAbi = parseAbi([
+  'event DepositPaid(bytes32 indexed id, address indexed merchant, address indexed vault, uint256 amount, uint256 excess, bytes32 ref)',
+  'event DepositRefunded(bytes32 indexed id, address indexed merchant, address indexed refundTo, uint256 amount, uint256 totalRefunded)',
+  'event DepositReturned(bytes32 indexed id, address indexed refundTo, uint256 amount)',
+  'function payment(bytes32 id) view returns (address merchant, address refundTo, uint256 amount, uint256 refunded, uint64 paidAt, uint32 refunds)',
+]);
+
+export type HistoryMethod = 'wallet' | 'deposit' | 'subscription';
+type Common = { id: Hex; tx: Hex; block: bigint; /** unix seconds of the block */ time: number; method: HistoryMethod };
+export type HistoryRow = Common & (
+  | { kind: 'paid'; payer: Address; amount: bigint; ref: Hex }
+  | { kind: 'refunded'; payer: Address; amount: bigint; totalRefunded: bigint }
+  | { kind: 'subscribed'; payer: Address; amount: bigint; period: number; cycles: number; ref: Hex }
+  | { kind: 'charged'; payer: Address | null; cycle: number; amount: bigint }
+  | { kind: 'cancelled'; by: Address }
+  | { kind: 'deposit-paid'; payer: Address | null; amount: bigint; excess: bigint; ref: Hex }
+  | { kind: 'deposit-refunded'; payer: Address; amount: bigint; totalRefunded: bigint }
+  | { kind: 'deposit-returned'; payer: Address; amount: bigint }
+);
 
 type RpcLog = { topics: Hex[]; data: Hex; transactionHash: Hex; blockNumber: Hex };
+type Untimed<T> = T extends unknown ? Omit<T, 'time'> : never;
 
-/** Every order, refund, subscription, charge and cancellation of one merchant, oldest first. */
-export async function merchantHistory(merchant: Address, opts: CheckoutOptions & { fromBlock?: bigint; chunk?: bigint } = {}): Promise<HistoryRow[]> {
+/**
+ * Every order, refund, subscription, charge and cancellation of one merchant (TazorCheckout), plus its payments
+ * by plain transfer (TazorDepositCheckout; pass depositCheckout: null to skip), oldest first. Each row carries its
+ * block's time (one eth_getBlockByNumber per block).
+ */
+export async function merchantHistory(merchant: Address, opts: CheckoutOptions & { fromBlock?: bigint; chunk?: bigint; depositCheckout?: Address | null } = {}): Promise<HistoryRow[]> {
   const r = resolve(opts);
   const rpc = async <T>(method: string, params: unknown[]): Promise<T> => {
     const res = await r.f(r.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
@@ -319,45 +339,80 @@ export async function merchantHistory(merchant: Address, opts: CheckoutOptions &
   const head = BigInt(await rpc<Hex>('eth_blockNumber', []));
   const from = opts.fromBlock ?? CHECKOUT_DEPLOY_BLOCK;
   const chunk = opts.chunk ?? 50_000n;
-  const byMerchant = (eventName: 'OrderPaid' | 'Refunded' | 'Subscribed') => {
-    const [t0] = encodeEventTopics({ abi: checkoutAbi, eventName });
-    return [t0, null, pad(getAddress(merchant)).toLowerCase() as Hex] as (Hex | null)[];
-  };
-  const logs: RpcLog[] = [];
-  const get = async (topics: (Hex | null | Hex[])[]) => {
+  const who = pad(getAddress(merchant)).toLowerCase() as Hex;
+  const get = async (address: Address, topics: (Hex | null | Hex[])[]) => {
+    const out: RpcLog[] = [];
     for (let a = from; a <= head; a += chunk) {
       const b = a + chunk - 1n < head ? a + chunk - 1n : head;
-      logs.push(...(await rpc<RpcLog[]>('eth_getLogs', [{ address: r.checkout, topics, fromBlock: toHex(a), toBlock: toHex(b) }])));
+      out.push(...(await rpc<RpcLog[]>('eth_getLogs', [{ address, topics, fromBlock: toHex(a), toBlock: toHex(b) }])));
     }
+    return out;
   };
-  await get(byMerchant('OrderPaid'));
-  await get(byMerchant('Refunded'));
-  await get(byMerchant('Subscribed'));
-  const rows: HistoryRow[] = [];
-  const subIds = new Set<string>();
+  const topic = (abi: readonly unknown[], eventName: string) => (encodeEventTopics as (a: unknown) => Hex[])({ abi, eventName })[0];
+  const base = (l: RpcLog, method: HistoryMethod) => ({ tx: l.transactionHash, block: BigInt(l.blockNumber), method });
+  const rows: Untimed<HistoryRow>[] = [];
+
+  // TazorCheckout: wallet payments, refunds and subscriptions
   const decode = (l: RpcLog) => decodeEventLog({ abi: checkoutAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
+  const logs = [
+    ...(await get(r.checkout, [topic(checkoutAbi, 'OrderPaid'), null, who])),
+    ...(await get(r.checkout, [topic(checkoutAbi, 'Refunded'), null, who])),
+    ...(await get(r.checkout, [topic(checkoutAbi, 'Subscribed'), null, who])),
+  ];
+  const subPayer = new Map<string, Address>();
   for (const l of logs) {
     const e = decode(l);
-    const base = { tx: l.transactionHash, block: BigInt(l.blockNumber) };
-    if (e.eventName === 'OrderPaid') rows.push({ kind: 'paid', id: e.args.id, payer: e.args.payer, amount: e.args.amount, ref: e.args.ref, ...base });
-    if (e.eventName === 'Refunded') rows.push({ kind: 'refunded', id: e.args.id, payer: e.args.payer, amount: e.args.amount, totalRefunded: e.args.totalRefunded, ...base });
-    if (e.eventName === 'Subscribed') { subIds.add(e.args.id.toLowerCase()); rows.push({ kind: 'subscribed', id: e.args.id, payer: e.args.payer, amount: e.args.amount, period: Number(e.args.period), cycles: Number(e.args.cycles), ref: e.args.ref, ...base }); }
-  }
-  if (subIds.size) {
-    const [charged] = encodeEventTopics({ abi: checkoutAbi, eventName: 'Charged' });
-    const [cancelled] = encodeEventTopics({ abi: checkoutAbi, eventName: 'Cancelled' });
-    const more: RpcLog[] = [];
-    const start = logs.length;
-    await get([[charged, cancelled], [...subIds] as Hex[]]);
-    more.push(...logs.splice(start));
-    for (const l of more) {
-      const e = decode(l);
-      const base = { tx: l.transactionHash, block: BigInt(l.blockNumber) };
-      if (e.eventName === 'Charged' && Number(e.args.cycle) > 1) rows.push({ kind: 'charged', id: e.args.id, cycle: Number(e.args.cycle), amount: e.args.amount, ...base });
-      if (e.eventName === 'Cancelled') rows.push({ kind: 'cancelled', id: e.args.id, by: e.args.by, ...base });
+    if (e.eventName === 'OrderPaid') rows.push({ kind: 'paid', id: e.args.id, payer: e.args.payer, amount: e.args.amount, ref: e.args.ref, ...base(l, 'wallet') });
+    if (e.eventName === 'Refunded') rows.push({ kind: 'refunded', id: e.args.id, payer: e.args.payer, amount: e.args.amount, totalRefunded: e.args.totalRefunded, ...base(l, 'wallet') });
+    if (e.eventName === 'Subscribed') {
+      subPayer.set(e.args.id.toLowerCase(), e.args.payer);
+      rows.push({ kind: 'subscribed', id: e.args.id, payer: e.args.payer, amount: e.args.amount, period: Number(e.args.period), cycles: Number(e.args.cycles), ref: e.args.ref, ...base(l, 'subscription') });
     }
   }
-  return rows.sort((x, y) => (x.block < y.block ? -1 : x.block > y.block ? 1 : 0));
+  if (subPayer.size) {
+    for (const l of await get(r.checkout, [[topic(checkoutAbi, 'Charged'), topic(checkoutAbi, 'Cancelled')], [...subPayer.keys()] as Hex[]])) {
+      const e = decode(l);
+      if (e.eventName === 'Charged' && Number(e.args.cycle) > 1) rows.push({ kind: 'charged', id: e.args.id, payer: subPayer.get(e.args.id.toLowerCase()) ?? null, cycle: Number(e.args.cycle), amount: e.args.amount, ...base(l, 'subscription') });
+      if (e.eventName === 'Cancelled') rows.push({ kind: 'cancelled', id: e.args.id, by: e.args.by, ...base(l, 'subscription') });
+    }
+  }
+
+  // TazorDepositCheckout: payments by plain transfer (exchange withdrawals), their refunds and returned funds
+  const dep = opts.depositCheckout === null ? null : getAddress(opts.depositCheckout ?? DEPOSIT_CHECKOUT);
+  if (dep) {
+    const decodeDep = (l: RpcLog) => decodeEventLog({ abi: depositEventsAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
+    const paidIds = new Set<string>();
+    for (const l of [...(await get(dep, [topic(depositEventsAbi, 'DepositPaid'), null, who])), ...(await get(dep, [topic(depositEventsAbi, 'DepositRefunded'), null, who]))]) {
+      const e = decodeDep(l);
+      if (e.eventName === 'DepositPaid') {
+        paidIds.add(e.args.id.toLowerCase());
+        rows.push({ kind: 'deposit-paid', id: e.args.id, payer: null, amount: e.args.amount, excess: e.args.excess, ref: e.args.ref, ...base(l, 'deposit') });
+      }
+      if (e.eventName === 'DepositRefunded') rows.push({ kind: 'deposit-refunded', id: e.args.id, payer: e.args.refundTo, amount: e.args.amount, totalRefunded: e.args.totalRefunded, ...base(l, 'deposit') });
+    }
+    if (paidIds.size) {
+      for (const l of await get(dep, [topic(depositEventsAbi, 'DepositReturned'), [...paidIds] as Hex[]])) {
+        const e = decodeDep(l);
+        if (e.eventName === 'DepositReturned') rows.push({ kind: 'deposit-returned', id: e.args.id, payer: e.args.refundTo, amount: e.args.amount, ...base(l, 'deposit') });
+      }
+      // the customer of a deposit order is its refund address (where any excess went)
+      for (const row of rows) {
+        if (row.kind !== 'deposit-paid') continue;
+        const out = await ethCall(r.rpc, r.f, dep, encodeFunctionData({ abi: depositEventsAbi, functionName: 'payment', args: [row.id] })).catch(() => null);
+        if (out) row.payer = (decodeFunctionResult({ abi: depositEventsAbi, functionName: 'payment', data: out }) as readonly [Address, Address, ...unknown[]])[1];
+      }
+    }
+  }
+
+  // one timestamp read per block
+  const times = new Map<bigint, number>();
+  for (const b of [...new Set(rows.map((x) => x.block))]) {
+    const blk = await rpc<{ timestamp: Hex } | null>('eth_getBlockByNumber', [toHex(b), false]);
+    times.set(b, blk ? Number(BigInt(blk.timestamp)) : 0);
+  }
+  return rows
+    .map((x) => ({ ...x, time: times.get(x.block) ?? 0 }) as HistoryRow)
+    .sort((x, y) => (x.block < y.block ? -1 : x.block > y.block ? 1 : 0));
 }
 
 export async function readSubscription(id: Hex, opts: CheckoutOptions = {}) {
@@ -368,19 +423,85 @@ export async function readSubscription(id: Hex, opts: CheckoutOptions = {}) {
   return { merchant, payer, amount, period: Number(period), cycles: Number(cycles), charged: Number(charged), start, active, nextChargeAt: next };
 }
 
-/** CSV for the accountant: date-less but exact (block, tx), one row per on-chain event. */
-export function historyCsv(rows: HistoryRow[]): string {
-  const usd = (v: bigint) => { const s = v.toString().padStart(7, '0'); return `${s.slice(0, -6)}.${s.slice(-6)}`; };
-  const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-  const lines = [['type', 'id', 'counterparty', 'amount_usdt', 'detail', 'block', 'transaction'].join(',')];
+/** USDT base units as a decimal string with at least two decimals ("-0.02", "1.5" → "1.50"). */
+export function usdtAmount(v: bigint): string {
+  const neg = v < 0n;
+  const s = (neg ? -v : v).toString().padStart(7, '0');
+  const frac = s.slice(-6).replace(/0+$/, '').padEnd(2, '0');
+  return `${neg ? '-' : ''}${s.slice(0, -6)}.${frac}`;
+}
+
+const utc = (t: number) => (t ? new Date(t * 1000).toISOString().replace('T', ' ').slice(0, 19) : '');
+
+/**
+ * CSV for the accountant, one row per on-chain event, dated by its block:
+ * date_utc, type, order, customer, method, gross_usdt, refund_usdt (negative), net_usdt (= gross + refund),
+ * detail, transaction, explorer_url; then a TOTAL row.
+ */
+export function historyCsv(rows: HistoryRow[], explorer = EXPLORER): string {
+  const q = (x: string) => (/[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x);
+  const head = ['date_utc', 'type', 'order', 'customer', 'method', 'gross_usdt', 'refund_usdt', 'net_usdt', 'detail', 'transaction', 'explorer_url'];
+  const lines = [head.join(',')];
+  let gross = 0n;
+  let refunds = 0n;
   for (const r of rows) {
-    const [who, amount, detail] =
-      r.kind === 'paid' ? [r.payer, usd(r.amount), 'order paid'] :
-      r.kind === 'refunded' ? [r.payer, `-${usd(r.amount)}`, `refund (total refunded ${usd(r.totalRefunded)})`] :
-      r.kind === 'subscribed' ? [r.payer, usd(r.amount), `subscribed: ${r.cycles} × every ${r.period} s (cycle 1 paid)`] :
-      r.kind === 'charged' ? ['', usd(r.amount), `subscription cycle ${r.cycle}`] :
-      [r.by, '', 'subscription cancelled'];
-    lines.push([r.kind, r.id, who, amount, detail, r.block.toString(), r.tx].map((x) => q(String(x))).join(','));
+    const [type, customer, g, rf, detail]: [string, string, bigint, bigint, string] =
+      r.kind === 'paid' ? ['payment', r.payer, r.amount, 0n, 'order paid by wallet signature'] :
+      r.kind === 'refunded' ? ['refund', r.payer, 0n, -r.amount, `refund to the customer (total refunded ${usdtAmount(r.totalRefunded)})`] :
+      r.kind === 'subscribed' ? ['subscription', r.payer, r.amount, 0n, `subscribed: ${r.cycles} × every ${r.period} s (cycle 1 paid)`] :
+      r.kind === 'charged' ? ['subscription charge', r.payer ?? '', r.amount, 0n, `subscription cycle ${r.cycle}`] :
+      r.kind === 'cancelled' ? ['cancellation', r.by, 0n, 0n, 'subscription cancelled'] :
+      r.kind === 'deposit-paid' ? ['payment', r.payer ?? '', r.amount, 0n, `paid by transfer to a deposit address${r.excess ? ` (excess ${usdtAmount(r.excess)} returned to the customer)` : ''}`] :
+      r.kind === 'deposit-refunded' ? ['refund', r.payer, 0n, -r.amount, `refund to the customer (total refunded ${usdtAmount(r.totalRefunded)})`] :
+      ['returned', r.payer, 0n, 0n, `${usdtAmount(r.amount)} returned to the customer from the deposit address (not revenue)`];
+    gross += g;
+    refunds += rf;
+    lines.push([utc(r.time), type, `${r.id.slice(0, 10)}…`, customer, r.method, usdtAmount(g), usdtAmount(rf), usdtAmount(g + rf), detail, r.tx, `${explorer}/tx/${r.tx}`].map((x) => q(String(x))).join(','));
   }
+  lines.push(['', 'TOTAL', '', '', '', usdtAmount(gross), usdtAmount(refunds), usdtAmount(gross + refunds), `${rows.length} events`, '', ''].join(','));
   return lines.join('\n') + '\n';
+}
+
+// ---- when to ship: wait longer only for big payments
+
+/**
+ * A merchant's shipping rule. Small payments are safe to ship once Whitechain's sequencer confirms them; for
+ * payments at or above `waitForEthereumAbove` (USDT) wait until the block is posted to Ethereum, and at or above
+ * `waitForFinalAbove` (if set) until it is final.
+ */
+export type ShipPolicy = { waitForEthereumAbove: string; waitForFinalAbove?: string };
+export const DEFAULT_SHIP_POLICY: ShipPolicy = { waitForEthereumAbove: '100' };
+export type ReadyStage = 'sequencer' | 'ethereum' | 'finalized';
+export type ShipDecision = { ready: boolean; waitFor: ReadyStage; reason: string };
+
+const toUnits = (v: bigint | string): bigint => {
+  if (typeof v === 'bigint') return v;
+  if (!/^\d+(\.\d{1,6})?$/.test(v.trim())) throw new Error(`not a USDT amount: ${v}`);
+  const [w, f = ''] = v.trim().split('.');
+  return BigInt(w) * 1_000_000n + BigInt(f.padEnd(6, '0'));
+};
+const RANK: Record<Stage, number> = { pending: 0, sequencer: 1, ethereum: 2, finalized: 3 };
+
+/** The stage a payment of `amount` (base units, or a USDT decimal string) must reach before shipping. */
+export function requiredStage(amount: bigint | string, policy: Partial<ShipPolicy> = DEFAULT_SHIP_POLICY): ReadyStage {
+  const a = toUnits(amount);
+  const p = { ...DEFAULT_SHIP_POLICY, ...policy };
+  if (p.waitForFinalAbove !== undefined && a >= toUnits(p.waitForFinalAbove)) return 'finalized';
+  return a >= toUnits(p.waitForEthereumAbove) ? 'ethereum' : 'sequencer';
+}
+
+/** Is a payment of `amount` at `stage` ready to ship under `policy`? With what to wait for, in words. */
+export function readyToShip(amount: bigint | string, stage: Stage | null, policy: Partial<ShipPolicy> = DEFAULT_SHIP_POLICY): ShipDecision {
+  const p = { ...DEFAULT_SHIP_POLICY, ...policy };
+  const waitFor = requiredStage(amount, p);
+  const ready = !!stage && RANK[stage] >= RANK[waitFor];
+  const above = waitFor === 'finalized' ? p.waitForFinalAbove! : p.waitForEthereumAbove;
+  const reason = ready
+    ? waitFor === 'sequencer' ? `Ready to ship: under ${p.waitForEthereumAbove} USDT, confirmation on Whitechain is enough`
+      : waitFor === 'ethereum' ? `Ready to ship: posted to Ethereum (${above} USDT and above wait for this)`
+      : `Ready to ship: final (${above} USDT and above wait for this)`
+    : !stage || stage === 'pending' ? 'Waiting for the payment to be confirmed on Whitechain'
+      : waitFor === 'ethereum' ? `Payment received; waiting for Whitechain to post it to Ethereum (big payments only: ${above} USDT and above)`
+      : `Payment received; waiting for it to be final (${above} USDT and above)`;
+  return { ready, waitFor, reason };
 }
