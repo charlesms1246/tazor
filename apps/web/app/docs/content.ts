@@ -8,6 +8,8 @@ export const DOC_GROUPS: DocGroup[] = [
       { slug: 'what-is-tazor', title: 'What is Tazor', summary: 'B2B invoices, payment runs and direct debits in USDT on Whitechain, approved by verified people.' },
       { slug: 'approver-passkey', title: 'Your approver passkey', summary: 'Create the passkey you approve with, and the approver account that goes with it.' },
       { slug: 'company-on-ens', title: 'Your company on ENS', summary: 'How a company name such as acme.taz0r.eth holds who may approve.' },
+      { slug: 'product-tour', title: 'Product tour', summary: 'The whole cycle in one pass: receive, pay, control and keep the books.' },
+      { slug: 'switching-companies', title: 'Switching companies', summary: 'Act as Acme (buyer) or Bluejay (supplier) to see both sides of a payment.' },
     ],
   },
   {
@@ -15,6 +17,7 @@ export const DOC_GROUPS: DocGroup[] = [
     pages: [
       { slug: 'create-invoice', title: 'Create an invoice', summary: 'Send an encrypted payment link that only the holder of the link can read.' },
       { slug: 'pay-invoice', title: 'Pay an invoice', summary: 'Open a payment link, check it, approve it with your passkey and pay.' },
+      { slug: 'approvals', title: 'Approvals', summary: 'What an approval signs, when two are needed, and how a second approver joins.' },
       { slug: 'payment-runs', title: 'Payment runs', summary: 'Approve many invoices from one buyer with a single signature.' },
       { slug: 'mandates', title: 'Mandates (direct debits)', summary: 'Let a supplier collect up to a fixed amount each period, within limits you sign.' },
       { slug: 'financing', title: 'Invoice financing', summary: 'Turn an approved invoice into a claim that a financier can buy before the due date.' },
@@ -23,10 +26,12 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     title: 'Company',
     pages: [
+      { slug: 'company-page', title: 'The Company page', summary: 'Your company profile, its people, and whether Whitechain agrees with ENS about each of them.' },
       { slug: 'team-and-roles', title: 'Team and roles', summary: 'Approvers, admins and agents, and how a backup signer protects against a lost phone.' },
       { slug: 'policies', title: 'Policies', summary: 'Spending limits, payee rules, temporary access and the time-locked exit.' },
       { slug: 'removing-a-person', title: 'Removing a person', summary: 'Stop someone approving for your company in about three seconds.' },
       { slug: 'freeze-device', title: 'Freeze a device', summary: 'Revoke your own approver for a company if your phone is lost or compromised.' },
+      { slug: 'security-page', title: 'The Security page', summary: 'Live health of everything a payment depends on, recent removals and lost-device controls.' },
     ],
   },
   {
