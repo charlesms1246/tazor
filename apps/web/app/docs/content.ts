@@ -21,6 +21,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { slug: 'payment-runs', title: 'Payment runs', summary: 'Approve many invoices from one buyer with a single signature.' },
       { slug: 'mandates', title: 'Mandates (direct debits)', summary: 'Let a supplier collect up to a fixed amount each period, within limits you sign.' },
       { slug: 'financing', title: 'Invoice financing', summary: 'Turn an approved invoice into a claim that a financier can buy before the due date.' },
+      { slug: 'checkout', title: 'Checkout, refunds & subscriptions', summary: 'Take USDT from any wallet with one signature, refund it in one click, and charge subscriptions, all gasless.' },
     ],
   },
   {
@@ -47,6 +48,7 @@ export const DOC_GROUPS: DocGroup[] = [
     title: 'Developers',
     pages: [
       { slug: 'sdk', title: 'Pay button SDK', summary: 'Take a Tazor payment on any website with one script tag, one element and one event.' },
+      { slug: 'agents-x402', title: 'AI agents (x402)', summary: 'Let AI agents pay per request in USDT with the standard x402 protocol and Tazor as the facilitator.' },
       { slug: 'relayer-api', title: 'Relayer API', summary: 'The optional, stateless relayer: every endpoint, request and response.' },
       { slug: 'contracts', title: 'Contracts', summary: 'Every contract address this build uses, with explorer links.' },
       { slug: 'passkey-check', title: 'Passkey check', summary: "Sign a test challenge with this device's passkey and verify it on Whitechain's P-256 precompile." },
