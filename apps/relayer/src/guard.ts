@@ -11,7 +11,9 @@ export class Paused extends Error {}
 export const PAUSED_HINT = 'anyone can still submit the same transaction themselves (Copy calldata), or through Ethereum';
 
 /** Routes that make the relayer pay gas. */
-export type GuardedRoute = '/approver' | '/pay' | '/payrun' | '/sync' | '/mandate' | '/pull' | '/revoke' | '/userop' | '/sandbox/admit';
+export type GuardedRoute = '/approver' | '/pay' | '/payrun' | '/sync' | '/mandate' | '/pull' | '/revoke' | '/userop' | '/sandbox/admit'
+  | '/checkout/pay' | '/checkout/refund' | '/checkout/subscribe' | '/checkout/cancel' | '/checkout/charge' | '/x402/settle' | '/webhooks/test' | 'cron'
+  | '/checkout/deposit/settle' | '/checkout/deposit/refund';
 
 export type GuardLimits = {
   /** Gas-spending requests per IP per hour, across all guarded routes. */
@@ -95,7 +97,7 @@ export function createGuard(o: {
   const spentToday = (balance: bigint) => (dayStart && dayStart.balance > balance ? dayStart.balance - balance : 0n);
 
   /** Throws Paused (503) or Throttled (429); otherwise records the request. */
-  async function check(route: GuardedRoute, ip: string, account?: string) {
+  async function check(route: GuardedRoute, ip: string, account?: string | (string | undefined)[]) {
     const balance = await readBalance();
     if (balance !== null && balance < L.minBalance) {
       throw new Paused(`relayer paused: low balance (${formatEther(balance)} WBT, floor ${formatEther(L.minBalance)}); ${PAUSED_HINT}`);
@@ -105,7 +107,15 @@ export function createGuard(o: {
     }
     if (route === '/approver') take(`approver:${ip}`, DAY, L.approverPerIpDay, 'new approver accounts per address per day');
     take(`ip:${ip}`, HOUR, L.perIpHour, 'relayed transactions per address per hour');
-    if (account) take(`acct:${route}:${account.toLowerCase()}`, DAY, L.perAccountDay, `${route} requests per account per day`);
+    // each key (payer, merchant, subscription…) has its own daily budget per route
+    for (const k of (Array.isArray(account) ? account : [account])) if (k) take(`acct:${route}:${k.toLowerCase()}`, DAY, L.perAccountDay, `${route} requests per account per day`);
+  }
+
+  /** Only the balance floor and the daily budget (for the cron, which has no client IP). */
+  async function checkBudget() {
+    const balance = await readBalance();
+    if (balance !== null && balance < L.minBalance) throw new Paused(`relayer paused: low balance (${formatEther(balance)} WBT, floor ${formatEther(L.minBalance)}); ${PAUSED_HINT}`);
+    if (balance !== null && spentToday(balance) >= L.dailyBudget) throw new Paused(`relayer paused: today's gas budget (${formatEther(L.dailyBudget)} WBT) is used up; ${PAUSED_HINT}`);
   }
 
   /** For /health: balance, today's spend, runway and the limits in force. */
@@ -130,7 +140,7 @@ export function createGuard(o: {
     };
   }
 
-  return { limits: L, check, health };
+  return { limits: L, check, checkBudget, health };
 }
 
 export type Guard = ReturnType<typeof createGuard>;

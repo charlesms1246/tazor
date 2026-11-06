@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { decodeFunctionData, getAddress, type Address, type Hex } from 'viem';
 import { createHandler } from '../src/app.ts';
 import { handlerFromEnv } from '../src/env.ts';
+import { CHECKOUT_ROUTES, WEBHOOK_ROUTES, X402_ROUTES } from '../src/checkout/routes.ts';
 import { createRoleSync, L1_BLOCK, MAX_RANGE, roleCacheAbi, type RoleSync, type ScanSummary } from '../src/sync.ts';
 
 const ACME = getAddress('0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1');
@@ -224,7 +225,10 @@ test('GET /watch: 401 without the cron bearer, 200 with it (7200-block lookback)
 test('GET /health reports roleSync and the watched registries; GET / describes the relayer', async () => {
   assert.deepEqual(
     await (await fetch(`${withSync.base}/health`)).json(),
-    { ok: true, relayer: null, paymentModule: null, approverAccountFactory: null, revocationList: null, mandateModule: null, roleSync: true, watchRegistries: [ACME], mirrorEnabled: false, mirrorReason: 'mirror not configured', sandbox: { enabled: false, account: null, registry: null } },
+    { ok: true, relayer: null, paymentModule: null, approverAccountFactory: null, revocationList: null, mandateModule: null, roleSync: true, watchRegistries: [ACME], mirrorEnabled: false, mirrorReason: 'mirror not configured', sandbox: { enabled: false, account: null, registry: null },
+      checkout: { enabled: false, address: null, depositAddress: null, routes: CHECKOUT_ROUTES },
+      x402: { enabled: false, networks: ['whitechain-sepolia', 'eip155:1874'], scheme: 'exact', asset: '0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7', demoPayTo: null, routes: X402_ROUTES },
+      webhooks: { enabled: false, merchants: 0, storage: null, routes: WEBHOOK_ROUTES } },
   );
   const h = await (await fetch(`${withoutSync.base}/health`)).json();
   assert.equal(h.roleSync, false);

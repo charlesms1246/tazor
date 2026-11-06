@@ -14,12 +14,19 @@ import type { MirrorService } from './mirror-service.ts';
 import type { Sandbox } from './sandbox/service.ts';
 import { clientIp, handleSandbox } from './sandbox/routes.ts';
 import { Paused, Throttled, type Guard, type GuardedRoute } from './guard.ts';
+import type { Address } from 'viem';
+import type { Checkout } from './checkout/service.ts';
+import type { Deposit } from './checkout/deposit.ts';
+import type { X402 } from './checkout/x402.ts';
+import type { Webhooks } from './webhooks.ts';
+import { CHECKOUT_ROUTES, WEBHOOK_ROUTES, X402_ROUTES, X402_NETWORKS, handleCheckout } from './checkout/routes.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type, authorization',
+  'access-control-allow-headers': 'content-type, authorization, x-payment',
+  'access-control-expose-headers': 'x-payment-response',
 };
 
 /** JSON-safe view of a sync result (bigints as decimal strings). */
@@ -65,6 +72,13 @@ export function createHandler(deps: {
   sandbox?: Sandbox;
   /** Rate limits, the balance floor and the daily gas budget for every route that spends the relayer's gas. */
   guard?: Guard;
+  /** Gasless checkout (TazorCheckout), the x402 facilitator and signed merchant webhooks. */
+  checkout?: Checkout;
+  deposit?: Deposit;
+  x402?: X402;
+  webhooks?: Webhooks;
+  /** payTo of the demo x402 resource. */
+  x402PayTo?: Address;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown, headers: Record<string, string> = {}) => {
@@ -86,9 +100,15 @@ export function createHandler(deps: {
           roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? deps.mirror?.registries ?? [],
           ...(deps.mirror ? await mirrorHealthJson(deps.mirror) : { mirrorEnabled: false, mirrorReason: 'mirror not configured' }),
           ...(deps.guard ? { gas: await deps.guard.health() } : {}),
+          checkout: { enabled: !!deps.checkout, address: deps.checkout?.address ?? null, depositAddress: deps.deposit?.address ?? null, routes: CHECKOUT_ROUTES },
+          x402: { enabled: !!deps.x402, networks: X402_NETWORKS, scheme: 'exact', asset: '0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7', demoPayTo: deps.x402PayTo ?? null, routes: X402_ROUTES },
+          webhooks: { enabled: !!deps.webhooks, merchants: deps.webhooks?.merchants() ?? 0, storage: deps.webhooks?.storage ?? null, routes: WEBHOOK_ROUTES },
           sandbox: { enabled: !!deps.sandbox, account: deps.sandbox?.config.account ?? null, registry: deps.sandbox?.config.registry ?? null },
         });
       }
+      if (await handleCheckout(req, new URL(req.url ?? '/', 'http://relayer'), {
+        checkout: deps.checkout, deposit: deps.deposit, x402: deps.x402, webhooks: deps.webhooks, guard: deps.guard, payTo: deps.x402PayTo,
+      }, readJson, reply)) return;
       if (deps.sandbox && req.method === 'POST' && path === '/sandbox/admit') await guard('/sandbox/admit');
       if (deps.sandbox && (await handleSandbox(req, path, deps.sandbox, readJson, reply))) return;
       if (deps.mirror && req.method === 'POST' && path === '/mirror') {
@@ -110,11 +130,13 @@ export function createHandler(deps: {
         await guard('/sync', account);
         return reply(200, syncJson(await deps.roleSync.syncAccount(getAddress(registry), getAddress(account))));
       }
-      if ((deps.roleSync || deps.mirror) && req.method === 'GET' && path === '/watch') {
+      if ((deps.roleSync || deps.mirror || deps.checkout) && req.method === 'GET' && path === '/watch') {
         if (deps.cronSecret && req.headers.authorization !== `Bearer ${deps.cronSecret}`) return reply(401, { error: 'unauthorized' });
         const roles = deps.roleSync ? scanJson(await deps.roleSync.scanOnce({ lookback: WATCH_LOOKBACK })) : {};
         const mirror = deps.mirror ? await deps.mirror.scanOnce() : undefined;
-        return reply(200, { ...roles, ...(mirror ? { mirror } : {}) });
+        // subscriptions: charge the due ones (within the gas budget), remind merchants 24 h ahead
+        const subscriptions = deps.checkout ? await deps.checkout.scanDue(async () => { await deps.guard?.checkBudget(); }).catch((e) => ({ error: e instanceof Error ? e.message.split('\n')[0] : String(e) })) : undefined;
+        return reply(200, { ...roles, ...(mirror ? { mirror } : {}), ...(subscriptions ? { subscriptions } : {}) });
       }
       if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
         const json = await readJson(req);
