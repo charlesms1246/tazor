@@ -15,6 +15,10 @@ import {
 import { ethCall, getReceipt, rpc } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
+import { recordEvent } from '@/lib/events.ts';
+import { labelOf } from '@/lib/people.ts';
+import { companyByAccount } from '@/lib/company.ts';
 
 const REVOKE_VALIDITY_S = 600n;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -38,6 +42,16 @@ function RemovePerson() {
         if (!r) return;
         const revoked = decodeIsRevoked(await ethCall(rl, encodeIsRevokedCall(getAddress(account), getAddress(target))));
         setTx({ ...tx, seconds: (Date.now() - tx.started) / 1000, status: r.status === '0x1' ? 'success' : 'reverted', revoked });
+        if (revoked) {
+          const t = getAddress(target);
+          const co = companyByAccount(account)?.ens ?? `${account.slice(0, 6)}…${account.slice(-4)}`;
+          const me = loadPasskey()?.approverAccount;
+          recordEvent({
+            subject: t, kind: 'role-revoked', at: Date.now(), title: `${labelOf(t)} removed as approver for ${co}`,
+            actor: me ? labelOf(me as Address) : undefined, detail: `${((Date.now() - tx.started) / 1000).toFixed(1)} s to confirm`,
+            tx: tx.hash, chain: 'whitechain',
+          });
+        }
       } catch { /* keep polling */ }
     }, 500);
     return () => clearInterval(t);
@@ -93,6 +107,12 @@ function RemovePerson() {
         </div>
         {digest && <p className="small muted">Signed digest (matches the contract): <code className="break" data-testid="revoke-digest">{digest}</code></p>}
         {error && <Notice tone="negative"><span data-testid="revoke-error">{error}</span></Notice>}
+        {isAddress(target) && (
+          <div>
+            <div className="small faint" style={{ marginBottom: 8 }}>Activity for {labelOf(getAddress(target))}</div>
+            <Timeline subject={getAddress(target)} testId="person-timeline" />
+          </div>
+        )}
         {tx && (
           <p className="row" data-testid="revoke-tx">
             <span className="muted">Transaction</span>
@@ -115,6 +135,8 @@ function BackupSigner() {
   const [step, setStep] = useState('');
   const [tx, setTx] = useState<{ hash: Hex; started: number; seconds?: number; status?: string; added?: boolean } | null>(null);
   const valid = isAddress(eoa);
+  const [me, setMe] = useState<Address | null>(null);
+  useEffect(() => { const k = loadPasskey(); if (k) setMe(getAddress(k.approverAccount)); }, []);
 
   useEffect(() => {
     if (!tx || tx.seconds !== undefined) return;
@@ -125,6 +147,14 @@ function BackupSigner() {
         if (!r) return;
         const added = key ? decodeIsSigner(await ethCall(key.approverAccount, encodeIsSigner(backupSigner(getAddress(eoa))))) : undefined;
         setTx({ ...tx, seconds: (Date.now() - tx.started) / 1000, status: r.status === '0x1' ? 'success' : 'reverted', added });
+        if (added && key) {
+          const who = getAddress(key.approverAccount);
+          const b = getAddress(eoa);
+          recordEvent({
+            subject: who, kind: 'role-granted', at: Date.now(), title: `Backup signer ${b.slice(0, 6)}…${b.slice(-4)} added to ${labelOf(who)}`,
+            actor: labelOf(who), detail: 'sponsored by the WB Soul paymaster', tx: tx.hash, chain: 'whitechain',
+          });
+        }
       } catch { /* keep polling */ }
     }, 1000);
     return () => clearInterval(t);
@@ -185,6 +215,12 @@ function BackupSigner() {
           {step && <span className="small muted" data-testid="backup-step">{step}</span>}
         </div>
         {error && <Notice tone="negative"><span data-testid="backup-error">{error}</span></Notice>}
+        {me && (
+          <div>
+            <div className="small faint" style={{ marginBottom: 8 }}>Activity for {labelOf(me)}</div>
+            <Timeline subject={me} testId="backup-timeline" />
+          </div>
+        )}
         {tx && (
           <p className="row" data-testid="backup-tx">
             <span className="muted">Transaction</span>
