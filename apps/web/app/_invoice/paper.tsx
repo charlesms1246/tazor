@@ -9,6 +9,8 @@ import type { Invoice } from '@/lib/invoice.ts';
 import { splitTax, type TaxInfo } from '@/lib/invoices-store.ts';
 import './paper.css';
 import { toast } from './toast.tsx';
+import { INR_PER_USDT, inrText } from '@/lib/money.ts';
+import { gstSplit, stateName, type GstMeta } from '@/lib/gst.ts';
 
 export type PaperLine = { description: string; quantity: bigint | null; unitPrice: bigint | null };
 export type PaperInvoice = {
@@ -21,6 +23,8 @@ export type PaperInvoice = {
   lines: PaperLine[];
   memo: string;
   tax: TaxInfo | null;
+  /** Display-only GST details (GSTINs, place of supply, HSN/SAC per line); not part of the signed invoice. */
+  gst?: GstMeta | null;
 };
 export type PaperStatus = 'draft' | 'sent' | 'paid';
 
@@ -32,11 +36,11 @@ export const issuedFromId = (id: string): number | null => {
 };
 
 /** Paper view of a created invoice; a final tax line written by withTax is shown as Tax again. */
-export function paperFromInvoice(i: Invoice, issued?: number): PaperInvoice {
+export function paperFromInvoice(i: Invoice, issued?: number, gst?: GstMeta | null): PaperInvoice {
   const { lines, tax } = splitTax(i.lines);
   return {
     id: i.id, supplierName: i.supplierName, payee: i.payee, buyer: i.buyerAccount,
-    issued: issued ?? issuedFromId(i.id), due: i.dueDate, lines, memo: i.memo, tax,
+    issued: issued ?? issuedFromId(i.id), due: i.dueDate, lines, memo: i.memo, tax, gst: gst ?? null,
   };
 }
 
@@ -48,7 +52,7 @@ const day = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-GB', { da
 const short = (a: string) => (a.length > 14 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || 'T';
 
-function Party({ label, value }: { label: string; value: string }) {
+function Party({ label, value, gstin }: { label: string; value: string; gstin?: string }) {
   const v = value.trim();
   const name = isAddress(v) ? nameOf(v as Address) : null;
   return (
@@ -58,6 +62,7 @@ function Party({ label, value }: { label: string; value: string }) {
         {name && <div className="ip-party-name">{name}</div>}
         <div className="ip-mono" title={v}>{short(v)}</div>
       </> : <div className="ip-faint">Not set</div>}
+      {gstin && <div className="ip-gstin">GSTIN {gstin}</div>}
     </div>
   );
 }
@@ -92,6 +97,8 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
   const totals = p.lines.map((l) => (l.quantity !== null && l.unitPrice !== null ? l.quantity * l.unitPrice : null));
   const subtotal = totals.reduce<bigint>((s, t) => s + (t ?? 0n), 0n);
   const total = subtotal + (p.tax?.amount ?? 0n);
+  const hasHsn = !!p.gst?.hsn?.some((h) => h);
+  const split = p.tax ? gstSplit(p.tax, p.gst ?? null) : null;
   const supplier = p.supplierName.trim();
 
   return (
@@ -106,6 +113,7 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
             ? <img className="ip-logo" src={logo} alt="" />
             : <div className="ip-monogram" aria-hidden>{initials(supplier)}</div>}
           <div className="ip-supplier">{supplier || <span className="ip-faint">Supplier name</span>}</div>
+          {p.gst?.supplierGstin && <div className="ip-gstin" data-testid="paper-gstin-supplier">GSTIN {p.gst.supplierGstin}</div>}
         </div>
         <div className="ip-title">
           <div className="ip-word">INVOICE</div>
@@ -113,21 +121,23 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
             <dt>Number</dt><dd data-testid="paper-number">{p.id ?? <span className="ip-faint">Assigned on create</span>}</dd>
             <dt>Issued</dt><dd>{p.issued !== null ? day(p.issued) : <span className="ip-faint">On create</span>}</dd>
             <dt>Due</dt><dd>{p.due !== null ? day(p.due) : <span className="ip-faint">Not set</span>}</dd>
+            {p.gst?.placeOfSupply && <><dt>Place of supply</dt><dd data-testid="paper-pos">{p.gst.placeOfSupply} · {stateName(p.gst.placeOfSupply)}</dd></>}
           </dl>
         </div>
       </header>
 
       <section className="ip-parties">
-        <Party label="Bill to" value={p.buyer} />
+        <Party label="Bill to" value={p.buyer} gstin={p.gst?.buyerGstin} />
         <Party label="Pay to" value={p.payee} />
       </section>
 
       <table className="ip-lines">
-        <thead><tr><th>Description</th><th className="ip-n">Qty</th><th className="ip-n">Unit price</th><th className="ip-n">Amount</th></tr></thead>
+        <thead><tr><th>Description</th>{hasHsn && <th>HSN/SAC</th>}<th className="ip-n">Qty</th><th className="ip-n">Unit price</th><th className="ip-n">Amount</th></tr></thead>
         <tbody>
           {p.lines.map((l, n) => (
             <tr key={n}>
               <td>{l.description.trim() || <span className="ip-faint">Line {n + 1}</span>}</td>
+              {hasHsn && <td className="ip-hsn" data-testid={`paper-hsn-${n}`}>{p.gst?.hsn?.[n] || '—'}</td>}
               <td className="ip-n">{l.quantity !== null ? l.quantity.toString() : '—'}</td>
               <td className="ip-n">{l.unitPrice !== null ? money(l.unitPrice) : '—'}</td>
               <td className="ip-n">{totals[n] !== null ? money(totals[n]!) : '—'}</td>
@@ -139,10 +149,16 @@ export function InvoicePaper({ invoice: p, status, link, txHash, logo }: {
       <div className="ip-sums">
         <div className="ip-sum"><span>Subtotal</span><span className="ip-n" data-testid="paper-subtotal">{money(subtotal)}</span></div>
         {p.tax && <div className="ip-sum"><span>{p.tax.label} {p.tax.rate}%</span><span className="ip-n" data-testid="paper-tax">{money(p.tax.amount)}</span></div>}
+        {split && split.parts.map((t) => (
+          <div className="ip-sum ip-sub" key={t.label} data-testid={`paper-${t.label.toLowerCase()}`}>
+            <span>of which {t.label} {t.rate}%</span><span className="ip-n">{money(t.amount)}</span>
+          </div>
+        ))}
         <div className="ip-due">
           <span>Total due</span>
           <span className="ip-n"><span data-testid="paper-total">{money(total)}</span> <span className="ip-unit">USDT</span></span>
         </div>
+        <div className="ip-inr" data-testid="paper-inr">{inrText(total)} <span>· indicative at ₹{INR_PER_USDT.toFixed(2)} per USDT</span></div>
       </div>
 
       <section className="ip-pay">
