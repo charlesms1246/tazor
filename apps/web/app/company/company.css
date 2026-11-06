@@ -13,3 +13,5 @@
 @media (max-width: 900px) {
   .drawer { width: 100vw; border-left: 0; }
 }
+.drawer-head > :first-child { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.drawer-head > .btn { flex: none; }

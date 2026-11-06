@@ -228,3 +228,10 @@
   .list-bar .tab .tab-count, .list-bar .tab .tab-sum { margin-left: 0; }
   .list-search { width: 100%; }
 }
+
+/* scan-to-pay block: QR and its actions centred at the foot of the sheet */
+.ip-pay { flex-direction: column; align-items: center; text-align: center; gap: 12px; }
+.ip-qr-wrap { align-items: center; }
+.ip-pay-text { align-items: center; }
+.ip-actions { justify-content: center; }
+@container paper (max-width: 600px) { .ip-pay { align-items: center; } }

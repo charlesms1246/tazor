@@ -476,3 +476,10 @@ main, .page, .card { min-width: 0; }
   .table th, .table td { padding-left: 10px; padding-right: 10px; }
   pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
 }
+
+/* containment: nothing may grow past its card; long ids, links and hashes wrap or ellipsise */
+.card, .notice, .well, .kv > dd, .cell-sub { overflow-wrap: anywhere; }
+.notice > *, .row > *, .spread > *, .card-head > *, .kv > dd > *, .page-header > * { min-width: 0; max-width: 100%; }
+.notice { flex-wrap: wrap; }
+.notice > div, .notice > span { flex: 1 1 0; }
+.mono, code { overflow-wrap: anywhere; }
