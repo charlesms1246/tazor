@@ -10,6 +10,7 @@ import { config } from '@/lib/config.ts';
 import { ethCall, getBlockTimestamp, getReceipt, rpc } from '@/lib/rpc.ts';
 import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInjectedWallet } from '@/lib/ensgate.ts';
 import { appendPayment, loadPasskey } from '@/lib/storage.ts';
+import { verifyCompany, type CompanyVerification } from '@/lib/soul.ts';
 import {
   decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals, parseApprovals,
   relayerBody, serializeApproval, type Approval,
@@ -33,6 +34,7 @@ export default function PayPage() {
   const [calldata, setCalldata] = useState('');
   const [label, setLabel] = useState('acme');
   const [l1, setL1] = useState<L1 | null>(null);
+  const [supplier, setSupplier] = useState<CompanyVerification | 'checking' | 'error'>('checking');
 
   useEffect(() => {
     const load = () =>
@@ -61,6 +63,16 @@ export default function PayPage() {
           : { status: 'refused', reason: `On-chain digest ${onchain} does not match the invoice shown (${local}).` });
       })
       .catch((e) => setGuard({ status: 'refused', reason: `Could not read the on-chain digest: ${msg(e)}` }));
+  }, [state]);
+
+  useEffect(() => {
+    if (typeof state !== 'object') return;
+    const { paymentModule, wbSoulMirror } = config;
+    if (!paymentModule || !wbSoulMirror) return setSupplier('error');
+    setSupplier('checking');
+    verifyCompany(state.invoice.supplierAccount, { paymentModule, mirror: wbSoulMirror })
+      .then(setSupplier)
+      .catch(() => setSupplier('error'));
   }, [state]);
 
   useEffect(() => {
@@ -168,7 +180,12 @@ export default function PayPage() {
       <h1>Invoice {i.id}</h1>
       <table>
         <tbody>
-          <tr><td>From</td><td>{i.supplierName} ({i.supplierAccount})</td></tr>
+          <tr><td>From</td><td>{i.supplierName} ({i.supplierAccount}){' '}
+            {supplier === 'checking' ? <span data-testid="supplier-checking">checking…</span>
+              : typeof supplier === 'object' && supplier.verified
+                ? <strong data-testid="supplier-verified" style={{ color: 'green' }} title={`admin ${supplier.admin}, soul ${supplier.soulId}`}>✓ Verified by WhiteBIT (simulated on testnet)</strong>
+                : <span data-testid="supplier-unverified" style={{ color: '#666' }}>Not verified</span>}
+          </td></tr>
           <tr><td>Pay to</td><td>{i.payee}</td></tr>
           <tr><td>Buyer account</td><td>{i.buyerAccount}</td></tr>
           <tr><td>Token</td><td>{i.token}</td></tr>

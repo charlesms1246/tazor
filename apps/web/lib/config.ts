@@ -12,6 +12,7 @@ export const config = {
   tazorAccountFactory: addr(process.env.NEXT_PUBLIC_TAZOR_ACCOUNT_FACTORY, '0xe6efb87a9f3C2d7275aDB9526094Fc7aa4d5b4A2'),
   roleCache: addr(process.env.NEXT_PUBLIC_ROLE_CACHE, '0x8AC436e5BB681aE4d576e0131391aE3AACA88BDe'),
   mandateModule: addr(process.env.NEXT_PUBLIC_MANDATE_MODULE, '0xB6f4F1B437AC30223D3661bD7bdd12aAec73aC32'),
+  wbSoulMirror: addr(process.env.NEXT_PUBLIC_WB_SOUL, '0x9822650A99bD33F29E383345F570dAE1e4E00928'),
   revocationList: addr(process.env.NEXT_PUBLIC_REVOCATION_LIST, '0x407a8605Fc6fe002Eb025b2dcf9f9C630d5D311e'),
   sepolia: {
     chainId: 11155111,
