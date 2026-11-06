@@ -1,0 +1,20 @@
+{
+  "name": "@tazor/ens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:fork": "node --test --test-concurrency=1 --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts"
+  },
+  "dependencies": {
+    "viem": "2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "7.0.2"
+  }
+}
