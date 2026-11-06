@@ -6,6 +6,8 @@ import { config } from '@/lib/config.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, Empty, Field, Notice, PageHeader } from '../_ui/index.tsx';
+import { ScanQr } from './scan.tsx';
+import '../_invoice/paper.css';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -50,6 +52,7 @@ export function NoLink() {
             <div className="row">
               <button data-testid="open-link-go" className="btn btn-primary" onClick={onOpen} disabled={!link.trim()}>Open</button>
             </div>
+            <ScanQr />
           </div>
         </Card>
 
