@@ -1,0 +1,10 @@
+.rm { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.rm-overlay { position: fixed; inset: 0; background: rgba(10, 14, 30, 0.35); z-index: 80; }
+.rm-dialog { position: fixed; z-index: 81; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  display: grid; gap: 12px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: 0 12px 40px rgba(10, 14, 30, 0.2); text-align: left; cursor: default; }
+.rm-dialog h3 { margin: 0; font-size: 17px; }
+.rm-text { margin: 0; padding: 12px; border-radius: var(--radius-inner); background: var(--raised); font-family: var(--font); font-size: 13px; line-height: 19px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 900px) { .rm-actions .btn { min-height: 44px; flex: 1 1 auto; } .rm .btn { min-height: 44px; } }
+.due-overdue { color: var(--negative); font-weight: 500; }
+.due-today, .due-soon { color: var(--pill-warning-ink, #9a5b00); }

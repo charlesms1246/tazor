@@ -13,6 +13,8 @@ import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { ClearSampleInvoices, SampleInvoices } from '../_demo/demo-banner.tsx';
+import { ReminderButton } from '../_invoice/reminder.tsx';
+import { dueIn } from '@/lib/reminders.ts';
 import { InvoicePaper, paperFromInvoice, printInvoice, type PaperInvoice } from '../_invoice/paper.tsx';
 import { HistoryTimeline } from '../_invoice/history.tsx';
 import { useHistory, useSubjectHistory } from '@/lib/chain-history.ts';
@@ -56,6 +58,12 @@ export default function InvoicesPage() {
   const [logoError, setLogoError] = useState('');
   const [viewing, setViewing] = useState<StoredInvoice | null>(null);
   const [listTab, setListTab] = useState<ListTab>('all');
+  // deep link from Home (/invoices/?tab=overdue): applied once, when the company is known
+  const urlTab = useRef<ListTab | null | undefined>(undefined);
+  if (urlTab.current === undefined && typeof location !== 'undefined') {
+    const t = new URLSearchParams(location.search).get('tab');
+    urlTab.current = t === 'all' || t === 'sent' || t === 'paid' || t === 'overdue' ? t : null;
+  }
   const [side, setSide] = useState<Side>('sent');
   const [gst, setGst] = useState<GstMeta>({});
   const setGstField = (patch: Partial<GstMeta>) => { setGst({ ...gst, ...patch }); setError(''); setDirty(true); };
@@ -95,7 +103,8 @@ export default function InvoicesPage() {
     if (pickedFor.current === company.id) return;
     pickedFor.current = null;
     setSide(/supplier/i.test(company.role.trim()) ? 'sent' : 'bills');
-    setListTab('all');
+    setListTab(urlTab.current ?? 'all');
+    urlTab.current = null;
   }, [company.id, company.role, company.status]);
   useEffect(() => {
     const sync = () => setInbox(loadInbox());
@@ -440,7 +449,8 @@ export default function InvoicesPage() {
                         <td>{r.id}<span className="cell-sub">{s?.invoice.memo || s?.invoice.lines[0]?.description || (r.side === 'bills' ? 'Opened from a payment link' : '')}</span></td>
                         <td>{who(r) || <span className="faint">—</span>}{r.counterparty && <span className="cell-sub mono">{r.counterparty.slice(0, 6)}…{r.counterparty.slice(-4)}</span>}</td>
                         <td className="num">{amt(r.amount)}<span className="cell-sub"><Inr v={r.amount} /></span></td>
-                        <td className="num">{r.dueDate ? day(r.dueDate) : <span className="faint">—</span>}</td>
+                        <td className="num">{r.dueDate ? day(r.dueDate) : <span className="faint">—</span>}
+                          {r.dueDate > 0 && r.status !== 'paid' && (() => { const d = dueIn(r.dueDate * 1000); return <span className={`cell-sub due-${d.tone}`} data-testid="inv-due-label">{d.text}</span>; })()}</td>
                         <td><Pill tone={st.tone} testId="inv-status">{st.text}</Pill></td>
                         <td>
                           <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
@@ -449,6 +459,8 @@ export default function InvoicesPage() {
                             {r.side === 'sent' && s && <>
                               <span onClickCapture={() => toast('Link copied')}><CopyButton value={s.link} label="Copy link" /></span>
                               <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
+                              {r.status !== 'paid' && <ReminderButton remindKey={r.key} to={who(r) || null} from={s.invoice.supplierName || company.name} what={`invoice ${r.id}`}
+                                amount={usdtNumber(r.amount)} dueMs={r.dueDate ? r.dueDate * 1000 : null} link={s.link} />}
                             </>}
                           </span>
                         </td>
