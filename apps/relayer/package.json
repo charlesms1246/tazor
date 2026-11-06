@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "watch:roles": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/watch-main.ts",
     "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts"
