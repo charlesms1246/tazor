@@ -1,4 +1,5 @@
 import {
+  fallback,
   createPublicClient, decodeEventLog, getAddress, http, isAddress, parseAbi, zeroAddress, type Address, type Hex,
 } from 'viem';
 import { sepolia } from 'viem/chains';
@@ -141,8 +142,9 @@ type Ens = {
   subregistry: (registry: Address, label: string) => Promise<Address | null>;
 };
 
-export function ensClient(rpcUrl = config.sepolia.rpcUrl): Ens {
-  const c = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+export function ensClient(rpcUrl?: string): Ens {
+  const urls = rpcUrl ? [rpcUrl] : config.sepolia.rpcUrls;
+  const c = createPublicClient({ chain: sepolia, transport: fallback(urls.map((u) => http(u, { timeout: 8_000, batch: true, retryCount: 1 })), { rank: false }) });
   return {
     text: (name, key) => c.getEnsText({ name, key, universalResolverAddress: UNIVERSAL_RESOLVER }).catch(() => null),
     name: (address) => c.getEnsName({ address, universalResolverAddress: UNIVERSAL_RESOLVER }).catch(() => null),

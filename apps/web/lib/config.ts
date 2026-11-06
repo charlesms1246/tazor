@@ -21,7 +21,9 @@ export const config = {
   depositCheckout: addr(process.env.NEXT_PUBLIC_DEPOSIT_CHECKOUT, '0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab'),
   sepolia: {
     chainId: 11155111,
-    rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com',
+    rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC || 'https://sepolia.gateway.tenderly.co',
+    /** Tried in order when one is slow or rate-limited (public Sepolia RPCs vary from minute to minute). */
+    rpcUrls: [process.env.NEXT_PUBLIC_SEPOLIA_RPC || 'https://sepolia.gateway.tenderly.co', 'https://1rpc.io/sepolia', 'https://ethereum-sepolia-rpc.publicnode.com'],
     explorer: 'https://sepolia.etherscan.io',
     ensGate: addr(process.env.NEXT_PUBLIC_ENS_GATE, '0x3fDFaeFe793F05BB22FA58AB44eE294E51B26c2a'),
   },
