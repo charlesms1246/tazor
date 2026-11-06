@@ -252,7 +252,14 @@ export async function allCheckoutLogs(pages = 4, f: typeof fetch = fetch): Promi
 /** An order's events from the contract that holds it, straight from Whitechain's RPC (explorer as the fallback). */
 export async function orderEvents(id: Hex, contract: Address, f: typeof fetch = fetch): Promise<CheckoutEvent[]> {
   try {
-    const logs = await rpc<RawLog[]>('eth_getLogs', [{ address: contract, fromBlock: toHex(CHECKOUT_DEPLOY_BLOCK), toBlock: 'latest', topics: [null, id] }]);
+    // the public RPC refuses log ranges over 10,000 blocks, so read in chunks
+    const head = BigInt(await rpc<Hex>('eth_blockNumber', []));
+    const chunks: Promise<RawLog[]>[] = [];
+    for (let a = BigInt(CHECKOUT_DEPLOY_BLOCK); a <= head; a += 9_000n) {
+      const b = a + 8_999n < head ? a + 8_999n : head;
+      chunks.push(rpc<RawLog[]>('eth_getLogs', [{ address: contract, fromBlock: toHex(a), toBlock: toHex(b), topics: [null, id] }]));
+    }
+    const logs = (await Promise.all(chunks)).flat();
     return decodeCheckoutLogs(logs).filter((e) => e.id === id.toLowerCase());
   } catch {
     return decodeCheckoutLogs(await explorerLogs(contract, 8, f)).filter((e) => e.id === id.toLowerCase());

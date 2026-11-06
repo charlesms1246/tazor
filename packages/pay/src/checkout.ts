@@ -338,7 +338,7 @@ export async function merchantHistory(merchant: Address, opts: CheckoutOptions &
   };
   const head = BigInt(await rpc<Hex>('eth_blockNumber', []));
   const from = opts.fromBlock ?? CHECKOUT_DEPLOY_BLOCK;
-  const chunk = opts.chunk ?? 50_000n;
+  const chunk = opts.chunk ?? 9_000n; // the public RPC refuses log ranges over 10,000 blocks
   const who = pad(getAddress(merchant)).toLowerCase() as Hex;
   const get = async (address: Address, topics: (Hex | null | Hex[])[]) => {
     const out: RpcLog[] = [];

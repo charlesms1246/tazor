@@ -3,7 +3,7 @@ import type { Sender } from '../sender.ts';
 import type { ChainLog, CheckoutChain } from './service.ts';
 import type { X402Chain } from './x402.ts';
 
-const LOG_CHUNK = 50_000n;
+const LOG_CHUNK = 9_000n; // the public RPC refuses log ranges over 10,000 blocks
 
 /** Live Whitechain access for checkout and x402: reads, chunked log scans, the relayer's queued sender, receipts. */
 export function liveChain(client: PublicClient, sender: Sender): CheckoutChain & X402Chain {
