@@ -119,13 +119,13 @@ export default function ExportPage() {
     <div className="page">
       <PageHeader title="Reports" subtitle="Accounting exports built in your browser from payments recorded on this device; nothing is sent anywhere." />
       {payments.length === 0 ? (
-        <Card>
+        <div data-tour="reports"><Card>
           <div data-testid="empty"><Empty>No paid invoices recorded on this device yet. Pay an invoice and it appears here, ready to export.</Empty></div>
           <div style={{ marginTop: 16 }}><a className="btn btn-sm" href="/pay/">Pay an invoice</a></div>
-        </Card>
+        </Card></div>
       ) : (
         <>
-          <Card title="Export" subtitle="Tally, Xero and QuickBooks bank-statement CSVs, or an ISO 20022 camt.054-style notification (USDT, 6 dp; not XSD-valid).">
+          <div data-tour="reports"><Card title="Export" subtitle="Tally, Xero and QuickBooks bank-statement CSVs, or an ISO 20022 camt.054-style notification (USDT, 6 dp; not XSD-valid).">
             <div className="fields">
               <Field label="Account">
                 <select className="select mono" data-testid="account" value={account} onChange={(e) => setAccount(e.target.value)}>
@@ -139,7 +139,7 @@ export default function ExportPage() {
                 <button className="btn" data-testid="camt" onClick={() => download(`tazor-camt054-${stamp}.xml`, 'application/xml', toCamt054(mine, account))}>ISO 20022 camt.054</button>
               </div>
             </div>
-          </Card>
+          </Card></div>
           <Card title="Payments" subtitle={`${mine.length} ${mine.length === 1 ? 'payment' : 'payments'} for this account.`} flush>
             {mine.length === 0 ? <div style={{ padding: '0 24px 24px' }}><Empty>No payments for this account. Pick another account above.</Empty></div> : (
               <div className="table-wrap"><table className="table table-stack">

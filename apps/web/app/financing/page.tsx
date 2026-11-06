@@ -17,6 +17,9 @@ import { ethCall } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { sendOnWhitechain } from '@/lib/wallet-wc.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
+import { recordEvent } from '@/lib/events.ts';
+import { usdt2dp } from '@/lib/export.ts';
 
 const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
 const Amount = ({ v }: { v: bigint }) => <><span className="num">{formatUnits(v, 6)}</span> <span className="faint">USDT</span></>;
@@ -25,7 +28,7 @@ const ZERO = '0x0000000000000000000000000000000000000000';
 
 type Tx = { to: Address; data: Hex; label: string };
 
-function Txs({ txs, id }: { txs: Tx[]; id: string }) {
+function Txs({ txs, id, onSent }: { txs: Tx[]; id: string; onSent?: (t: Tx, hash: Hex) => void }) {
   const [hashes, setHashes] = useState<Record<number, Hex>>({});
   const [err, setErr] = useState('');
   return (
@@ -38,7 +41,7 @@ function Txs({ txs, id }: { txs: Tx[]; id: string }) {
           </div>
           <div className="row">
             <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: t.to, data: t.data })).catch(() => undefined)}>Copy calldata</button>
-            <button className="btn btn-sm" onClick={() => sendOnWhitechain(t.to, t.data).then((h) => setHashes({ ...hashes, [i]: h }), (e) => setErr(msg(e)))}>Send with your wallet</button>
+            <button className="btn btn-sm" onClick={() => sendOnWhitechain(t.to, t.data).then((h) => { setHashes({ ...hashes, [i]: h }); onSent?.(t, h); }, (e) => setErr(msg(e)))}>Send with your wallet</button>
             {hashes[i] && <Addr value={hashes[i]} href={`${config.explorer}/tx/${hashes[i]}`} />}
           </div>
         </div>
@@ -171,6 +174,16 @@ function Claim({ fm }: { fm: Address }) {
     } catch (e) { setView(null); setError(msg(e)); }
   };
   const due = view ? Number(view.due) * 1000 <= Date.now() : false;
+  const short = (v: bigint) => { const t = v.toString(); return t.length > 10 ? `${t.slice(0, 6)}…${t.slice(-4)}` : t; };
+  const onSent = (t: Tx, hash: Hex) => {
+    if (!view) return;
+    const subject = `claim:${view.id.toString()}`;
+    if (t.label.startsWith('buy')) {
+      recordEvent({ subject, kind: 'financed', at: Date.now(), title: `Invoice claim #${short(view.id)} bought by a financier for ${usdt2dp(view.price)} USDT`, tx: hash, chain: 'whitechain' });
+    } else if (t.label.startsWith('settle')) {
+      recordEvent({ subject, kind: 'settled', at: Date.now(), title: `Invoice claim #${short(view.id)} settled: ${usdt2dp(view.amount)} USDT paid to the holder`, tx: hash, chain: 'whitechain' });
+    }
+  };
 
   return (
     <Card title="2. Claim" subtitle="Look up a committed claim, list it for sale, or buy it as a financier. At the due date anyone can settle it from the buyer\u2019s account, paying whoever then holds it.">
@@ -212,7 +225,13 @@ function Claim({ fm }: { fm: Address }) {
           </div>
         )}
         {error && <Notice tone="negative"><span data-testid="claim-error">{error}</span></Notice>}
-        {out && <Txs txs={out} id="claim" />}
+        {out && <Txs txs={out} id="claim" onSent={onSent} />}
+        {view && view.account !== ZERO && (
+          <div>
+            <div className="small faint" style={{ marginBottom: 8 }}>Activity for this claim</div>
+            <Timeline subject={`claim:${view.id.toString()}`} testId="claim-timeline" />
+          </div>
+        )}
       </div>
     </Card>
   );
