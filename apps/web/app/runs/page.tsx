@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatUnits, isAddressEqual, type Address, type Hex } from 'viem';
+import { isAddressEqual, type Address, type Hex } from 'viem';
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
@@ -10,7 +10,7 @@ import { buildInvoiceAuth, type InvoiceAuth } from '@/lib/invoice-auth.ts';
 import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
 import type { Invoice } from '@/lib/invoice.ts';
 import { isV2Account } from '@/lib/pay-v2.ts';
-import { defaultAuthParams, mergeApprovals, parseApprovals, serializeApproval, type Approval } from '@/lib/payment.ts';
+import { defaultAuthParams, mergeApprovals, type Approval } from '@/lib/payment.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { ethCall, getReceipt } from '@/lib/rpc.ts';
 import { recordEvent, type EventKind } from '@/lib/events.ts';
@@ -18,14 +18,20 @@ import { upsertInbox } from '@/lib/inbox.ts';
 import { RUN_STEPS, pendingSteps, shortAddr, subjectOf, useEvents } from '@/lib/story.ts';
 import { decodeRunDigest, encodePayRun, encodeRunDigestCall, payRunRelayerBody, runDigest } from '@/lib/runs.ts';
 import { loadPasskey } from '@/lib/storage.ts';
-import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { Timeline } from '../_ui/timeline.tsx';
 import '../_invoice/touch.css';
+import { ApprovalNames, MyApproval } from '../_invoice/approvals-ui.tsx';
+import { parseApprovalInput } from '@/lib/approval-code.ts';
+import { hasHex } from '@/lib/hex-text.ts';
+import { plain } from '@/lib/human.ts';
 import { loadInvoices, runCandidates } from '@/lib/invoices-store.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import { partyName } from '@/lib/story.ts';
+import { usdtNumber } from '@/lib/money.ts';
+import { AddrChip } from '../_human/chip.tsx';
 
-const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
+const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const MAX = 50;
 
@@ -43,6 +49,7 @@ export default function RunsPage() {
   const [run, setRun] = useState<Run | null>(null);
   const [rows, setRows] = useState<{ line: number; error: string }[]>([]);
   const [mine, setMine] = useState<Approval | null>(null);
+  const [mineAt, setMineAt] = useState(0);
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,9 +87,10 @@ export default function RunsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, tx]);
 
-  const approvals = (() => {
-    try { return mergeApprovals(mine ? [mine] : [], pasted.trim() ? parseApprovals(pasted) : []); } catch { return null; }
+  const pastedParse = (() => {
+    try { return { list: parseApprovalInput(pasted, run?.digest), error: '' }; } catch (e) { return { list: null, error: msg(e) }; }
   })();
+  const approvals = pastedParse.list === null ? null : mergeApprovals(mine ? [mine] : [], pastedParse.list);
   const run$ = (fn: () => Promise<void>) => async () => {
     setBusy(true); setError('');
     try { await fn(); } catch (e) { setError(msg(e)); } finally { setBusy(false); }
@@ -130,9 +138,10 @@ export default function RunsPage() {
     const key = loadPasskey();
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
     setMine({ approver: key.approverAccount, signature: await counterfactualApproval(key, await signDigestWithPasskey(key.credentialId, run.digest, key)) });
+    setMineAt(Date.now());
     const who = shortAddr(key.approverAccount);
     story(run, 'approved', `approved by ${who}`, { actor: who, detail: 'one passkey signature for the whole run' });
-    upsertInbox({ id: run.digest, status: 'approved', approvals: 1 + (pasted.trim() ? (() => { try { return parseApprovals(pasted).length; } catch { return 0; } })() : 0) });
+    upsertInbox({ id: run.digest, status: 'approved', approvals: 1 + (pastedParse.list?.length ?? 0) });
   });
 
   const onPay = run$(async () => {
@@ -157,7 +166,14 @@ export default function RunsPage() {
   });
 
   const total = run?.auths.reduce((s, a) => s + a.amount, 0n) ?? 0n;
-  const errorNotice = error && <Notice tone="negative" testId="run-error">{error}</Notice>;
+  const errorNotice = error && (
+    <Notice tone="negative" testId="run-error">
+      <span className="stack" style={{ gap: 4, minWidth: 0 }}>
+        <span>{plain(error)}</span>
+        {hasHex(error) && <details className="small error-detail"><summary>For developers</summary>{error}</details>}
+      </span>
+    </Notice>
+  );
   return (
     <div className="page tz-touch">
       <PageHeader title="Payment runs" subtitle="Approve many invoices with one signature; each link is decrypted and checked exactly as on the Pay page." />
@@ -185,13 +201,13 @@ export default function RunsPage() {
 
       {run && (
         <div className="grid-2">
-          <Card title="Run" flush subtitle={<>{run.auths.length} invoices from buyer <Addr value={run.account} href={`${config.explorer}/address/${run.account}`} /></>}>
+          <Card title="Run" flush subtitle={<>{run.auths.length} invoices from <AddrChip value={run.account} name={partyName(run.account)} href={`${config.explorer}/address/${run.account}`} /></>}>
             <div className="table-wrap"><table className="table table-stack" data-testid="run-table">
               <thead><tr><th>Invoice</th><th>Pay to</th><th className="num">Amount</th></tr></thead>
               <tbody>{run.invoices.map((i, n) => (
                 <tr key={n}>
                   <td>{i.id}<span className="cell-sub">{i.supplierName}</span></td>
-                  <td><Addr value={run.auths[n].payee} /></td>
+                  <td><AddrChip value={run.auths[n].payee} name={partyName(run.auths[n].payee)} /></td>
                   <td className="num">{amt(run.auths[n].amount)}</td>
                 </tr>
               ))}</tbody>
@@ -199,34 +215,41 @@ export default function RunsPage() {
             </table></div>
           </Card>
 
-          <Card title="Approve and pay" subtitle={<>{run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} <Addr value={run.module} href={`${config.explorer}/address/${run.module}`} /></>}>
+          <Card title="Approve and pay" subtitle={<>Your passkey signs all {run.invoices.length} invoices at once; {run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} checks the limits.</>}>
             <div className="stack">
-              <Notice tone="positive" testId="run-guard-ok"><span style={{ minWidth: 0 }}>The contract computes the same run digest for these invoices.<span className="mono small digest-line" title={run.digest}>{run.digest}</span></span></Notice>
+              <div data-testid="run-guard-ok" data-digest={run.digest}>
+                <Notice tone="positive">✓ The contract agrees on exactly these {run.invoices.length} invoices ({amt(total)} in total).</Notice>
+              </div>
               <div className="row">
                 <button data-testid="run-approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy}>Approve run with passkey</button>
                 {mine && <Pill tone="positive">Approved on this device</Pill>}
               </div>
-              {mine && (
-                <div className="well">
-                  <p className="small muted">Your approval</p>
-                  <code data-testid="run-my-approval" className="mono break">{serializeApproval(mine)}</code>
-                </div>
-              )}
-              <Field label="Approvals from other approvers (JSON)">
-                <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
+              {mine && <MyApproval approval={mine} at={mineAt || Date.now()} digest={run.digest} what={`the payment run of ${run.invoices.length} invoices`} testId="run-my-approval" shareTestId="run-share-approval" />}
+              <Field label="Paste an approval a colleague shared">
+                <textarea data-testid="run-pasted" className="textarea" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={2} placeholder="Tazor approval for the payment run…: TZA1.…" />
               </Field>
+              {pastedParse.list && <ApprovalNames approvals={pastedParse.list} testId="run-pasted-approvals" />}
+              {pastedParse.error && <Notice tone="negative" testId="run-pasted-error">{pastedParse.error}</Notice>}
               <div className="row">
                 <button data-testid="run-pay" className={mine ? 'btn btn-primary' : 'btn'} onClick={onPay} disabled={busy || !approvals?.length}>Pay run</button>
                 <button data-testid="run-calldata" className="btn" onClick={onCopy} disabled={busy || !approvals?.length}>Copy calldata</button>
               </div>
               {errorNotice}
-              {tx && <Notice tone="positive" testId="run-tx"><span>Transaction <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer" className="mono break">{tx}</a></span></Notice>}
-              {calldata && (
-                <div className="well">
-                  <p className="small muted">To <span className="mono">{run.module}</span> on Whitechain</p>
-                  <code data-testid="run-calldata-out" className="mono break">{calldata}</code>
-                </div>
-              )}
+              {tx && <div data-testid="run-tx" data-tx={tx}><Notice tone="positive">Payment run sent · <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer">View transaction</a></Notice></div>}
+              {calldata && <p className="small muted">Calldata copied. It is also under For developers below.</p>}
+              <details className="tech-details" data-testid="run-for-developers">
+                <summary>For developers</summary>
+                <dl className="kv">
+                  <dt>Run digest</dt><dd><span className="mono break">{run.digest}</span></dd>
+                  <dt>Module</dt><dd><span className="mono break">{run.module}</span></dd>
+                </dl>
+                {calldata && (
+                  <div className="well">
+                    <p className="small muted">payRun calldata for {run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} on Whitechain</p>
+                    <code data-testid="run-calldata-out" className="mono break">{calldata}</code>
+                  </div>
+                )}
+              </details>
             </div>
           </Card>
         </div>

@@ -20,8 +20,9 @@ import { recordEvent } from '@/lib/events.ts';
 import { INVOICE_STEPS, partyName, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
 import { toast, Toasts } from '../_invoice/toast.tsx';
+import { usdtNumber } from '@/lib/money.ts';
 
-const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
+const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 const blankLine = (): LineForm => ({ description: '', quantity: '1', unitPrice: '' });
@@ -149,7 +150,7 @@ export default function InvoicesPage() {
   const inTab = (s: StoredInvoice, t: ListTab) => t === 'all' || rowStatus(s) === t;
   const q = query.trim().toLowerCase();
   const matches = (s: StoredInvoice) => !q || [
-    s.invoice.id, s.invoice.buyerAccount, partyName(s.invoice.buyerAccount), formatUnits(s.invoice.amount, 6), s.invoice.memo,
+    s.invoice.id, s.invoice.buyerAccount, partyName(s.invoice.buyerAccount), formatUnits(s.invoice.amount, 6), usdtNumber(s.invoice.amount), s.invoice.memo,
   ].some((v) => v.toLowerCase().includes(q));
   const rows = list.filter((s) => inTab(s, listTab) && matches(s));
   const tabStats = (t: ListTab) => {
@@ -169,7 +170,7 @@ export default function InvoicesPage() {
       if (!saveInvoice(stored)) setError('Created, but this browser would not save it to the list; copy the link now.');
       const subject = subjectOf(r.invoice);
       const to = partyName(r.invoice.buyerAccount);
-      recordEvent({ subject, kind: 'created', at: stored.createdAt * 1000, title: `${r.invoice.id} created by ${r.invoice.supplierName}`, actor: r.invoice.supplierName, detail: `${formatUnits(r.invoice.amount, 6)} USDT` });
+      recordEvent({ subject, kind: 'created', at: stored.createdAt * 1000, title: `${r.invoice.id} created by ${r.invoice.supplierName}`, actor: r.invoice.supplierName, detail: `${usdtNumber(r.invoice.amount)} USDT` });
       recordEvent({ subject, kind: 'sent', at: Date.now(), title: `${r.invoice.id} sent to ${to}`, detail: 'payment link generated' });
       setCreated(stored);
       toast(`Payment link for ${r.invoice.id} created`);
@@ -291,7 +292,7 @@ export default function InvoicesPage() {
               <Notice tone="positive">
                 <span className="stack" style={{ gap: 8 }}>
                   <span>Invoice {created.invoice.id} is ready. Send this link to your customer:</span>
-                  <span className="mono break inv-link-text" data-testid="inv-link" title={created.link}>{created.link}</span>
+                  <span className="small muted" data-testid="inv-link" data-link={created.link}>Encrypted payment link for {created.invoice.id}: only someone with the link can read the invoice.</span>
                   <span className="row">
                     <span onClickCapture={() => toast('Link copied')}><CopyButton value={created.link} label="Copy link" /></span>
                     <a className="btn btn-sm" data-testid="inv-open" href={created.link} target="_blank" rel="noreferrer">Open</a>
@@ -330,7 +331,7 @@ export default function InvoicesPage() {
                   return (
                     <button key={t.id} role="tab" className="tab" aria-selected={listTab === t.id} data-testid={`inv-tab-${t.id}`} onClick={() => setListTab(t.id)}>
                       {t.label}<span className="tab-count" data-testid={`inv-tab-count-${t.id}`}>{st.count}</span>
-                      <span className="tab-sum" data-testid={`inv-tab-total-${t.id}`}>{formatUnits(st.total, 6)} USDT</span>
+                      <span className="tab-sum" data-testid={`inv-tab-total-${t.id}`}>{usdtNumber(st.total)} USDT</span>
                     </button>
                   );
                 })}

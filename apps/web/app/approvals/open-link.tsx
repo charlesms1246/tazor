@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, type ClipboardEvent } from 'react';
-import { formatUnits } from 'viem';
 import { config } from '@/lib/config.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { isPayLink } from '../pay/no-link.tsx';
 import { ScanQr } from '../pay/scan.tsx';
-import { Addr, Card, Empty, Notice } from '../_ui/index.tsx';
+import { Card, Empty, Notice } from '../_ui/index.tsx';
+import { usdtNumber } from '@/lib/money.ts';
 
 /** Paste or scan the payment link a supplier sent, then open it on /pay/. */
 export function OpenLinkBar() {
@@ -66,8 +66,8 @@ export function PaidFromDevice() {
             {payments.map((p) => (
               <tr key={p.txHash} data-testid="paid-row">
                 <td>{p.invoice.supplierName}<span className="cell-sub">{p.invoice.id} · {day(p.blockTimestamp)}</span></td>
-                <td className="num">{formatUnits(p.invoice.amount, 6)} <span className="faint">USDT</span></td>
-                <td><Addr value={p.txHash} href={`${config.explorer}/tx/${p.txHash}`} /></td>
+                <td className="num">{usdtNumber(p.invoice.amount)} <span className="faint">USDT</span></td>
+                <td><a href={`${config.explorer}/tx/${p.txHash}`} target="_blank" rel="noreferrer" data-value={p.txHash}>View transaction</a></td>
               </tr>
             ))}
           </tbody>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { decodeEventLog, decodeFunctionResult, encodeFunctionData, formatUnits, parseAbi, toHex, type Address, type Hex } from 'viem';
+import { decodeEventLog, decodeFunctionResult, encodeFunctionData, parseAbi, toHex, type Address, type Hex } from 'viem';
 import { config } from './config.ts';
 import { configV2 } from './config-v2.ts';
 import { companyByAccount } from './company.ts';
@@ -10,6 +10,7 @@ import { decodeConfigV2, encodeConfigV2Of, ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR
 import { ethCall } from './rpc.ts';
 import { loadPayments } from './storage.ts';
 import { invoiceHash } from './invoice.ts';
+import { usdtNumber } from './money.ts';
 
 /** Event fragments, copied from contracts/src (PaymentModule(V2), MandateModule(V2), RevocationList, RoleCache, EnsGate). */
 export const historyAbi = parseAbi([
@@ -85,8 +86,10 @@ export async function fetchLogs(src: Source, f: typeof fetch = fetch, maxPages =
 
 const eq = (a?: string | null, b?: string | null) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 const short = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
+/** A short human reference for a hash or id (never the full value): #a1b2c3 */
+const ref = (h: string) => `#${h.toLowerCase().replace(/^0x/, '').slice(0, 6)}`;
 const name = (a: string) => companyByAccount(a)?.name ?? short(a);
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
+const usdt = (v: bigint) => `${usdtNumber(v)} USDT`;
 const ON_CHAIN = 'on-chain';
 const roleNames = (r: bigint) =>
   [r & ROLE_APPROVER ? 'approver' : '', r & ROLE_TAZOR_ADMIN ? 'admin' : '', r & ROLE_AGENT ? 'agent' : ''].filter(Boolean).join(', ') || 'no roles';
@@ -107,7 +110,7 @@ export type MapContext = { account: Address; registries?: Address[]; names?: Inv
 export function mapLogs(batches: { src: Source; logs: BlockscoutLog[] }[], ctx: MapContext): ChainEvent[] {
   const A = ctx.account;
   const names = ctx.names ?? (() => null);
-  const invoiceLabel = (subject: string) => names(subject) ?? `Invoice ${short(subject)}`;
+  const invoiceLabel = (subject: string) => names(subject) ?? `Invoice ${ref(subject)}`;
   const decoded = batches.flatMap(({ src, logs }) => logs.flatMap((log) => {
     try {
       const topics = log.topics.filter((t): t is Hex => !!t);
@@ -165,7 +168,7 @@ export function mapLogs(batches: { src: Source; logs: BlockscoutLog[] }[], ctx: 
         if (!myMandates.has(mandateId.toLowerCase())) break;
         out.push({
           ...base, subject: mandateId.toLowerCase(), kind: 'mandate-created',
-          title: `Mandate ${short(mandateId)} set up: ${name(account)} pays ${name(payee)} up to ${usdt(capPerPeriod)} every ${Number(period) / 86400} days`,
+          title: `Mandate ${ref(mandateId)} set up: ${name(account)} pays ${name(payee)} up to ${usdt(capPerPeriod)} every ${Number(period) / 86400} days`,
           detail: `${ON_CHAIN} · ${src.name}`, payer: account, payee,
         });
         break;
@@ -175,14 +178,14 @@ export function mapLogs(batches: { src: Source; logs: BlockscoutLog[] }[], ctx: 
         if (!myMandates.has(mandateId.toLowerCase())) break;
         out.push({
           ...base, subject: mandateId.toLowerCase(), kind: 'collected',
-          title: `Mandate ${short(mandateId)} collected ${usdt(amount)}`, detail: `${ON_CHAIN} · period ${periodIndex}`, amount: amount.toString(),
+          title: `Mandate ${ref(mandateId)} collected ${usdt(amount)}`, detail: `${ON_CHAIN} · period ${periodIndex}`, amount: amount.toString(),
         });
         break;
       }
       case 'MandateCancelled': {
         const { mandateId, by } = ev.args;
         if (!myMandates.has(mandateId.toLowerCase())) break;
-        out.push({ ...base, subject: mandateId.toLowerCase(), kind: 'mandate-cancelled', title: `Mandate ${short(mandateId)} cancelled by ${name(by)}`, detail: ON_CHAIN });
+        out.push({ ...base, subject: mandateId.toLowerCase(), kind: 'mandate-cancelled', title: `Mandate ${ref(mandateId)} cancelled by ${name(by)}`, detail: ON_CHAIN });
         break;
       }
       case 'ApproverRevoked': {

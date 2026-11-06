@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatUnits } from 'viem';
 import { INBOX_CHANGED, loadInbox, type InboxItem, type InboxStatus } from '@/lib/inbox.ts';
 import { useHistory, type ChainEvent } from '@/lib/chain-history.ts';
 import { useCompany } from '@/lib/company.ts';
@@ -11,6 +10,7 @@ import { Card, Empty, PageHeader, Pill } from '../_ui/index.tsx';
 import { OpenLinkBar, PaidFromDevice } from './open-link.tsx';
 import './approvals.css';
 import '../_invoice/touch.css';
+import { usdtNumber } from '@/lib/money.ts';
 
 const TABS: { status: InboxStatus; label: string }[] = [
   { status: 'needs-approval', label: 'Needs approval' },
@@ -32,7 +32,7 @@ const EMPTY: Record<InboxStatus, string> = {
 };
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 const amount = (v?: string) => {
-  try { return v ? <>{formatUnits(BigInt(v), 6)} <span className="faint">USDT</span></> : <span className="faint">—</span>; } catch { return <span className="faint">—</span>; }
+  try { return v ? <>{usdtNumber(BigInt(v))} <span className="faint">USDT</span></> : <span className="faint">—</span>; } catch { return <span className="faint">—</span>; }
 };
 /** An inbox row built from an on-chain InvoicePaid this company paid. */
 type Row = InboxItem & { chain?: ChainEvent };

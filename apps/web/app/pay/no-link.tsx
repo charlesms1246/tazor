@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatUnits } from 'viem';
 import { config } from '@/lib/config.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
-import { Addr, Card, Empty, Field, Notice, PageHeader } from '../_ui/index.tsx';
+import { Card, Empty, Field, Notice, PageHeader } from '../_ui/index.tsx';
 import { ScanQr } from './scan.tsx';
 import '../_invoice/paper.css';
 import '../_invoice/touch.css';
+import { usdtNumber } from '@/lib/money.ts';
 
-const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
+const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 
 /** True for a payment link to this site's Pay page: <origin>/pay/#v1.… */
@@ -87,7 +87,7 @@ export function NoLink() {
                 <tr key={p.txHash} data-testid="paid-row">
                   <td>{p.invoice.supplierName}<span className="cell-sub">{p.invoice.id} · {day(p.blockTimestamp)}</span></td>
                   <td className="num">{amt(p.invoice.amount)}</td>
-                  <td><Addr value={p.txHash} href={`${config.explorer}/tx/${p.txHash}`} /></td>
+                  <td><a href={`${config.explorer}/tx/${p.txHash}`} target="_blank" rel="noreferrer" data-value={p.txHash}>View transaction</a></td>
                 </tr>
               ))}
             </tbody>

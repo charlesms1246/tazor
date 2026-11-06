@@ -14,12 +14,12 @@ import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInject
 import { appendPayment, loadPasskey, loadPayments } from '@/lib/storage.ts';
 import { verifyCompany, type CompanyVerification } from '@/lib/soul.ts';
 import {
-  decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals, parseApprovals,
-  relayerBody, serializeApproval, type Approval,
+  decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals,
+  relayerBody, type Approval,
 } from '@/lib/payment.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
-import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { Redirect } from '../_redirect/redirect.tsx';
 import { InvoicePaper, issuedFromId, paperFromInvoice } from '../_invoice/paper.tsx';
 import { HistoryTimeline } from '../_invoice/history.tsx';
@@ -28,17 +28,23 @@ import { eventsFor, recordEvent, type TimelineEvent } from '@/lib/events.ts';
 import { loadInbox, upsertInbox } from '@/lib/inbox.ts';
 import { INVOICE_STEPS, inboxForInvoice, recordOpened, shortAddr, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
+import { ApprovalNames, MyApproval } from '../_invoice/approvals-ui.tsx';
+import { parseApprovalInput } from '@/lib/approval-code.ts';
+import { hasHex } from '@/lib/hex-text.ts';
+import { plain } from '@/lib/human.ts';
 import { printInvoice } from '../_invoice/paper.tsx';
 import { toast, Toasts } from '../_invoice/toast.tsx';
 import { friendlyError } from '@/lib/friendly-errors.ts';
 import { elapsed } from '@/lib/events.ts';
 import { partyName } from '@/lib/story.ts';
+import { usdtNumber } from '@/lib/money.ts';
+import { AddrChip } from '../_human/chip.tsx';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
 type Guard = { status: 'checking' } | { status: 'ok'; digest: Hex } | { status: 'refused'; reason: string };
 
-const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
+const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const day = (ts: number | bigint) => new Date(Number(ts) * 1000).toISOString().slice(0, 10);
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -46,6 +52,7 @@ export default function PayPage() {
   const [state, setState] = useState<'loading' | 'none' | 'invalid' | Loaded>('loading');
   const [guard, setGuard] = useState<Guard>({ status: 'checking' });
   const [mine, setMine] = useState<Approval | null>(null);
+  const [mineAt, setMineAt] = useState(0);
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -108,11 +115,11 @@ export default function PayPage() {
         const s = subjectOf(state.invoice);
         recordEvent(ok
           ? { subject: s, kind: 'policy-passed', at: Date.now(), title: `${state.invoice.id} passed the contract check`, detail: `${v2 ? 'PaymentModuleV2' : 'PaymentModule'} digest matches` }
-          : { subject: s, kind: 'failed', at: Date.now(), title: `${state.invoice.id} refused: digest mismatch`, detail: 'the contract digest does not match the invoice shown' });
+          : { subject: s, kind: 'failed', at: Date.now(), title: `${state.invoice.id} refused: the contract does not match the invoice shown`, detail: 'the link may have been altered' });
       })
       .catch((e) => {
         setGuard({ status: 'refused', reason: `Could not read the on-chain digest: ${msg(e)}` });
-        recordEvent({ subject: subjectOf(state.invoice), kind: 'failed', at: Date.now(), title: `${state.invoice.id}: contract check unavailable`, detail: msg(e).slice(0, 120) });
+        recordEvent({ subject: subjectOf(state.invoice), kind: 'failed', at: Date.now(), title: `${state.invoice.id}: contract check unavailable`, detail: plain(msg(e)).slice(0, 120) });
       });
   }, [state, v2]);
 
@@ -179,7 +186,7 @@ export default function PayPage() {
   // a toast when this session's payment lands (not for invoices that were already paid when opened)
   useEffect(() => {
     if (typeof state !== 'object') return;
-    if (tx?.status === 'success' || l1?.l2Tx) toast(`Paid ${formatUnits(state.invoice.amount, 6)} USDT to ${state.invoice.supplierName}`);
+    if (tx?.status === 'success' || l1?.l2Tx) toast(`Paid ${usdtNumber(state.invoice.amount)} USDT to ${state.invoice.supplierName}`);
     else if (tx?.status === 'reverted') toast('The payment reverted on Whitechain', 'error');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tx?.status, l1?.l2Tx]);
@@ -195,9 +202,12 @@ export default function PayPage() {
   }
 
   const { invoice: i, auth } = state;
-  const approvals = (() => {
-    try { return mergeApprovals(mine ? [mine] : [], pasted.trim() ? parseApprovals(pasted) : []); } catch { return null; }
+  // colleagues' approvals arrive as TZA1 codes (or the older JSON); a code for another invoice is refused here
+  const signedDigest = guard.status === 'ok' ? guard.digest : undefined;
+  const pastedParse = (() => {
+    try { return { list: parseApprovalInput(pasted, signedDigest), error: '' }; } catch (e) { return { list: null, error: msg(e) }; }
   })();
+  const approvals = pastedParse.list === null ? null : mergeApprovals(mine ? [mine] : [], pastedParse.list);
   // contracts read inner signatures; an ERC-6492-wrapped approver must be deployed first (the relayer does this)
   const inner = (approvals ?? []).map((a) => ({ ...a, signature: unwrap6492(a.signature).inner }));
   const pendingDeploys = (approvals ?? []).map((a) => unwrap6492(a.signature)).filter((u) => u.factory);
@@ -207,7 +217,7 @@ export default function PayPage() {
     setError('');
     try { await fn(); } catch (e) {
       setError(msg(e));
-      story('failed', `${i.id}: ${msg(e).slice(0, 80)}`, { detail: msg(e).slice(0, 160) });
+      story('failed', `${i.id}: ${(friendlyError(msg(e))?.title ?? plain(msg(e))).slice(0, 90)}`, { detail: plain(msg(e)).slice(0, 160) });
     } finally { setBusy(false); }
   };
 
@@ -217,9 +227,10 @@ export default function PayPage() {
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
     const signature = await counterfactualApproval(key, await signInvoiceAuthWithPasskey(key.credentialId, guard.digest, key));
     setMine({ approver: key.approverAccount, signature });
+    setMineAt(Date.now());
     const who = shortAddr(key.approverAccount);
     story('approved', `${i.id} approved by ${who}`, { actor: who, detail: 'passkey signature' });
-    const others = (() => { try { return pasted.trim() ? parseApprovals(pasted) : []; } catch { return []; } })();
+    const others = pastedParse.list ?? [];
     const count = mergeApprovals([{ approver: key.approverAccount, signature }], others).length;
     const prev = loadInbox().find((x) => x.id === subject)?.approvals ?? 0;
     upsertInbox({ id: subject!, status: 'approved', approvals: Math.max(prev, count) });
@@ -292,7 +303,7 @@ export default function PayPage() {
   const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore ?? chainPaid ?? null;
   const settledIn = tx?.status === 'success' && tx.seconds !== undefined ? tx.seconds
     : l1?.l2Tx && l1.seconds !== undefined ? l1.seconds : elapsed(history.events, 'submitted', 'paid');
-  const amountText = formatUnits(i.amount, 6);
+  const amountText = usdtNumber(i.amount);
 
   // the guided steps, driven by the existing states
   type StepState = 'todo' | 'active' | 'done' | 'error';
@@ -336,7 +347,7 @@ export default function PayPage() {
           </div>
         </section>
       )}
-      {v2 && <p className="small muted" data-testid="v2-account" style={{ margin: 0 }}>This company uses PaymentModuleV2 (spending limits and payee rules apply) · <span className="mono break">{configV2.paymentModule}</span></p>}
+      {v2 && <p className="small muted" data-testid="v2-account" data-module={configV2.paymentModule ?? ''} style={{ margin: 0 }}>This company uses PaymentModuleV2: its spending limits and payee rules apply to this payment.</p>}
 
       <div className="pay-split">
         <div className="stack">
@@ -352,11 +363,11 @@ export default function PayPage() {
                 <dd>
                   <span className="stack" style={{ gap: 4 }}>
                     <span>{i.supplierName}</span>
-                    <Addr value={i.supplierAccount} href={explorer(i.supplierAccount)} />
+                    <AddrChip value={i.supplierAccount} href={explorer(i.supplierAccount)} />
                     <span className="pill-wrap">
                       {supplier === 'checking' ? <Pill testId="supplier-checking">checking…</Pill>
                         : typeof supplier === 'object' && supplier.verified
-                          ? <span title={`Verified by WhiteBIT (simulated on testnet). Admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT · simulated</Pill></span>
+                          ? <span title="Verified by WhiteBIT (simulated on testnet)"><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT · simulated</Pill></span>
                           : <Pill testId="supplier-unverified">Not verified</Pill>}
                     </span>
                   </span>
@@ -365,11 +376,21 @@ export default function PayPage() {
                 <dt>Due</dt><dd className="num">{day(i.dueDate)}</dd>
               </dl>
               {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
-              {guard.status === 'refused' && <Notice tone="negative" testId="guard-refused">Refusing to sign: {guard.reason}</Notice>}
-              {guard.status === 'ok' && (
-                <Notice tone="positive" testId="guard-ok">
-                  <span style={{ minWidth: 0 }}>The contract computes the same digest for this invoice.<span className="mono small digest-line" title={guard.digest}>{guard.digest}</span></span>
+              {guard.status === 'refused' && (
+                <Notice tone="negative" testId="guard-refused">
+                  <span className="stack" style={{ gap: 4, minWidth: 0 }}>
+                    <span>Refusing to sign: {/does not match/.test(guard.reason)
+                      ? 'the contract does not match the invoice shown, so the link may have been altered. Ask the supplier for a new link.'
+                      : /not configured/.test(guard.reason) ? 'this app has no payment contract configured.'
+                        : "the page could not check this invoice with the contract right now. Try again in a minute."}</span>
+                    <details className="small error-detail"><summary>For developers</summary>{guard.reason}</details>
+                  </span>
                 </Notice>
+              )}
+              {guard.status === 'ok' && (
+                <div data-testid="guard-ok" data-digest={guard.digest}>
+                  <Notice tone="positive"><span style={{ minWidth: 0 }}>✓ The contract agrees on exactly this invoice: {i.id}, {amt(i.amount)} to {i.supplierName}.</span></Notice>
+                </div>
               )}
               <div className="row">
                 <button data-testid="approve" className={mine || paidTx ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with passkey</button>
@@ -383,31 +404,34 @@ export default function PayPage() {
                     <span className="stack" style={{ gap: 4, minWidth: 0 }}>
                       <b data-testid="error-title">{friendly.title}</b>
                       <span>{friendly.fix}{friendly.href && <> <a href={friendly.href}>Open</a></>}</span>
-                      <span className="small error-detail">Details: {error}</span>
+                      <details className="small error-detail"><summary>For developers</summary>{error}</details>
                     </span>
-                  ) : <span style={{ minWidth: 0 }} className="break">{error}</span>}
+                  ) : (
+                    <span className="stack" style={{ gap: 4, minWidth: 0 }}>
+                      <span className="break">{plain(error)}</span>
+                      {hasHex(error) && <details className="small error-detail"><summary>For developers</summary>{error}</details>}
+                    </span>
+                  )}
                 </Notice>
               )}
               {tx && (
-                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx"><span style={{ minWidth: 0 }}>
-                  Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="mono break">{tx.hash}</a>{' '}
-                  {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
+                <div data-testid="tx" data-tx={tx.hash}>
+                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'}><span style={{ minWidth: 0 }}>
+                  {tx.seconds === undefined ? 'Payment sent, waiting for Whitechain…' : tx.status === 'success' ? `Payment confirmed in ${tx.seconds.toFixed(1)} s` : `The payment reverted after ${tx.seconds.toFixed(1)} s`}
+                  {' · '}<a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">View transaction</a>
                   {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
                 </span></Notice>
+                </div>
               )}
               <details className="colleagues" open={!!pasted.trim() || !!mine || undefined} data-testid="colleagues">
                 <summary>Need a second approver?</summary>
                 <div className="stack">
-                  {mine && (
-                    <div className="well">
-                      <p className="small muted">Your approval: send it to the second approver</p>
-                      <code data-testid="my-approval" className="mono break">{serializeApproval(mine)}</code>
-                    </div>
-                  )}
-                  <Field label="Have approvals from colleagues? Paste them here (JSON)">
-                    <textarea data-testid="pasted" className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
+                  {mine && signedDigest && <MyApproval approval={mine} at={mineAt || Date.now()} digest={signedDigest} what={i.id} testId="my-approval" shareTestId="share-approval" />}
+                  <Field label="Paste an approval a colleague shared">
+                    <textarea data-testid="pasted" className="textarea" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={2} placeholder="Tazor approval for INV-…: TZA1.…" />
                   </Field>
-                  {approvals === null && <Notice tone="negative">Pasted approvals are not valid JSON {'{approver, signature}'}.</Notice>}
+                  {pastedParse.list && <ApprovalNames approvals={pastedParse.list} testId="pasted-approvals" />}
+                  {pastedParse.error && <Notice tone="negative" testId="pasted-error">{pastedParse.error}</Notice>}
                 </div>
               </details>
               <div className="pay-more">
@@ -415,9 +439,11 @@ export default function PayPage() {
                 {v2 && <button data-testid="pay-as-agent" className="btn btn-sm btn-ghost" onClick={onPayAsAgent} disabled={busy || !mine}>Pay as agent (calldata)</button>}
               </div>
               {(calldata || l1) && pendingDeploys.map((u) => (
-                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first"><span style={{ minWidth: 0 }}>Not deployed yet: first send to the ApproverAccountFactory <span className="mono break">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></span></Notice>
+                <div key={u.factoryCalldata} data-testid="deploy-first" data-value={u.factoryCalldata}>
+                  <Notice tone="warning">Your approver account is created first: one extra transaction, sent from any wallet. Its data is under For developers below.</Notice>
+                </div>
               ))}
-              {calldata && <p className="small muted">Calldata ready: see Technical details below.</p>}
+              {calldata && <p className="small muted">Calldata copied. It is also under For developers below.</p>}
             </div>
           </Card>
 
@@ -443,7 +469,7 @@ export default function PayPage() {
               </div>
               {l1 && (
                 <div data-testid="l1" className="stack">
-                  <p className="muted">To EnsGate <span className="mono">{gate}</span> on Sepolia. {l1.fee !== undefined
+                  <p className="muted">To Tazor&apos;s EnsGate {gate && <AddrChip value={gate} href={`${config.sepolia.explorer}/address/${gate}`} />} on Ethereum Sepolia. {l1.fee !== undefined
                     ? <span data-testid="l1-fee">Estimated fee: {formatEther(l1.fee)} ETH ({l1.gas?.toString()} gas)</span>
                     : l1.feeError ? <span data-testid="l1-fee-error">Fee estimate failed: {l1.feeError}</span> : 'Estimating fee…'}</p>
                   <div className="row">
@@ -451,11 +477,11 @@ export default function PayPage() {
                     <button data-testid="copy-l1" className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>
                     <button data-testid="watch-l1" className="btn" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
                   </div>
-                  <p className="small muted">The raw calldata is under Technical details below.</p>
-                  {l1.hash && <p>Ethereum tx <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer" className="mono break">{l1.hash}</a></p>}
+                  <p className="small muted">The raw calldata is under For developers below.</p>
+                  {l1.hash && <p data-tx={l1.hash}>Sent on Ethereum · <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer">View on Etherscan</a></p>}
                   {l1.started && (
                     <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status"><span>{l1.l2Tx
-                      ? <>Delivered on Whitechain in {l1.seconds?.toFixed(0)} s: <a href={`${config.explorer}/tx/${l1.l2Tx}`} target="_blank" rel="noreferrer" className="mono break">{l1.l2Tx}</a></>
+                      ? <>Delivered on Whitechain in {l1.seconds?.toFixed(0)} s · <a href={`${config.explorer}/tx/${l1.l2Tx}`} target="_blank" rel="noreferrer">View transaction</a></>
                       : 'Waiting for the deposit to reach Whitechain…'}</span></Notice>
                   )}
                 </div>
@@ -465,14 +491,16 @@ export default function PayPage() {
           </div>
 
           <Card>
-            <details className="tech-details" open={!!(calldata || l1)}>
-              <summary>Technical details</summary>
+            <details className="tech-details" data-testid="for-developers">
+              <summary>For developers</summary>
               <div className="stack">
                 <dl className="kv">
-                  <dt>Pay to</dt><dd><Addr value={i.payee} href={explorer(i.payee)} /></dd>
-                  <dt>Buyer account</dt><dd><Addr value={i.buyerAccount} href={explorer(i.buyerAccount)} /></dd>
-                  <dt>Token</dt><dd><Addr value={i.token} href={explorer(i.token)} /></dd>
-                  <dt>invoiceHash</dt><dd><span className="mono break" data-testid="invoice-hash">{auth.invoiceHash}</span></dd>
+                  <dt>Pay to</dt><dd><AddrChip value={i.payee} name={partyName(i.payee)} href={explorer(i.payee)} /></dd>
+                  <dt>Buyer account</dt><dd><AddrChip value={i.buyerAccount} name={partyName(i.buyerAccount)} href={explorer(i.buyerAccount)} /></dd>
+                  <dt>Token</dt><dd><AddrChip value={i.token} name="USDT" href={explorer(i.token)} /></dd>
+                  <dt>Invoice hash</dt><dd><span className="mono break" data-testid="invoice-hash">{auth.invoiceHash}</span></dd>
+                  <dt>Payment module</dt><dd><span className="mono break">{pm}</span></dd>
+                  {guard.status === 'ok' && <><dt>Signed digest</dt><dd><span className="mono break">{guard.digest}</span></dd></>}
                   <dt>Approval valid until</dt><dd className="num">{day(auth.expiry)}</dd>
                 </dl>
                 {calldata && (
@@ -481,6 +509,12 @@ export default function PayPage() {
                     <code data-testid="calldata-out" className="mono break">{calldata}</code>
                   </div>
                 )}
+                {(calldata || l1) && pendingDeploys.map((u) => (
+                  <div className="well" key={`dev-${u.factoryCalldata}`}>
+                    <p className="small muted">First send this to the ApproverAccountFactory <span className="mono">{u.factory}</span></p>
+                    <code className="mono break">{u.factoryCalldata}</code>
+                  </div>
+                ))}
                 {l1 && (
                   <div className="well">
                     <p className="small muted">Calldata for any wallet or Etherscan (to <span className="mono">{gate}</span>)</p>
