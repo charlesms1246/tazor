@@ -11,6 +11,8 @@ import { FreezeDevice } from '../settings/freeze.tsx';
 import { Card, Empty, PageHeader, Pill } from '../_ui/index.tsx';
 import { HEALTH_KEYS, healthRows } from './rows.ts';
 import { ContractsList, RelayerSettings } from './relayer-settings.tsx';
+import { AddrChip } from '../_human/chip.tsx';
+import { plain } from '@/lib/human.ts';
 import './security.css';
 
 const MIRROR_TONE: Record<EnsMirrorState, 'positive' | 'warning' | 'neutral'> = { mirrored: 'positive', 'still-on-ens': 'warning', unknown: 'neutral' };
@@ -105,16 +107,16 @@ export default function SecurityPage() {
           <div className="stack" style={{ gap: 10 }}>
             {revokedPeople.map((p) => (
               <div key={p.address} className="spread revocation-row" data-testid="revoked-person">
-                <span><span style={{ fontWeight: 500 }}>{p.label}</span><span className="cell-sub mono">{p.address}</span></span>
+                <span><span style={{ fontWeight: 500 }}>{p.label}</span><span className="cell-sub"><AddrChip value={p.address} href={`${config.explorer}/address/${p.address}`} /></span></span>
                 <span className="row" style={{ gap: 6 }}><Pill tone="negative">Revoked on Whitechain</Pill>{mirrorPill(p.address)}</span>
               </div>
             ))}
             {events.map((e) => (
               <div key={`${e.subject}-${e.at}`} className="spread revocation-row" data-testid="revocation-event">
-                <span><span style={{ fontWeight: 500 }}>{e.title}</span><span className="cell-sub">{new Date(e.at).toLocaleString()}{e.actor && <> · by {e.actor}</>}</span></span>
+                <span><span style={{ fontWeight: 500 }}>{plain(e.title)}</span><span className="cell-sub">{new Date(e.at).toLocaleString()}{e.actor && <> · by {e.actor}</>}</span></span>
                 <span className="row" style={{ gap: 6 }}>
                   {mirrorPill(e.subject)}
-                  {e.tx && <a className="small" href={`${config.explorer}/tx/${e.tx}`} target="_blank" rel="noreferrer">Whitechain tx</a>}
+                  {e.tx && <a className="small" href={`${config.explorer}/tx/${e.tx}`} target="_blank" rel="noreferrer">View transaction</a>}
                 </span>
               </div>
             ))}

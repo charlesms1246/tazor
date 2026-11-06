@@ -47,7 +47,7 @@ async function setup(page: Page, posts: Record<string, unknown>[], revoked: { v:
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true } });
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER);
 }
 
 for (const [label, co, list] of [['v1', V1_CO, V1_LIST], ['v2', V2_CO, V2_LIST]] as const) {
@@ -58,10 +58,12 @@ for (const [label, co, list] of [['v1', V1_CO, V1_LIST], ['v2', V2_CO, V2_LIST]]
     await page.goto('/security/');
     await page.getByTestId('freeze-account').fill(co);
     await page.getByTestId('freeze-prepare').click();
-    await expect(page.getByTestId('freeze-confirm')).toContainText(list);
+    await expect(page.getByTestId('freeze-list')).toHaveAttribute('data-value', list);
+    await expect(page.getByTestId('freeze-confirm')).toContainText("revocation list");
+    await expect(page.getByTestId('freeze-confirm')).not.toContainText(list);
     expect(posts).toHaveLength(0);
     await page.getByTestId('freeze-yes').click();
-    await expect(page.getByTestId('freeze-tx')).toContainText('0xefef');
+    await expect(page.getByTestId('freeze-tx').locator('a')).toHaveAttribute('href', /0xefef/);
     expect(posts).toHaveLength(1);
     const p = posts[0] as { account: string; target: string; admin: string; list?: string };
     expect(getAddress(p.account)).toBe(co);

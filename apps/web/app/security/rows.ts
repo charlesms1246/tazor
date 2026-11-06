@@ -1,4 +1,5 @@
 import type { Health } from '@/lib/health.ts';
+import { plain } from '../../lib/human.ts';
 
 export type HealthKey = 'relayer' | 'whitechain' | 'ethereum' | 'fallback' | 'rolesync' | 'mirror';
 export type HealthRow = { key: HealthKey; name: string; tone: 'positive' | 'negative' | 'warning' | 'neutral'; status: string; detail: string };
@@ -44,7 +45,7 @@ function mirrorRow(h: Health): HealthRow {
     return { key: 'mirror', name, tone: 'neutral', status: 'Unknown', detail: 'No relayer report. A removal still takes effect on Whitechain at once; any company admin can also remove the role on ENS.' };
   }
   if (!h.relayer.mirrorEnabled) {
-    return { key: 'mirror', name, tone: 'warning', status: 'Not authorized', detail: `Removals take effect on Whitechain at once but are not copied to ENS by this relayer${h.relayer.mirrorReason ? `: ${h.relayer.mirrorReason}` : '.'}` };
+    return { key: 'mirror', name, tone: 'warning', status: 'Not authorized', detail: `Removals take effect on Whitechain at once but are not copied to ENS by this relayer${h.relayer.mirrorReason ? `: ${plain(h.relayer.mirrorReason)}` : '.'}` };
   }
   return { key: 'mirror', name, tone: 'positive', status: 'Enabled', detail: 'The relayer copies Whitechain removals to the company’s ENS name.' };
 }

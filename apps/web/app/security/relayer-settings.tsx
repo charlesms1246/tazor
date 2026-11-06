@@ -5,6 +5,7 @@ import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { getRelayerUrl, hasRelayerOverride, normalizeRelayerUrl, setRelayerUrl } from '@/lib/relayer-url.ts';
 import { Field, Notice, Pill } from '../_ui/index.tsx';
+import { AddrChip } from '../_human/chip.tsx';
 
 type RelayerHealth = { relayer: string | null; paymentModule: string | null } | { error: string };
 
@@ -73,7 +74,7 @@ export function RelayerSettings({ onChange }: { onChange?: () => void }) {
         {note && <Notice tone={noteBad ? 'negative' : 'positive'}><span data-testid="relayer-note">{note}</span></Notice>}
         {health && ('error' in health
           ? <Notice tone="negative"><span data-testid="relayer-health">Relayer check failed: {health.error}</span></Notice>
-          : <Notice tone="positive"><span data-testid="relayer-health">Relayer OK: sender <span className="mono break">{health.relayer ?? 'none'}</span>, PaymentModule <span className="mono break">{health.paymentModule ?? 'none'}</span></span></Notice>)}
+          : <Notice tone="positive"><span data-testid="relayer-health">Relayer OK. It sends from {health.relayer ? <AddrChip value={health.relayer} href={`${config.explorer}/address/${health.relayer}`} testId="relayer-sender" /> : 'no address'} and pays through {health.paymentModule ? <AddrChip value={health.paymentModule} name="PaymentModule" href={`${config.explorer}/address/${health.paymentModule}`} testId="relayer-payment-module" /> : 'no payment module'}.</span></Notice>)}
       </div>
     </div>
   );
@@ -81,26 +82,27 @@ export function RelayerSettings({ onChange }: { onChange?: () => void }) {
 
 /** The contract addresses compiled into this build. */
 export function ContractsList() {
-  const rows: [string, string | null][] = [
-    ['Chain', `${config.chainId} (${config.rpcUrl})`],
-    ['PaymentModule (v1)', config.paymentModule], ['MandateModule (v1)', config.mandateModule],
-    ['RevocationList (v1)', config.revocationList], ['ApproverAccountFactory', config.approverAccountFactory],
-    ['TazorAccountFactory', config.tazorAccountFactory], ['RoleCache', config.roleCache], ['WB Soul (simulated mirror)', config.wbSoulMirror],
-    ['PaymentModuleV2', configV2.paymentModule], ['MandateModuleV2', configV2.mandateModule],
-    ['FinancingModule', configV2.financingModule], ['RevocationListV2', configV2.revocationList],
-    ['EnsGate (Sepolia)', config.sepolia.ensGate], ['EnsGate v2 (Sepolia)', configV2.ensGateV2],
+  const wc = (a: string) => `${config.explorer}/address/${a}`;
+  const sep = (a: string) => `${config.sepolia.explorer}/address/${a}`;
+  const rows: [string, string | null, (a: string) => string][] = [
+    ['PaymentModule v1', config.paymentModule, wc], ['MandateModule v1', config.mandateModule, wc],
+    ['RevocationList v1', config.revocationList, wc], ['ApproverAccountFactory', config.approverAccountFactory, wc],
+    ['TazorAccountFactory', config.tazorAccountFactory, wc], ['RoleCache', config.roleCache, wc], ['WB Soul (simulated mirror)', config.wbSoulMirror, wc],
+    ['PaymentModuleV2', configV2.paymentModule, wc], ['MandateModuleV2', configV2.mandateModule, wc],
+    ['FinancingModule', configV2.financingModule, wc], ['RevocationListV2', configV2.revocationList, wc],
+    ['EnsGate (Sepolia)', config.sepolia.ensGate, sep], ['EnsGate v2 (Sepolia)', configV2.ensGateV2, sep],
   ];
   return (
     <div className="settings-row">
       <div>
         <h2>Contracts</h2>
-        <p>Whitechain Sepolia and Ethereum Sepolia addresses compiled into this build.</p>
+        <p>The contracts this build talks to on Whitechain Sepolia (chain {config.chainId}) and Ethereum Sepolia. Full addresses are on the <a href="/docs/contracts/">Contracts</a> docs page.</p>
       </div>
       <dl className="kv" data-testid="addresses">
-        {rows.map(([k, v]) => (
+        {rows.map(([k, v, href]) => (
           <Fragment key={k}>
             <dt>{k}</dt>
-            <dd className={v ? 'mono' : 'faint'}>{v ?? 'not configured'}</dd>
+            <dd className={v ? '' : 'faint'}>{v ? <AddrChip value={v} href={href(v)} /> : 'not configured'}</dd>
           </Fragment>
         ))}
       </dl>

@@ -20,8 +20,13 @@ const RULES: [RegExp, (c: Required<Ctx>) => Friendly][] = [
   [/ERC20InsufficientBalance|PaymentTransferFailed|exceeds balance|insufficient/i, (c) => ({ title: `${c.company}'s account doesn't hold enough USDT for this invoice.`, fix: 'Top up the company account with test USDT, then pay again.' })],
   [/Relayer unreachable|relayer returned 5\d\d|upstream error/i, () => ({ title: "Tazor's relayer didn't answer.", fix: 'Your approval is still valid: use "Send via Ethereum" below, or "Copy calldata" and send it from any wallet.' })],
   [/no PaymentModule configuration/i, (c) => ({ title: `This relayer can't submit payments for ${c.company} yet.`, fix: 'Use "Copy calldata" and send it from any wallet, or "Send via Ethereum" below.' })],
-  [/Relayer URL is not configured/i, () => ({ title: 'No relayer is set on this device.', fix: 'Choose one in Settings, or use "Send via Ethereum" / "Copy calldata".', href: '/settings/' })],
+  [/Relayer URL is not configured/i, () => ({ title: 'No relayer is set on this device.', fix: 'Choose one on Security & settings, or use "Send via Ethereum" / "Copy calldata".', href: '/security/' })],
   [/No approvals yet/i, () => ({ title: 'Nobody has approved this invoice yet.', fix: 'Tap "Approve with passkey" first.' })],
+  [/Too many new guests/i, () => ({ title: 'Too many people are trying the demo right now.', fix: 'Wait a few minutes, then tap Retry.' })],
+  [/approver (was |has been )?revoked|ApproverRevoked/i, () => ({ title: 'This approver has been removed, so the payment was refused.', fix: 'That is the expected result when someone is removed. Nothing to do.' })],
+  [/Failed to fetch|fetch failed|NetworkError|ECONNREFUSED|ENOTFOUND|network error/i, () => ({ title: "We couldn't reach the network service.", fix: 'Check your connection (or the relayer on Security & settings), then tap Retry.', href: '/security/' })],
+  [/timed out|timeout|took too long/i, () => ({ title: 'This took longer than expected.', fix: 'Tap Retry to try the step again, or Skip to move on.' })],
+  [/simulation reverted|execution reverted|reverted/i, () => ({ title: 'The contract refused this transaction.', fix: 'Nothing was sent or charged. Tap Retry; if it happens again, Skip this step and check System health.', href: '/security/' })],
 ];
 
 /** The friendly version of an error message, or null if it isn't one we recognise. */

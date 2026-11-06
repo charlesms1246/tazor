@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { encodeFunctionData, getAddress, isAddress, type Address, type Hex } from 'viem';
 import { revocationListAbi } from '@/lib/abi/RevocationList.ts';
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
@@ -11,14 +11,22 @@ import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { decodeIsRevoked, decodeRevokeDigest, encodeIsRevokedCall, encodeRevokeDigestCall, revokeDigest, revokeRelayerBody, type Revoke } from '@/lib/revoke.ts';
 import { ethCall } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
+import { companyByAccount, useCompany } from '@/lib/company.ts';
+import { shortAddress } from '@/lib/human.ts';
+import { AddrChip } from '../_human/chip.tsx';
 import { Field, Notice, Pill } from '../_ui/index.tsx';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 type Prepared = { list: Address; v2: boolean; r: Revoke; digest: Hex; me: Address };
 
+const companyName = (a: string) => companyByAccount(a)?.name ?? `company ${shortAddress(a)}`;
+
 /** Self-revoke this device's approver for one company (allowed without the admin role). */
 export function FreezeDevice() {
+  const company = useCompany();
   const [account, setAccount] = useState('');
+  // start with the company this device is acting for; it can still be changed
+  useEffect(() => { setAccount((a) => a || company.account); }, [company.account]);
   const [prep, setPrep] = useState<Prepared | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +49,7 @@ export function FreezeDevice() {
     const r: Revoke = { account: a, target: key.approverAccount, deadline: BigInt(Math.floor(Date.now() / 1000) + 3600) };
     const local = revokeDigest(r, list, config.chainId);
     const onchain = decodeRevokeDigest(await ethCall(list, encodeRevokeDigestCall(r)));
-    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error(`Refusing to sign: contract digest ${onchain} differs from ${local}.`);
+    if (onchain.toLowerCase() !== local.toLowerCase()) throw new Error("Refusing to sign: the contract doesn't agree with this page about what you would sign. Nothing was changed.");
     setPrep({ list, v2, r, digest: local, me: key.approverAccount });
   });
 
@@ -84,7 +92,7 @@ export function FreezeDevice() {
         <p>If this phone is lost or compromised, revoke its approver for a company. It takes effect on Whitechain immediately and cannot be undone; an admin has to add a new approver account.</p>
       </div>
       <div className="fields">
-        <Field label="Company account">
+        <Field label="Company account" hint={isAddress(account) ? `Freezes this device for ${companyName(account)}.` : 'The company account this device approves for.'}>
           <input className="input mono" data-testid="freeze-account" value={account} onChange={(e) => setAccount(e.target.value)} placeholder="0x…" />
         </Field>
         <div className="row">
@@ -94,7 +102,11 @@ export function FreezeDevice() {
         {prep && (
           <Notice tone="warning">
             <div className="stack" style={{ gap: 12 }} data-testid="freeze-confirm">
-              <span>Revoke approver <span className="mono break">{prep.me}</span> for <span className="mono break">{prep.r.account}</span> on {prep.v2 ? 'RevocationListV2' : 'RevocationList'} <span className="mono break">{prep.list}</span>? This cannot be undone.</span>
+              <span>
+                This adds your device (<AddrChip value={prep.me} href={`${config.explorer}/address/${prep.me}`} testId="freeze-me" />) to{' '}
+                <b>{companyName(prep.r.account)}</b>&apos;s revocation list (<AddrChip value={prep.list} name={prep.v2 ? 'RevocationList v2' : 'RevocationList'} href={`${config.explorer}/address/${prep.list}`} testId="freeze-list" />).
+                {' '}From then on this device can&apos;t approve payments for {companyName(prep.r.account)}. This can&apos;t be undone.
+              </span>
               <span className="row">
                 <button className="btn btn-sm btn-danger" data-testid="freeze-yes" onClick={onConfirm} disabled={busy}>Yes, freeze with passkey</button>
                 <button className="btn btn-sm" onClick={() => setPrep(null)}>Cancel</button>
@@ -103,12 +115,13 @@ export function FreezeDevice() {
           </Notice>
         )}
         {error && <Notice tone="negative"><span data-testid="freeze-error">{error}</span></Notice>}
-        {result?.tx && <p className="small" data-testid="freeze-tx">Submitted: <a className="mono break" href={`${config.explorer}/tx/${result.tx}`} target="_blank" rel="noreferrer">{result.tx}</a></p>}
+        {result?.tx && <p className="small" data-testid="freeze-tx">✓ Freeze submitted on Whitechain · <a href={`${config.explorer}/tx/${result.tx}`} target="_blank" rel="noreferrer" data-value={result.tx}>View transaction</a></p>}
         {result?.calldata && (
-          <div className="well">
-            <p className="small muted">Calldata (to <span className="mono break">{result.calldata.to}</span> on Whitechain):</p>
+          <details className="well">
+            <summary className="small muted">For developers: send it yourself from any wallet</summary>
+            <p className="small muted">Send this calldata to {shortAddress(result.calldata.to)} on Whitechain:</p>
             <code className="break small" data-testid="freeze-calldata">{result.calldata.data}</code>
-          </div>
+          </details>
         )}
         {result && (
           <div className="row">

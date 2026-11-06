@@ -8,7 +8,7 @@ import { getRelayerUrl } from '../../lib/relayer-url.ts';
 import { loadPasskey } from '../../lib/storage.ts';
 import { createRunner, KEY, parseState, type ApiResult, type Chain, type Ctx, type Deps, type Dom, type RunState, type Runner } from './engine.ts';
 import { fromClient, getSandbox, type CounterpartyAction } from './sandbox-port.ts';
-import { STORY } from './story.ts';
+import { LABELS, STORY } from './story.ts';
 
 export const AUTOPILOT_EVENT = 'tazor:autopilot';
 const ADDR = /^0x[0-9a-fA-F]{40}$/;
@@ -117,6 +117,7 @@ const deps: Omit<Deps, 'onChange'> = {
   load: () => { try { return parseState(localStorage.getItem(KEY)); } catch { return null; } },
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   now: () => Date.now(),
+  label: (t) => LABELS[t] ?? 'the next control',
 };
 
 let runner: Runner | null = null;

@@ -7,6 +7,23 @@ const SHOP = 'https://bluejay-shop.vercel.app';
 export const OFFLINE_RELAYER = 'https://relayer-offline.invalid';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
 
+/** Human names for the elements the Autopilot acts on, used in its messages. */
+export const LABELS: Record<string, string> = {
+  'inv-fill-sample': 'the "Fill with sample data" button', 'inv-create': 'the "Create payment link" button', 'inv-link': 'the payment link',
+  'inv-customer': 'the customer field', 'inv-payee': 'the payee field', 'inv-supplier-account': 'the supplier account field', 'inv-supplier-name': 'the supplier name field',
+  'inv-line-qty-0': 'the first line quantity', 'inv-line-price-0': 'the first line price', 'inv-line-qty-1': 'the second line quantity', 'inv-line-price-1': 'the second line price',
+  'inv-total': 'the invoice total', 'inv-preview': 'the invoice preview',
+  approve: 'the "Approve with passkey" button', pay: 'the "Pay" button', 'guard-ok': 'the contract check', amount: 'the amount',
+  'pay-success-amount': 'the payment confirmation', 'pay-success-time': 'the settlement time', 'pay-success-tx': 'the transaction link',
+  'run-links': 'the payment links box', 'run-prepare': 'the "Check run" button', 'run-approve': 'the "Approve run with passkey" button', 'run-pay': 'the "Pay run" button', 'run-tx': 'the run transaction',
+  'm-account': 'the account field', 'm-payee': 'the payee field', 'm-cap': 'the limit field', 'm-expiry': 'the end date', 'm-prepare': 'the "Review" button',
+  'm-digest': 'the contract check', 'm-approve': 'the "Approve with passkey" button', 'm-submit': 'the "Create mandate" button', 'm-tx': 'the mandate confirmation',
+  'company-ens': 'the company ENS name', 'company-ens-links': 'the ENS links', 'registry-contract-link': 'the registry link', 'person-sync-state': 'the sync status',
+  'relayer-url': 'the relayer address field', 'relayer-save': 'the "Save" button', 'relayer-clear': 'the "Clear" button', 'health-refresh': 'the "Refresh" button',
+  'prepare-l1': 'the "Prepare Ethereum transaction" button', 'send-l1': 'the "Send with your wallet" button', activity: 'the activity list', tally: 'the "Tally CSV" button',
+  create: 'the "Create passkey" button', 'approver-account': 'your approver account',
+};
+
 /** Total in USDT shown on the invoice form, or NaN. */
 export const totalOf = (t: string | null) => Number((t ?? '').replace(/[^0-9.]/g, '')) || NaN;
 /** Above this, the sandbox needs two approvers; every Autopilot payment (a run of two included) stays at or under it. */
@@ -67,7 +84,7 @@ export const STORY: Step[] = [
       asBuyer,
       { do: 'goto', path: '/company/' },
       { do: 'highlight', testid: 'company-ens', say: 'The company is an ENS name; people are roles on its registry.' },
-      { do: 'capture', testid: 'registry-contract-link', attr: 'href', as: 'registryUrl', say: (v) => `ENS registry contract: ${v}` },
+      { do: 'capture', testid: 'registry-contract-link', attr: 'href', as: 'registryUrl', say: () => 'The company’s ENS registry is public' },
       { do: 'highlight', testid: 'company-ens-links', ms: 1200 },
     ],
   },
@@ -88,8 +105,9 @@ export const STORY: Step[] = [
     actions: [
       { do: 'click', testid: 'pay' },
       { do: 'waitFor', wait: { testid: 'pay-success' }, timeout: 120_000, say: 'Waiting for Whitechain…' },
-      { do: 'capture', testid: 'pay-success-time', as: 'paidIn', say: (v) => v.split('·')[0].trim() },
-      { do: 'capture', testid: 'pay-success-tx', attr: 'href', as: 'payment', tx: 'whitechain', say: () => 'Payment transaction' },
+      { do: 'capture', testid: 'pay-success-amount', as: 'paidWhat' },
+      { do: 'capture', testid: 'pay-success-time', as: 'paidIn' },
+      { do: 'capture', testid: 'pay-success-tx', attr: 'href', as: 'payment', tx: 'whitechain', say: (_v, c) => `${c.paidWhat}, ${c.paidIn.split('·')[0].trim().replace(/^Settled/, 'settled')}` },
       { do: 'assertChain', key: 'paymentTx', chain: 'whitechain' },
     ],
   },
@@ -106,7 +124,7 @@ export const STORY: Step[] = [
       { do: 'userTap', testid: 'run-approve', prompt: 'Your turn: tap "Approve run with passkey". One signature covers both invoices.', until: { testid: 'run-my-approval' } },
       { do: 'click', testid: 'run-pay' },
       { do: 'waitFor', wait: { testid: 'run-tx' }, timeout: 120_000, say: 'Paying both invoices in one transaction…' },
-      { do: 'capture', testid: 'run-tx', as: 'run', attr: 'href', inner: 'a', tx: 'whitechain', say: () => 'Two invoices paid in one transaction' },
+      { do: 'capture', testid: 'run-tx', as: 'run', attr: 'href', inner: 'a', tx: 'whitechain', say: () => 'Paid two invoices to the supplier in one transaction' },
     ],
   },
   {
@@ -119,11 +137,11 @@ export const STORY: Step[] = [
       { do: 'fill', testid: 'm-cap', value: '0.30' },
       { do: 'fill', testid: 'm-expiry', value: in90days },
       { do: 'click', testid: 'm-prepare' },
-      { do: 'capture', testid: 'm-digest', as: 'mandate', say: () => 'The page rebuilt the mandate and the contract agrees on its digest.' },
+      { do: 'capture', testid: 'm-digest', as: 'mandate', say: () => '✓ The contract agrees with the mandate shown on this page.' },
       { do: 'userTap', testid: 'm-approve', prompt: 'Your turn: tap "Approve with passkey" to sign the mandate (up to 0.30 USDT a period).', until: { enabled: 'm-submit' } },
       { do: 'click', testid: 'm-submit' },
       { do: 'waitFor', wait: { testid: 'm-tx' }, timeout: 120_000, say: 'Creating the mandate on Whitechain…' },
-      { do: 'capture', testid: 'm-tx', as: 'mandateCreated', tx: 'whitechain', say: () => 'Mandate created' },
+      { do: 'capture', testid: 'm-tx', as: 'mandateCreated', tx: 'whitechain', say: (_v, c) => `✓ Mandate approved: ${c.supplierName || 'the supplier'} may collect up to 0.30 USDT a period` },
       { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: (c.mandate.match(/0x[0-9a-fA-F]{64}/) ?? [''])[0] }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
     ],
   },
@@ -158,7 +176,7 @@ export const STORY: Step[] = [
       { do: 'goto', path: '/security/' },
       { do: 'fill', testid: 'relayer-url', value: OFFLINE_RELAYER },
       { do: 'click', testid: 'relayer-save' },
-      { do: 'log', text: `Simulated outage: this device now points at a relayer that doesn't answer (${OFFLINE_RELAYER}).`, kind: 'warn' },
+      { do: 'log', text: 'Simulated outage: this device now uses a relayer address that never answers.', kind: 'warn' },
       { do: 'click', testid: 'health-refresh' },
       { do: 'waitFor', wait: { textIn: ['health-relayer', 'Unreachable'] }, timeout: 20_000, say: 'System health: the relayer is unreachable.' },
       ...createInvoice('offlineLink', 'Invoice for the outage test.'),
@@ -167,7 +185,7 @@ export const STORY: Step[] = [
       { do: 'waitFor', wait: { testid: 'error' }, timeout: 30_000, say: 'Paying through our relayer fails, as expected…', optional: true },
       { do: 'click', testid: 'prepare-l1' },
       { do: 'userTap', testid: 'send-l1', prompt: 'Your turn: tap "Send with your wallet" and confirm on Ethereum Sepolia.', until: { testid: 'pay-success' }, timeout: 15 * 60_000 },
-      { do: 'capture', testid: 'pay-success-tx', attr: 'href', as: 'fallback', tx: 'whitechain', say: () => 'Delivered via Ethereum and settled on Whitechain' },
+      { do: 'capture', testid: 'pay-success-tx', attr: 'href', as: 'fallback', tx: 'whitechain', say: () => 'Paid via Ethereum with our relayer offline; settled on Whitechain' },
     ],
   },
   {

@@ -1,0 +1,4 @@
+.addr-chip { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; }
+.addr-chip-name { font-weight: 500; }
+.addr-chip-short { font-size: 13px; white-space: nowrap; }
+.addr-chip-link { font-size: 12px; }

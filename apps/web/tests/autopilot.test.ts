@@ -158,7 +158,7 @@ test('a timeout fails the step; retry restarts it; skip moves on; stop clears', 
   const r = createRunner(steps, w.deps());
   r.start('presenter');
   await settle(r, w, (s) => s?.status === 'failed');
-  assert.match(r.state()!.error!, /"missing" did not appear/);
+  assert.match(r.state()!.error!, /Timed out waiting for "missing" to be ready/);
   w.el.set('missing', {});
   r.retry();
   await settle(r, w, (s) => s?.status === 'done');
@@ -195,7 +195,7 @@ test('expectRefusal passes on a refusal and fails on success; mode filters steps
   w.setApi(() => ({ ok: true }));
   r.start('presenter');
   await settle(r, w, (s) => s?.status === 'failed');
-  assert.match(r.state()!.error!, /Expected a refusal/);
+  assert.match(r.state()!.error!, /should have been refused/);
 });
 
 test('openTab waits for the click on the panel link', async () => {
@@ -266,7 +266,7 @@ test('api retry repeats an idempotent call while pending-sync, then continues; g
   w.setApi(() => ({ ok: true, status: 'pending-sync' }));
   r.start('guest');
   await settle(r, w, (s) => s?.status === 'failed', 20_000);
-  assert.match(r.state()!.error!, /Still not ready after 180 s/);
+  assert.match(r.state()!.error!, /Timed out after 180 s: Waiting for Whitechain/);
 });
 
 test('sandbox port: 429 gives a plain wait message; the lib/sandbox client adapts', async () => {

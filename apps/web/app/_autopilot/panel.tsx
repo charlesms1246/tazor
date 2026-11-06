@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { STORY } from './story.ts';
 import { appliesTo, type RunState } from './engine.ts';
 import { AUTOPILOT_EVENT, explorerTx, findTestId, getRunner } from './browser.ts';
+import { explain } from './explain.ts';
+import { plain } from '@/lib/human.ts';
 import './autopilot.css';
 
 /** Subscribes to the shared runner. */
@@ -89,7 +91,19 @@ export function AutopilotPanel() {
                   : <span className="ap-callout-sub">The Autopilot continues as soon as the page reaches the next state.</span>}
               </div>
             )}
-            {s.status === 'failed' && <div className="ap-error" role="alert" data-testid="autopilot-error">{s.error}</div>}
+            {s.status === 'failed' && s.error && (() => {
+              const e = explain(s.error);
+              return (
+                <div className="ap-error" role="alert" data-testid="autopilot-error">
+                  <b>{e.title}</b>
+                  <span>{e.fix}{e.href && <> <a href={e.href}>Open</a></>}</span>
+                  <div className="ap-error-actions">
+                    <button type="button" className="btn btn-sm btn-primary" onClick={() => r.retry()} data-testid="autopilot-error-retry">Retry this step</button>
+                    <button type="button" className="btn btn-sm" onClick={() => r.skip()} data-testid="autopilot-error-skip">Skip it</button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <ol className="ap-log" ref={logRef} data-testid="autopilot-log">
               {lines.map((l, i) => (
@@ -97,8 +111,9 @@ export function AutopilotPanel() {
                   <span className="ap-time">{time(l.at)}</span>
                   <span className="ap-text">
                     {l.kind === 'sim' && <span className="ap-sim">simulated counterparty</span>}
-                    {l.text}
-                    {l.tx && <> <a href={explorerTx(l.chain, l.tx)} target="_blank" rel="noreferrer" className="mono" data-testid="autopilot-tx">{l.tx.slice(0, 10)}…</a></>}
+                    {l.kind === 'error' ? explain(l.text).title : plain(l.text)}
+                    {l.tx && <> · <a href={explorerTx(l.chain, l.tx)} target="_blank" rel="noreferrer" data-testid="autopilot-tx" data-value={l.tx}>View transaction{l.chain === 'sepolia' ? ' on Ethereum' : ''}</a></>}
+                    {!l.tx && l.href && <> · <a href={l.href} target="_blank" rel="noreferrer">View on the explorer</a></>}
                   </span>
                 </li>
               ))}

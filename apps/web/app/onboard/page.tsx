@@ -6,7 +6,8 @@ import { predictApproverAccount } from '@/lib/approver.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { loadPasskey, savePasskey, type StoredPasskey } from '@/lib/storage.ts';
-import { Addr, Card, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { Card, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import { AddrChip } from '../_human/chip.tsx';
 import { passkeySigner } from '@/lib/approver-signature.ts';
 import { admitCommand, admitted, checkAdmission, type Admission } from '@/lib/admission.ts';
 import { companyRegistry } from '@/lib/people.ts';
@@ -72,7 +73,7 @@ export default function OnboardPage() {
       const saved = savePasskey(record) ? 'Saved on this device.' : 'Could not save on this device; copy the values below.';
       setNote(saved);
       const relayerUrl = getRelayerUrl();
-      if (!relayerUrl) return setNote(`${saved} No relayer configured: anyone can deploy this account later with createAccount([signer id]).`);
+      if (!relayerUrl) return setNote(`${saved} No relayer is set, so your approver account isn't on Whitechain yet; anyone can add it later from the technical details.`);
       const res = await fetch(`${relayerUrl}/approver`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signer: p.signer }),
       });
@@ -125,10 +126,10 @@ export default function OnboardPage() {
                 <>
                   <dl className="kv">
                     <dt>Approver account</dt>
-                    <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="approver-account" /></dd>
+                    <dd><AddrChip value={stored.approverAccount} name="Your approver account" href={`${config.explorer}/address/${stored.approverAccount}`} testId="approver-account" /></dd>
                   </dl>
                   <details className="onboard-tech">
-                    <summary>Technical details</summary>
+                    <summary>Technical details (for developers)</summary>
                     <dl className="kv">
                       {signer && <><dt>Signer id</dt><dd><span className="mono break" data-testid="signer">{signer}</span></dd></>}
                       <dt>Passkey x</dt><dd><span className="mono break">{stored.x}</span></dd>
@@ -147,11 +148,11 @@ export default function OnboardPage() {
               {deploy ? (
                 <p data-testid="deploy">
                   {deploy.txHash
-                    ? <a href={`${config.explorer}/tx/${deploy.txHash}`} target="_blank" rel="noreferrer" className="mono break">{deploy.txHash}</a>
-                    : 'already deployed'}
+                    ? <>✓ Your approver account is live on Whitechain · <a href={`${config.explorer}/tx/${deploy.txHash}`} target="_blank" rel="noreferrer" data-value={deploy.txHash}>View transaction</a></>
+                    : '✓ Your approver account was already live on Whitechain.'}
                 </p>
               ) : (
-                <p className="muted">The relayer deploys your account on Whitechain. Without one, anyone can deploy it later with createAccount([signer id]).</p>
+                <p className="muted">The relayer puts your approver account on Whitechain for you. If there is no relayer, anyone can do it later from the technical details.</p>
               )}
             </div>
           </div>
@@ -167,10 +168,11 @@ export default function OnboardPage() {
                   <p className="muted">Send this command to an admin of {company.name} ({company.ens}). They run it once from the Tazor repo on testnet: it marks you verified in the WB Soul mirror (simulated KYC), gives you the approver role on ENS and syncs it to Whitechain. This page updates when it&apos;s done.</p>
                   <dl className="kv">
                     <dt>Your approver account</dt>
-                    <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="admit-account" /></dd>
+                    <dd><AddrChip value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} testId="admit-account" /></dd>
                   </dl>
                   {command && (
                     <>
+                      <p className="small" style={{ fontWeight: 500, margin: '4px 0 -4px' }}>Command for your admin (copy, don&apos;t edit)</p>
                       <pre className="admit-box" data-testid="admit-command">{command}</pre>
                       <div className="admit-actions">
                         <button type="button" className="btn btn-primary" onClick={onCopy} data-testid="admit-copy">{copied ? 'Copied' : 'Copy command'}</button>

@@ -63,6 +63,8 @@ export type Deps = {
   sleep(ms: number): Promise<void>;
   now(): number;
   onChange?(s: RunState | null): void;
+  /** A human name for an element ("the Create payment link button"); defaults to the testid. */
+  label?(testid: string): string;
 };
 
 export const KEY = 'tazor.autopilot.v1';
@@ -130,8 +132,9 @@ export function createRunner(steps: Step[], deps: Deps) {
     }
   }
 
+  const name = (t: string) => deps.label?.(t) ?? `"${t}"`;
   async function element(testid: string, g: number, timeout = ELEMENT_TIMEOUT) {
-    if (!(await until({ testid, enabled: testid }, timeout, g))) throw new Error(`"${testid}" did not appear or stayed disabled`);
+    if (!(await until({ testid, enabled: testid }, timeout, g))) throw new Error(`Timed out waiting for ${name(testid)} to be ready on this page.`);
   }
 
   /** Runs one action. 'next' advances; 'unload' means the page is navigating away (state already saved). */
@@ -174,7 +177,7 @@ export function createRunner(steps: Step[], deps: Deps) {
         log('info', a.say);
         if (await until(a.wait, a.timeout, g)) return 'next';
         if (a.optional) return 'next';
-        throw new Error(`Timed out: ${a.say}`);
+        throw new Error(`Timed out waiting for this: ${a.say.replace(/…$/, '')}.`);
       }
       case 'userTap': {
         await element(a.testid, g);
@@ -185,7 +188,7 @@ export function createRunner(steps: Step[], deps: Deps) {
         now.prompt = undefined; now.highlight = undefined;
         if (now.status === 'waiting-user') now.status = 'running';
         emit();
-        if (!ok) throw new Error(`Still waiting for you: ${a.prompt}`);
+        if (!ok) throw new Error(`Timed out waiting for your tap. ${a.prompt.replace(/^Your turn: /, 'When you are ready: ')}`);
         return 'next';
       }
       case 'openTab': {
@@ -196,17 +199,18 @@ export function createRunner(steps: Step[], deps: Deps) {
         now.prompt = undefined; now.link = undefined; now.acked = undefined;
         if (now.status === 'waiting-user') now.status = 'running';
         emit();
-        if (!ok) throw new Error('The tab was not opened');
+        if (!ok) throw new Error('Timed out waiting for you to open the tab.');
         return 'next';
       }
       case 'capture': {
         await until({ testid: a.testid }, ELEMENT_TIMEOUT, g);
         const v = a.attr ? deps.dom.attr(a.testid, a.attr, a.inner) : deps.dom.text(a.testid);
-        if (!v) throw new Error(`Nothing to read from "${a.testid}"`);
+        if (!v) throw new Error(`Couldn't read ${name(a.testid)} on this page.`);
         s.ctx = { ...s.ctx, [a.as]: v.trim() };
         const txHash = a.tx ? (v.match(/0x[0-9a-fA-F]{64}/)?.[0] ?? '') : '';
         if (a.tx && txHash) s.ctx[`${a.as}Tx`] = txHash;
-        if (a.say) log(txHash ? 'ok' : 'info', a.say(v.trim(), s.ctx), txHash ? { tx: txHash, chain: a.tx } : {});
+        const link = !txHash && a.attr === 'href' ? { href: v.trim() } : {};
+        if (a.say) log(txHash ? 'ok' : 'info', a.say(v.trim(), s.ctx), txHash ? { tx: txHash, chain: a.tx } : link);
         else emit();
         return 'next';
       }
@@ -219,7 +223,7 @@ export function createRunner(steps: Step[], deps: Deps) {
           log('info', a.retry.say);
           let waited = 0;
           while (r.ok && a.retry.while(r)) {
-            if (waited >= a.retry.maxMs) throw new Error(`Still not ready after ${Math.round(a.retry.maxMs / 1000)} s: ${a.retry.say}`);
+            if (waited >= a.retry.maxMs) throw new Error(`Timed out after ${Math.round(a.retry.maxMs / 1000)} s: ${a.retry.say.replace(/…$/, '')}.`);
             await until({ test: () => false }, a.retry.everyMs, g);
             waited += a.retry.everyMs;
             r = await deps.api(a.call.name, a.call.args ? a.call.args(cur().ctx) : {}, cur().ctx);
@@ -230,26 +234,27 @@ export function createRunner(steps: Step[], deps: Deps) {
         const txs = [...(r.txs ?? []), ...(r.tx ? [r.tx] : [])].filter((t, i, xs) => TX.test(t) && xs.indexOf(t) === i);
         if (a.saveAs && txs.length) s.ctx = { ...cur().ctx, [a.saveAs]: txs[txs.length - 1] };
         if (a.expectRefusal) {
-          if (r.ok) throw new Error(`Expected a refusal, but "${a.call.name}" succeeded`);
+          if (r.ok) throw new Error('This should have been refused, but it went through.');
           log('ok', `Refused, as it should be: ${r.error ?? r.detail ?? 'rejected'}`);
           return 'next';
         }
-        if (!r.ok) throw new Error(r.error ?? `${a.call.name} failed`);
-        for (const t of txs) log('ok', r.detail ?? `${a.call.name} confirmed`, { tx: t, chain: r.chain ?? 'whitechain' });
-        if (!txs.length) log('ok', r.detail ?? `${a.call.name} done`);
+        if (!r.ok) throw new Error(r.error ?? 'The service said no.');
+        const done = r.detail ?? a.say.replace(/…$/, '').replace(/^Simulated counterparty: /, '') + ': done';
+        txs.forEach((t, i) => log('ok', i === txs.length - 1 ? done : 'Step transaction', { tx: t, chain: r.chain ?? 'whitechain' }));
+        if (!txs.length) log('ok', done);
         return 'next';
       }
       case 'assertChain': {
         const h = s.ctx[a.key];
-        if (!h || !TX.test(h)) throw new Error(`No transaction recorded for ${a.key}`);
+        if (!h || !TX.test(h)) throw new Error('No transaction was recorded for this step.');
         for (let i = 0; i < 60; i++) {
           if (g !== gen) throw new Aborted();
           const r = await deps.receipt(a.chain, h);
           if (r === 'ok') { log('ok', `Confirmed on ${a.chain === 'sepolia' ? 'Ethereum Sepolia' : 'Whitechain'}`, { tx: h, chain: a.chain }); return 'next'; }
-          if (r === 'reverted') throw new Error(`Transaction reverted: ${h}`);
+          if (r === 'reverted') { log('error', 'The transaction was refused on chain.', { tx: h, chain: a.chain }); throw new Error('The transaction was refused on chain (reverted).'); }
           await deps.sleep(1000);
         }
-        throw new Error(`No receipt yet for ${h}`);
+        throw new Error('Timed out waiting for the transaction to be confirmed.');
       }
       case 'log': log(a.kind ?? 'info', val(a.text, s.ctx)); return 'next';
     }

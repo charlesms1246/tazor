@@ -28,7 +28,8 @@
 .ap-callout b { font-weight: 600; }
 .ap-callout-sub { color: #c9d4e4; font-size: 12px; line-height: 16px; }
 .ap-callout .btn { justify-self: start; background: var(--wc-lime); border-color: var(--wc-lime); color: var(--wc-ink); }
-.ap-error { padding: 10px 12px; border-radius: var(--radius-inner); background: var(--pill-negative-bg); color: var(--pill-negative-ink); font-size: 13px; overflow-wrap: anywhere; }
+.ap-error { display: grid; gap: 6px; padding: 12px; border-radius: var(--radius-inner); background: var(--pill-negative-bg); color: var(--pill-negative-ink); font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.ap-error-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .ap-log { flex: 1; min-height: 80px; overflow-y: auto; margin: 0; padding: 0; list-style: none; display: grid; align-content: start; gap: 6px; font-size: 12px; line-height: 17px; }
 .ap-log li { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; }
 .ap-time { font-family: var(--mono); color: var(--faint); font-size: 11px; }
