@@ -1,0 +1,139 @@
+{
+  "startedAt": "from log",
+  "company": "0xb99A12652BEe98429ae31EA0529A0b63f1073721",
+  "salt": "acme-p2",
+  "txs": [
+    {
+      "step": 1,
+      "label": "create",
+      "chain": "whitechain",
+      "hash": "0xbb97cd8f163d48700e4d2b4edbe066c93f59550ad9fbf39cfe48af6e1dd1d70e"
+    },
+    {
+      "step": 1,
+      "label": "fund",
+      "chain": "whitechain",
+      "hash": "0x847439e111d86a02b817793cf94650c65cd88a389f0fea3cf8dac93b8934c735"
+    },
+    {
+      "step": 2,
+      "label": "addPayee",
+      "chain": "whitechain",
+      "hash": "0x7e94fbe9b8df9917c031ea3c38309548733d9487869000cd72221bf932baa809"
+    },
+    {
+      "step": 2,
+      "label": "payOne 1 USDT",
+      "chain": "whitechain",
+      "hash": "0x44e89ba200aa8c00374fa6f104e6cf6476853fa23b59fb2aa6bc8b87c8712114"
+    },
+    {
+      "step": 4,
+      "label": "syncRoles",
+      "chain": "whitechain",
+      "hash": "0x9b5d5702159502f805da0bc050ccd3ad157ce928abde45600ca7795c6a20d9e9"
+    },
+    {
+      "step": 4,
+      "label": "payOne 4 USDT",
+      "chain": "whitechain",
+      "hash": "0x813018bd67c4096764272e0cb5a7e282bb1422f5071dd5f0f53d3fc6836e348a"
+    },
+    {
+      "step": 5,
+      "label": "provisionalGrant",
+      "chain": "whitechain",
+      "hash": "0x8babc9fae8c48e331636fdd503580bb45e7a56ca170fed4fe112a5b9c5175786"
+    },
+    {
+      "step": 5,
+      "label": "payOne 0.5 USDT (Meera)",
+      "chain": "whitechain",
+      "hash": "0xd4952b980f6ee35ae7d21e0f2c86f51935bc35e0f03e76149cdfcd5b6f21e661"
+    },
+    {
+      "step": 6,
+      "label": "payAsAgent 1 USDT",
+      "chain": "whitechain",
+      "hash": "0x7d6652fe3e27354d45edec4f5a13a2705811bd1a7874ec67955bbc19ab34a44a"
+    },
+    {
+      "step": 7,
+      "label": "setApproverExpiry",
+      "chain": "whitechain",
+      "hash": "0x5a0b6efd78cc4ffc68740733e881a9fcd3b36eb6771366baddcd0479997b3319"
+    },
+    {
+      "step": 8,
+      "label": "createMandate",
+      "chain": "whitechain",
+      "hash": "0x3bb6068f470e8b8dc275fa363b0402a7df435274892be8bc824729bc48d8097a"
+    },
+    {
+      "step": 8,
+      "label": "pull 0.6 USDT",
+      "chain": "whitechain",
+      "hash": "0xe03d957ccacaa28750f6790123be182fceed7ab4ff8c39bb26c73ae03f795aca"
+    },
+    {
+      "step": 9,
+      "label": "commit",
+      "chain": "whitechain",
+      "hash": "0x54f463c35c7fd525e594a242aec5e55c72852d9ca22edb28e690fc7391a91c22"
+    },
+    {
+      "step": 9,
+      "label": "sponsor Meera 0.01 WBT",
+      "chain": "whitechain",
+      "hash": "0xd5d4b7c97bdc83d7de42c9c392c28540080837baf150253be8d6d046e33b02a9"
+    },
+    {
+      "step": 9,
+      "label": "list (Meera)",
+      "chain": "whitechain",
+      "hash": "0x186adac545f3d2d12f9d8cfcd00ca68fcbdaedaf55df1ed1552c02eb57ea88a5"
+    },
+    {
+      "step": 9,
+      "label": "approve",
+      "chain": "whitechain",
+      "hash": "0xf36f2d1879aeb8c4bdc0f0bc2ba816739019d4f6f5d6e82205e1df9de9d760bd"
+    },
+    {
+      "step": 9,
+      "label": "buy",
+      "chain": "whitechain",
+      "hash": "0x95c1290f31fe2d373253be8151b303ff46b07b1e696ebdbf8cf6d7f01b11659a"
+    },
+    {
+      "step": 9,
+      "label": "settle",
+      "chain": "whitechain",
+      "hash": "0x53b7695c41fe1330579353915e4e458bd044aaf0d5dca57bd4663bd5130f723d"
+    },
+    {
+      "step": 10,
+      "label": "forward (Sepolia)",
+      "chain": "sepolia",
+      "hash": "0x7d89603aa2b95b792922a30054a0ee82a6ae0fe71b5bc26d6243513a023ae20f"
+    },
+    {
+      "step": 10,
+      "label": "payFromL1 (deposit)",
+      "chain": "whitechain",
+      "hash": "0x72a01b6cf23f5fbdfa579b869e57f16dcda948bf5dbd0da51f10c15bea2a8e9c"
+    },
+    {
+      "step": 11,
+      "label": "requestExit",
+      "chain": "whitechain",
+      "hash": "0x410740006cd8cc8886d077e2cb9341d76acbd88eec28babbd048d394d74eb92e"
+    },
+    {
+      "step": 11,
+      "label": "executeExit",
+      "chain": "whitechain",
+      "hash": "0x8d9a949fa37e8c44469694760a725ac221e7d9000d80d9e81a37c7e537136888"
+    }
+  ]
+}
