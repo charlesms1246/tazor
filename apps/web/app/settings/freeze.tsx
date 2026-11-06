@@ -11,6 +11,7 @@ import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { decodeIsRevoked, decodeRevokeDigest, encodeIsRevokedCall, encodeRevokeDigestCall, revokeDigest, revokeRelayerBody, type Revoke } from '@/lib/revoke.ts';
 import { ethCall } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
+import { Field, Notice, Pill } from '../_ui/index.tsx';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 type Prepared = { list: Address; v2: boolean; r: Revoke; digest: Hex; me: Address };
@@ -77,25 +78,47 @@ export function FreezeDevice() {
   });
 
   return (
-    <section>
-      <h2>Freeze my device</h2>
-      <p>If this phone is lost or compromised, revoke its approver for a company. It takes effect on Whitechain immediately and cannot be undone (an admin adds a new approver account).</p>
-      <p><label>Company account <input data-testid="freeze-account" value={account} onChange={(e) => setAccount(e.target.value)} size={44} /></label>{' '}
-        <button data-testid="freeze-prepare" onClick={onPrepare} disabled={busy}>Freeze…</button></p>
-      {prep && (
-        <p data-testid="freeze-confirm">
-          Revoke approver {prep.me} for {prep.r.account} on {prep.v2 ? 'RevocationListV2' : 'RevocationList'} {prep.list}?{' '}
-          <button data-testid="freeze-yes" onClick={onConfirm} disabled={busy}>Yes, freeze (Face ID)</button>{' '}
-          <button onClick={() => setPrep(null)}>Cancel</button>
-        </p>
-      )}
-      {error && <p data-testid="freeze-error" style={{ color: 'crimson' }}>{error}</p>}
-      {result?.tx && <p data-testid="freeze-tx">Submitted: <a href={`${config.explorer}/tx/${result.tx}`} target="_blank" rel="noreferrer">{result.tx}</a></p>}
-      {result?.calldata && (
-        <p>Calldata (to {result.calldata.to} on Whitechain):<br /><code data-testid="freeze-calldata" style={{ wordBreak: 'break-all' }}>{result.calldata.data}</code></p>
-      )}
-      {result && <p><button data-testid="freeze-check" onClick={onCheck} disabled={busy}>Check status</button>{' '}
-        {result.revoked !== undefined && <span data-testid="freeze-status">{result.revoked ? 'Revoked: this device can no longer approve for this company.' : 'Not revoked yet.'}</span>}</p>}
-    </section>
+    <div className="settings-row">
+      <div>
+        <h2>Freeze this device</h2>
+        <p>If this phone is lost or compromised, revoke its approver for a company. It takes effect on Whitechain immediately and cannot be undone; an admin has to add a new approver account.</p>
+      </div>
+      <div className="fields">
+        <Field label="Company account">
+          <input className="input mono" data-testid="freeze-account" value={account} onChange={(e) => setAccount(e.target.value)} placeholder="0x…" />
+        </Field>
+        <div className="row">
+          <button className="btn btn-danger" data-testid="freeze-prepare" onClick={onPrepare} disabled={busy}>Freeze…</button>
+          <span className="small faint">This device stops approving for that company, permanently.</span>
+        </div>
+        {prep && (
+          <Notice tone="warning">
+            <div className="stack" style={{ gap: 12 }} data-testid="freeze-confirm">
+              <span>Revoke approver <span className="mono break">{prep.me}</span> for <span className="mono break">{prep.r.account}</span> on {prep.v2 ? 'RevocationListV2' : 'RevocationList'} <span className="mono break">{prep.list}</span>? This cannot be undone.</span>
+              <span className="row">
+                <button className="btn btn-sm btn-danger" data-testid="freeze-yes" onClick={onConfirm} disabled={busy}>Yes, freeze (Face ID)</button>
+                <button className="btn btn-sm" onClick={() => setPrep(null)}>Cancel</button>
+              </span>
+            </div>
+          </Notice>
+        )}
+        {error && <Notice tone="negative"><span data-testid="freeze-error">{error}</span></Notice>}
+        {result?.tx && <p className="small" data-testid="freeze-tx">Submitted: <a className="mono break" href={`${config.explorer}/tx/${result.tx}`} target="_blank" rel="noreferrer">{result.tx}</a></p>}
+        {result?.calldata && (
+          <div className="well">
+            <p className="small muted">Calldata (to <span className="mono break">{result.calldata.to}</span> on Whitechain):</p>
+            <code className="break small" data-testid="freeze-calldata">{result.calldata.data}</code>
+          </div>
+        )}
+        {result && (
+          <div className="row">
+            <button className="btn btn-sm" data-testid="freeze-check" onClick={onCheck} disabled={busy}>Check status</button>
+            {result.revoked !== undefined && <span data-testid="freeze-status">{result.revoked
+              ? <><Pill tone="negative">Revoked</Pill> <span className="small muted">this device can no longer approve for this company.</span></>
+              : <Pill>Not revoked yet</Pill>}</span>}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
