@@ -4,6 +4,7 @@ import { encodeInvoiceLink } from '../lib/invoice-link.ts';
 import { WHITECHAIN_SEPOLIA_USDT, buildInvoiceAuth, invoiceAuthDigest } from '../lib/invoice-auth.ts';
 import { defaultAuthParams, encodePayOne } from '../lib/payment.ts';
 import type { Invoice } from '../lib/invoice.ts';
+import { unwrap6492 } from '../lib/erc6492.ts';
 
 const RPC = 'https://rpc.testnet.whitechain.io/';
 const PAYMENT_MODULE = '0x0000000000000000000000000000000000007000';
@@ -32,6 +33,7 @@ async function mockRpc(page: Page, invoiceDigest: Hex) {
   await page.route(RPC, async (route) => {
     const { id, method, params } = route.request().postDataJSON();
     let result: Hex | null = null;
+    if (method === 'eth_getCode') result = '0x6001';
     if (method === 'eth_call') {
       const data: string = params[0].data;
       if (data.startsWith(SEL.invoiceDigest)) result = word('bytes32', invoiceDigest);
@@ -88,7 +90,7 @@ test('matching digest enables Approve; passkey approval feeds the payOne calldat
   await expect(page.getByTestId('approval-count')).toHaveText('1');
 
   await page.getByTestId('calldata').click();
-  await expect(page.getByTestId('calldata-out')).toHaveText(encodePayOne(auth, [approval]));
+  await expect(page.getByTestId('calldata-out')).toHaveText(encodePayOne(auth, [{ ...approval, signature: unwrap6492(approval.signature).inner }]));
 });
 
 test('tampered link shows the invalid message', async ({ page }) => {

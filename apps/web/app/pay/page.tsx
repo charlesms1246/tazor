@@ -8,6 +8,7 @@ import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/inv
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
+import { counterfactualApproval, unwrap6492 } from '@/lib/erc6492.ts';
 import { ethCall, getBlockTimestamp, getReceipt, rpc } from '@/lib/rpc.ts';
 import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInjectedWallet } from '@/lib/ensgate.ts';
 import { appendPayment, loadPasskey } from '@/lib/storage.ts';
@@ -119,6 +120,9 @@ export default function PayPage() {
   const approvals = (() => {
     try { return mergeApprovals(mine ? [mine] : [], pasted.trim() ? parseApprovals(pasted) : []); } catch { return null; }
   })();
+  // contracts read inner signatures; an ERC-6492-wrapped approver must be deployed first (the relayer does this)
+  const inner = (approvals ?? []).map((a) => ({ ...a, signature: unwrap6492(a.signature).inner }));
+  const pendingDeploys = (approvals ?? []).map((a) => unwrap6492(a.signature)).filter((u) => u.factory);
 
   const run = (fn: () => Promise<void>) => async () => {
     setBusy(true);
@@ -130,7 +134,7 @@ export default function PayPage() {
     if (guard.status !== 'ok') return;
     const key = loadPasskey();
     if (!key) throw new Error('No passkey on this device. Create one on the onboarding page first.');
-    const signature = await signInvoiceAuthWithPasskey(key.credentialId, guard.digest, key);
+    const signature = await counterfactualApproval(key, await signInvoiceAuthWithPasskey(key.credentialId, guard.digest, key));
     setMine({ approver: key.approverAccount, signature });
   });
 
@@ -157,7 +161,7 @@ export default function PayPage() {
     if (!approvals?.length) throw new Error('No approvals yet.');
     if (!gate) throw new Error('EnsGate address is not configured.');
     if (!label.trim()) throw new Error('Enter the company name label.');
-    const data = encodeForward(label.trim(), auth, approvals);
+    const data = encodeForward(label.trim(), auth, inner);
     setL1({ data });
     try {
       const { gas, fee } = await estimateForwardFee(gate, data);
@@ -182,14 +186,14 @@ export default function PayPage() {
 
   const onCopyCalldata = run(async () => {
     if (!approvals?.length) throw new Error('No approvals yet.');
-    const data = v2 ? encodePayOneV2(auth, approvals) : encodePayOne(auth, approvals);
+    const data = v2 ? encodePayOneV2(auth, inner) : encodePayOne(auth, inner);
     setCalldata(data);
     await navigator.clipboard?.writeText(data).catch(() => undefined);
   });
 
   const onPayAsAgent = run(async () => {
     if (!mine) throw new Error('Approve first: the agent signs the same invoice digest.');
-    const data = encodePayAsAgent(auth, mine.approver, mine.signature);
+    const data = encodePayAsAgent(auth, mine.approver, unwrap6492(mine.signature).inner);
     setCalldata(data);
     await navigator.clipboard?.writeText(data).catch(() => undefined);
   });
@@ -281,6 +285,9 @@ export default function PayPage() {
           )}
         </div>
       )}
+      {(calldata || l1) && pendingDeploys.map((u) => (
+        <p key={u.factoryCalldata} data-testid="deploy-first">Not deployed yet: first send to the ApproverAccountFactory {u.factory}: <code style={{ wordBreak: 'break-all' }}>{u.factoryCalldata}</code></p>
+      ))}
       {calldata && (
         <p>Send this calldata to PaymentModule {(v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)'} from any wallet on Whitechain:<br />
           <code data-testid="calldata-out" style={{ wordBreak: 'break-all' }}>{calldata}</code></p>

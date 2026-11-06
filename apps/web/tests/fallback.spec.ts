@@ -6,6 +6,7 @@ import { defaultAuthParams } from '../lib/payment.ts';
 import { encodeForward, invoicePaidTopics } from '../lib/ensgate.ts';
 import { mandateModuleAbi } from '../lib/abi/MandateModule.ts';
 import type { Invoice } from '../lib/invoice.ts';
+import { unwrap6492 } from '../lib/erc6492.ts';
 
 const WC_RPC = 'https://rpc.testnet.whitechain.io/';
 const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com/';
@@ -36,6 +37,7 @@ async function mockChains(page: Page, opts: { delivered: () => boolean }) {
   await page.route(WC_RPC, async (route) => {
     const { id, method, params } = route.request().postDataJSON();
     if (method === 'eth_blockNumber') return route.fulfill(json(id, '0x100'));
+    if (method === 'eth_getCode') return route.fulfill(json(id, '0x6001')); // the approver account is deployed
     if (method === 'eth_getLogs') {
       const logs = opts.delivered() ? [{ topics: invoicePaidTopics(auth.account, auth.nonce), data: encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }, { type: 'bool' }], [invoice.payee, invoice.amount, true]), transactionHash: L2_TX, blockNumber: '0x101' }] : [];
       return route.fulfill(json(id, logs));
@@ -82,7 +84,7 @@ test('relayer down: Send via Ethereum builds forward calldata, estimates the fee
 
   await page.getByTestId('prepare-l1').click();
   await expect(page.getByTestId('l1-fee')).toHaveText('Estimated fee: 0.000482304 ETH (482304 gas)');
-  await expect(page.getByTestId('l1-data')).toHaveText(encodeForward('acme', auth, [approval]) as string);
+  await expect(page.getByTestId('l1-data')).toHaveText(encodeForward('acme', auth, [{ ...approval, signature: unwrap6492(approval.signature).inner }]) as string);
 
   await page.getByTestId('watch-l1').click();
   await expect(page.getByTestId('l1-status')).toContainText('Waiting');
