@@ -68,7 +68,7 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 ## Also built (one slide)
 
 - **Subscriptions:** permit-based pulls that can't run early or exceed the plan, cancel anytime by signature. The relayer's cron renews them and sends reminders. Live renewal: [`0x3c0b…06d1`](https://explorer.testnet.whitechain.io/tx/0x3c0b7ce52ce4cd1d817090dd5efe87ceb7ac3382776bab91d3f068b7b95406d1).
-- **Pay from an exchange:** every order has its own deposit address, so a plain transfer pays it, and any extra goes back in the same tx ([`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d)). Simulated on testnet; whether WhiteBIT withdrawals can target it is being checked with the Whitechain team.
+- **Pay from an exchange:** every order has its own deposit address, shown as an EIP-681 payment QR, so a plain transfer pays it, and any extra goes back in the same tx ([`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d)). Simulated on testnet; whether WhiteBIT withdrawals can target it is being checked with the Whitechain team.
 - **AI agents over x402** (`eip155:1874`, through a facilitator I run, with a spend cap): [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea).
 - **B2B invoices** approved by WhiteBIT-verified people with Face ID or fingerprint passkeys. Company roles live on ENS (details below).
 - **An Ethereum fallback** for when Tazor's servers are gone: [details below](#crops).
@@ -86,6 +86,28 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 | Subscribe → pull cycle 2 → cancel by signature | [`0xd483…f1c3`](https://explorer.testnet.whitechain.io/tx/0xd48336d3cd7043f9b8f794738ec1eb55af6f56ab1323d55e4d07e36f9dddf1c3), [`0x73cc…0754`](https://explorer.testnet.whitechain.io/tx/0x73cc7660e0dee0d0a67a3e439a9fe7b2697b6e53065279fbd6404c3820620754), [`0xad59…fdd9`](https://explorer.testnet.whitechain.io/tx/0xad59a297ede3d74489e1ea5f6310c0ee22a7e23976cdeabb8cbebddbb604fdd9) | a charge after the cancel reverts |
 
 Reproduce: `scripts/checkout-live.ts`, `scripts/hosted-checkout-live.ts`, `scripts/deposit-live.ts`, `scripts/subscription-cron-live.ts`, `scripts/accountant-export.ts` (receipts in `scripts/checkout-live/`).
+
+## Standards used
+
+| Standard | Where it's used |
+|---|---|
+| **EIP-3009** (transfer/receive with authorization) | Gasless checkout and merchant refunds (`receiveWithAuthorization`, so only the checkout contract can submit), and x402 agent payments (`transferWithAuthorization`) |
+| **EIP-2612** (permit) | Subscription pulls after the first period |
+| **EIP-712** (typed data) | Every signature, including the subscription cancel |
+| **ERC-5267** (`eip712Domain()`) | `TazorCheckout` publishes its signing domain on-chain, which the track USDT doesn't (see WHITECHAIN_FEEDBACK.md) |
+| **EIP-681** (payment request URIs), **new** | The pay-from-exchange QR and "Copy payment link" encode `ethereum:<USDT>@1874/transfer?address=<deposit address>&uint256=<amount>`, so wallet apps fill in the token, network and amount (`paymentUri()` in `@tazor/pay`) |
+| **ERC-7730** (clear signing), **new** | [`clear-signing/`](clear-signing/) describes every message and call a customer or merchant signs, so supporting wallets show "Pay 0.20 USDT through Tazor Checkout, valid until …" instead of raw data. The files validate against the official schema, and a test keeps them equal to what the SDK signs. Wallets show it once the files are in a wallet's registry. |
+| **ERC-1271** (contract signatures) | Contract wallets can pay, refund and approve (the USDT's `bytes` overloads) |
+| **ERC-6492** (signatures from undeployed accounts) | The relayer verifies approvals from approver accounts that aren't deployed yet |
+| **EIP-1167** clones + **CREATE2** | One deposit address per order, known before anything is deployed |
+| **ERC-7579**, **ERC-7913**, **ERC-7821** | B2B company and approver smart accounts: modules, any key type, batch execution |
+| **ERC-4337** | A paymaster that caps gas sponsorship per verified WB Soul |
+| **EIP-7702** | An approver's existing wallet gains approver code and keeps its address |
+| **RIP-7212** (P-256 verification) | Face ID and fingerprint passkeys verified on-chain |
+| **EIP-2935** + `L1Block` | Ethereum state (ENS roles) proven on Whitechain |
+| **ENSIP-10 / ENSIP-11** | Company names, roles and Whitechain addresses on ENS |
+| **CAIP-2** + **x402** | `eip155:1874` as the x402 network id, with a facilitator Tazor runs |
+| **EIP-1193** | Any browser wallet in wallet mode |
 
 ## Also built: B2B invoicing and approvals (live)
 
