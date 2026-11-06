@@ -1,32 +1,54 @@
 # Tazor
 
-**Business billing in USDT on Whitechain that no one can stop or redirect.**
+**Get a business paid in USDT on Whitechain, from checkout to refund to financing. The payer never needs WBT, a seed phrase or to know which chain they're on.**
 
-Tazor is B2B invoicing and direct debits in USDT on Whitechain, with a bank-style approval flow:
+Built at ETHGlobal Mumbai (November 2026) for **Whitechain**: Operate, with Scale and Tokenize underneath.
 
-- **Verified approvers:** every approver is a person WhiteBIT has verified (WB Soul).
-- **Roles on ENS:** who may approve for a company lives on its ENSv2 name (`acme.taz0r.eth`), and Whitechain checks it by storage proof, not by trusting a server.
-- **Passkeys, no wallet:** approvers sign with browser passkeys (Face ID, fingerprint or device PIN). They never see a wallet, seed phrase or gas.
-- **An Ethereum fallback:** if our relayer or servers go away, or Whitechain's sequencer refuses a payment, the signed payment can still be submitted on Ethereum. ENS is checked there, and a portal deposit delivers it to Whitechain: about a minute normally, and within Whitechain's ~12 h sequencing window at worst.
+| | What a business gets | Whitechain feature it rests on |
+|---|---|---|
+| **Checkout** | A 15-line drop-in pay button. The customer signs **one message** in any wallet (no gas, no WBT), or **pays from WhiteBIT or any exchange** with a plain transfer to the order's own deposit address | The track USDT's EIP-3009 `receiveWithAuthorization` (bytes signatures, so ERC-1271 works) and CREATE2 deposit addresses |
+| **After the sale** | One-click **refunds** that can only reach the original payer and never exceed what was paid. **Subscriptions** with permit-based pulls that can't run early, can't exceed the plan, and can be cancelled anytime. **HMAC-signed webhooks.** An **on-chain receipt** that tracks Whitechain's three finality stages. **Accountant export** | EIP-2612 `permit` on the track USDT; OP Stack `safe` / `finalized` heads |
+| **AI agents** | **x402 pay-per-request:** an agent holding only USDT pays an API through a facilitator we run, under a hard spend cap | EIP-3009 `transferWithAuthorization` |
+| **B2B invoicing** | Invoices, payment runs and direct-debit mandates, approved by **WhiteBIT-verified people** (WB Soul) with Face ID or fingerprint passkeys | P-256 precompile, WB Soul |
+| **Tokenize** | An approved invoice becomes a claim only verified holders can own. It's **sold at a discount** and **settled at maturity** in USDT | Transfer rules in the contract, WB Soul allowlist |
+| **Can't be switched off** | If our servers go away, or the sequencer refuses a payment, the signed payment still goes through Ethereum (OptimismPortal) | OP Stack forced inclusion |
 
-Built at ETHGlobal Mumbai, November 2026.
+**Why on-chain USDT on Whitechain, not a card or bank rail:** the customer authorises an exact amount to an exact merchant with one signature, and **anyone** can settle it in about 4 s for a fraction of a cent. The refund and subscription rules are enforced by the contract that moves the money, not by a processor's goodwill. An exchange user pays from their WhiteBIT balance with no wallet at all. A card network or bank API can't offer payments that settle in seconds, can't be redirected, and still go through if the provider disappears.
 
-**In 30 seconds (Whitechain Operate):** a supplier creates an invoice (or a shop drops in `<tazor-pay-button>`, 16 lines), the buyer's approvers sign with a passkey, and USDT settles on Whitechain in about 3 s. Refunds (credit notes), renewals (mandates / direct debits) and accountant exports (Tally, Xero, QuickBooks, camt.054-style) are built in. If our servers disappear, the same signed payment still goes through Ethereum.
-
-**Why on-chain USDT, not a bank rail:**
-- **Cross-border B2B is slow and expensive on bank rails:** an India→EU supplier payment by SWIFT typically settles in 1–3 business days with intermediary fees and a 1–3% FX spread; changing who may approve takes banks 7–10 working days; e-NACH mandates take 1–4 business days to activate. On Tazor a payment settles in about 3 s (measured), a mandate is one transaction, and removing an approver takes about 3 s.
-- **Cost:** a payment costs ~150–200k gas on Whitechain (fractions of a cent at testnet prices; see `proofs/gas`), a batch run ~40–55k per invoice.
-- **Enforcement where the money moves:** the payer's verified identity (WB Soul), the company's ENS authority and the approval policy are checked in the same transaction that moves the USDT, and the Ethereum fallback works without any operator. A bank or a custodial API can't give a company payments that no intermediary can block or redirect.
-
-USDT payment: [`0xbcee…4f21`](https://explorer.testnet.whitechain.io/tx/0xbceeaa443a3e17a19037a677a459a88dcd11a7e17b01ebd431118c997ce84f21) (1.2 USDT, acme → bluejay, submitted by the relayer)
+**Key USDT payments** (official USDT `0xcedf…55a7`, all on Whitechain Sepolia):
+- Gasless checkout via the hosted relayer: [`0xd064…a4aa`](https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa) (4.0 s; the customer held 0 WBT)
+- AI agent over x402: [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea)
+- Paid from an exchange-style transfer: [`0x91bb…c0`](https://explorer.testnet.whitechain.io/tx/0x91bb2ba4fa685641b222edb0ecd64724291e5eccd405110d2b122265961dd4c0)
+- B2B invoice approved by verified people: [`0xbcee…4f21`](https://explorer.testnet.whitechain.io/tx/0xbceeaa443a3e17a19037a677a459a88dcd11a7e17b01ebd431118c997ce84f21)
 
 **Try it (testnet only, no real money):**
-- App: https://tazor-app.vercel.app (pitch build). The reproducible IPFS build is published as a pinned CID; `taz0r.eth.limo` serves it once the mainnet `taz0r.eth` contenthash is set (pending, a single owner transaction).
-- **Autopilot:** https://tazor-app.vercel.app/autopilot/ runs every feature on the real pages, one step at a time, pausing only when your passkey or wallet must approve. "Try it yourself" creates a passkey on your phone and admits it to a sandbox company.
-- Merchant demo: https://bluejay-shop.vercel.app, a separate shop that takes a Tazor payment in 16 lines (`examples/merchant-demo`).
-- Relayer: https://tazor-relayer.vercel.app/health (optional and stateless; see CROPS).
+- **Merchant demo:** https://bluejay-shop.vercel.app, a separate shop with Tazor added in 15 lines. The customer view and the merchant view sit side by side: orders, refunds, subscriptions, webhooks and CSV.
+- **App:** https://tazor-app.vercel.app. It has receipts, the merchant Checkout console, B2B invoicing, approvals, mandates and financing. The **Autopilot** (`/autopilot/`) runs every feature on the real pages.
+- **AI agent:** `AGENT_KEY=… node --experimental-strip-types examples/agent/agent.ts`
+- **Relayer and x402 facilitator:** https://tazor-relayer.vercel.app/health (optional; anyone can submit the same signed payments).
 
-## Live on testnet
+## Checkout on Whitechain: live
+
+Contracts: [`TazorCheckout`](https://explorer.testnet.whitechain.io/address/0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670) and [`TazorDepositCheckout`](https://explorer.testnet.whitechain.io/address/0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab), both verified. Twenty fork tests run against the real Whitechain Sepolia USDT, including the attack cases: a redirected signature, a changed amount, double pay, an over-refund, a forged refund, a stranger cancelling, and changed plan terms.
+
+| Flow | Transactions | Notes |
+|---|---|---|
+| Pay with one signature (direct) | [`0xa460…880c`](https://explorer.testnet.whitechain.io/tx/0xa460e8e3039db8c9d1e7ee2b94872e659d348fa8372a9c56d7d67784a82d880c) | new payer with 0 WBT |
+| Partial refund, signed by the merchant | [`0xff03…bb19`](https://explorer.testnet.whitechain.io/tx/0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19) | the money can only go to the original payer |
+| Subscribe (cycle 1 + permit) → pull cycle 2 → cancel by signature | [`0xd483…f1c3`](https://explorer.testnet.whitechain.io/tx/0xd48336d3cd7043f9b8f794738ec1eb55af6f56ab1323d55e4d07e36f9dddf1c3), [`0x73cc…0754`](https://explorer.testnet.whitechain.io/tx/0x73cc7660e0dee0d0a67a3e439a9fe7b2697b6e53065279fbd6404c3820620754), [`0xad59…fdd9`](https://explorer.testnet.whitechain.io/tx/0xad59a297ede3d74489e1ea5f6310c0ee22a7e23976cdeabb8cbebddbb604fdd9) | a charge after the cancel reverts |
+| Hosted: pay → refund → finality → signed webhooks | [`0xd064…a4aa`](https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa), [`0x891a…f9a6`](https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6) | `order.paid`, `order.refunded` and `order.finality` signatures all verified |
+| Pay from an exchange: plain transfer with overpayment → settle | [`0xf4b8…e596`](https://explorer.testnet.whitechain.io/tx/0xf4b8e6dafefb85a3f2b39abbcd9bf8b738ca0554c72e203048606ef9f2f4e596), [`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d) | the merchant got exactly the order amount; the extra went back in the same tx |
+| AI agent pays an API over x402 | [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea) | with a 0.005 cap, the agent refuses the 0.01 price |
+
+Reproduce: `scripts/checkout-live.ts`, `scripts/deposit-live.ts`, `scripts/hosted-checkout-live.ts` (receipts in `scripts/checkout-live/`).
+
+**How the business pays gas, and what stops relayer drain (Scale):**
+- The relayer holds WBT, funded by the operator (faucet on testnet; on mainnet, WBT withdrawn from WhiteBIT). `/health` shows the gas runway.
+- Every write is checked before it costs gas: the signature, the payer's balance, the authorization not yet used, a validity window of at most 1 h, and an `eth_call` simulation.
+- Limits per IP, per payer, per merchant and per order, plus a daily WBT budget and a balance floor. A failed check costs us nothing.
+- The relayer is a convenience, not a gatekeeper: anyone can submit the same signed payment, so pausing it never strands a customer.
+
+## B2B invoicing and approvals: live
 
 | Flow | Transactions | Measured |
 |---|---|---|
@@ -200,6 +222,9 @@ cd apps/web && NEXT_PUBLIC_BUILD_TIME=2026-11-07T00:00:00Z pnpm build:ipfs
 | GatewayVM | [`0xb27f6D44036C38fE415906209aC1C5cfbd71adF9`](https://explorer.testnet.whitechain.io/address/0xb27f6D44036C38fE415906209aC1C5cfbd71adF9) |
 | EthVerifierHooks | [`0xFcCF01179c3e6AB33796a9D2804380D1C609b3bA`](https://explorer.testnet.whitechain.io/address/0xFcCF01179c3e6AB33796a9D2804380D1C609b3bA) |
 | WB Soul mirror (simulated) | [`0x9822650A99bD33F29E383345F570dAE1e4E00928`](https://explorer.testnet.whitechain.io/address/0x9822650A99bD33F29E383345F570dAE1e4E00928) |
+| TazorCheckout | [`0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670`](https://explorer.testnet.whitechain.io/address/0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670) |
+| TazorDepositCheckout | [`0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab`](https://explorer.testnet.whitechain.io/address/0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab) |
+| OrderVault (deposit address implementation) | [`0xf45F031Ed0b5f0134DB2ab255B29555F90c9fA82`](https://explorer.testnet.whitechain.io/address/0xf45F031Ed0b5f0134DB2ab255B29555F90c9fA82) |
 | USDT | [`0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7`](https://explorer.testnet.whitechain.io/address/0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7) |
 | PaymentModuleV2 | [`0x906620D82e2959351c81D731C67EA46DF71E36f3`](https://explorer.testnet.whitechain.io/address/0x906620D82e2959351c81D731C67EA46DF71E36f3) |
 | MandateModuleV2 | [`0x24b6eC6f6bf7e58bB3266b0b2701aE451ab7220F`](https://explorer.testnet.whitechain.io/address/0x24b6eC6f6bf7e58bB3266b0b2701aE451ab7220F) |
@@ -221,13 +246,23 @@ cd apps/web && NEXT_PUBLIC_BUILD_TIME=2026-11-07T00:00:00Z pnpm build:ipfs
 
 ## Prize tracks
 
-- **Whitechain: Operate (headline).**
-  - The drop-in piece: `@tazor/pay` and `<tazor-pay-button>`, added to a separate merchant site in 16 lines (merchant and customer views side by side; live at bluejay-shop.vercel.app).
-  - Supplier and buyer flows: an invoice generator with a live A4 invoice and QR code, passkey approval, payment in track USDT.
-  - Post-payment: refunds (credit notes), renewals (mandates / direct debits) and Tally / Xero / QuickBooks / camt.054-style export.
-- **Whitechain: Scale.** Payers never hold WBT or a seed phrase: passkeys, a hosted relayer and an ERC-4337 paymaster whose sponsorship is capped per verified WB Soul (a wallet farm is refused: live test in `scripts/demo-extras/`). The relayer is funded with WBT by the operator; the drain guard is the per-Soul quota.
-- **Whitechain: Tokenize.** Invoice financing: an approved invoice becomes a claim that only verified Souls or Tazor accounts may hold (enforced on every transfer); it is sold at a discount and settled to the holder at maturity, all in USDT.
-- **ENS: Best Use of ENSv2.** A company's ENSv2 sub-registry *is* its authority. EAC roles (APPROVER, ADMIN, AGENT) are proven onto Whitechain by storage proof, and checked natively on Ethereum in the fallback.
+- **Whitechain: Operate (headline).** Checkout through the after-sale steps, on the brief's own list:
+  - a drop-in button in 15 lines on a separate shop (`<tazor-pay-button>`, `@tazor/pay`);
+  - both views in the demo;
+  - an on-chain receipt;
+  - order webhooks;
+  - refunds the customer can check;
+  - subscriptions with permit-based pulls, cancel anytime, with due reminders sent as webhooks;
+  - invoices with due dates;
+  - accountant export (CSV, Tally, Xero, QuickBooks, camt.054-style).
+- **Whitechain: Scale.**
+  - Payers never hold WBT, a seed phrase or a chain choice: EIP-3009 signatures, passkeys, and pay-from-exchange.
+  - AI agents pay over **x402** through our facilitator, with a hard spend cap.
+  - The business covers gas through a guarded relayer, plus an ERC-4337 paymaster capped per verified WB Soul (a wallet farm is refused).
+- **Whitechain: Tokenize.** Invoice financing:
+  - an approved invoice becomes a claim that only verified Souls or Tazor accounts may hold, enforced on every transfer;
+  - it is sold at a discount and settled to the holder at maturity, all in USDT.
+- **ENS: Best Use of ENSv2.** A company's ENSv2 sub-registry is its authority. Its roles are proven onto Whitechain by storage proof.
 - **Ethereum Foundation: Best CROPS App.** We claim **C** and **S** (below).
 
 ## CROPS
