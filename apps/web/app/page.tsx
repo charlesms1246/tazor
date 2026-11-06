@@ -24,6 +24,8 @@ import { approvalRows, chainPaidMap, companyLedger, summarize } from '@/lib/ledg
 import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
 import { INR_RATE_NOTE, inrText, usdtNumber } from '@/lib/money.ts';
+import { GetPaid } from './_home/get-paid.tsx';
+import './_invoice/touch.css';
 import { allCheckoutLogs, checkoutAddress, checkoutTotals, decodeCheckoutLogs, depositCheckoutAddress, merchantView } from '@/lib/checkout.ts';
 
 const PAY_TIME = TIMINGS.find((t) => t.action.startsWith('Pay an approved'))?.tazor ?? '';
@@ -170,7 +172,7 @@ export default function Home() {
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader title="Home" subtitle={<>{COMPANY} · {company.role} · Whitechain Sepolia</>}
         actions={<button type="button" className="btn" data-testid="start-tour" onClick={() => startTour()}>Take the tour</button>} />
 
@@ -217,6 +219,8 @@ export default function Home() {
           {!activityError && (flows ? <FlowChart rows={flows} /> : <div className="skeleton" style={{ height: 200, width: '100%' }} />)}
         </Card>
       </div>
+
+      <GetPaid />
 
       <section className="lanes" aria-label="Overview" data-tour="lanes">
         <a className="lane" href="/invoices/" data-testid="lane-receivables">
