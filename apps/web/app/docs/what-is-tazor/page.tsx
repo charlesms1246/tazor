@@ -28,7 +28,6 @@ export default function Page() {
         <li>Create invoices and share payment links.</li>
         <li>Pay one invoice, or a run of up to 50 invoices with one signature.</li>
         <li>Set up mandates so a supplier can collect a fixed amount each period.</li>
-        <li>Finance an approved invoice by selling the claim before the due date.</li>
         <li>Export payments for Tally, Xero, QuickBooks or as an ISO 20022 camt.054-style file.</li>
       </ul>
       <h2>What it is not</h2>

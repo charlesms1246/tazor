@@ -6,7 +6,7 @@ import { eventsFor, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
 
 const txUrl = (e: TimelineEvent) => (e.chain === 'sepolia' ? `${config.sepolia.explorer}/tx/${e.tx}` : `${config.explorer}/tx/${e.tx}`);
 const TONE: Partial<Record<TimelineEvent['kind'], string>> = {
-  paid: 'done', 'fallback-delivered': 'done', collected: 'done', settled: 'done', 'role-synced': 'done',
+  paid: 'done', 'fallback-delivered': 'done', collected: 'done', 'role-synced': 'done',
   failed: 'bad', 'supplier-unverified': 'warn', 'role-revoked': 'bad', 'mandate-cancelled': 'warn',
 };
 const time = (ms: number) => new Date(ms).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });

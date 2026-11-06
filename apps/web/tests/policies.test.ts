@@ -1,13 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { keccak256, toBytes } from 'viem';
-import { financedDigest, claimId } from '../lib/financing.ts';
 import { invoiceAuthDigestV2, policyDigest, policyStructHash, ROLE_APPROVER, type PolicyMessage } from '../lib/policies.ts';
 
 // Expected values read once (read-only eth_call) from the live Whitechain Sepolia contracts:
-// PaymentModuleV2 0x9066…36f3 typedDigest(structHash) / invoiceDigest, FinancingModule 0x7BEB…dE8B financedDigest.
+// PaymentModuleV2 0x9066…36f3 typedDigest(structHash) / invoiceDigest.
 const PM2 = '0x906620D82e2959351c81D731C67EA46DF71E36f3';
-const FM = '0x7BEBCFC47be110a0175452456267bFdaD45DdE8B';
 const d = { chainId: 1874, verifyingContract: PM2 } as const;
 const ACCOUNT = '0xb99A12652BEe98429ae31EA0529A0b63f1073721';
 const PAYEE = '0xc1dce946D192e344251972470237F1471C93876c';
@@ -47,11 +45,4 @@ test('struct hashes use the live typehashes (AddPayee)', () => {
 test('v2 invoice digest equals the live PaymentModuleV2.invoiceDigest (domain version 2)', () => {
   const auth = { invoiceHash: IH, account: ACCOUNT, payee: PAYEE, amount: 1_200_000n, expiry: 1_999_999_999n, nonce: 7n } as const;
   assert.equal(invoiceAuthDigestV2(auth, d), '0xc5ba4b4002cbafdc421062f97ddcdc023faf569c97e14ca2c2f09dce1a02a622');
-});
-
-test('financed digest equals the live FinancingModule.financedDigest; claim id = uint256(digest)', () => {
-  const f = { invoiceHash: IH, account: ACCOUNT, holder: MEERA, amount: 2_000_000n, dueDate: 1_999_999_999n, nonce: 9n } as const;
-  const digest = financedDigest(f, { chainId: 1874, verifyingContract: FM });
-  assert.equal(digest, '0x53248f5a3c2b7167b3ebc00cf04df07da44c4723260af2fa66436693f6d75818');
-  assert.equal(claimId(digest), BigInt(digest));
 });

@@ -20,7 +20,6 @@ export const DOC_GROUPS: DocGroup[] = [
       { slug: 'approvals', title: 'Approvals', summary: 'What an approval signs, when two are needed, and how a second approver joins.' },
       { slug: 'payment-runs', title: 'Payment runs', summary: 'Approve many invoices from one buyer with a single signature.' },
       { slug: 'mandates', title: 'Mandates (direct debits)', summary: 'Let a supplier collect up to a fixed amount each period, within limits you sign.' },
-      { slug: 'financing', title: 'Invoice financing', summary: 'Turn an approved invoice into a claim that a financier can buy before the due date.' },
       { slug: 'checkout', title: 'Checkout, refunds & subscriptions', summary: 'Take USDT from any wallet with one signature, refund it in one click, and charge subscriptions, all gasless.' },
     ],
   },
@@ -59,7 +58,7 @@ export const DOC_GROUPS: DocGroup[] = [
     pages: [
       { slug: 'timings', title: 'Timings', summary: 'Typical bank times next to measured Tazor times, with the transactions that prove them.' },
       { slug: 'glossary', title: 'Glossary', summary: 'The terms used across Tazor, in one place.' },
-      { slug: 'faq', title: 'FAQ', summary: 'Short answers to the questions finance teams ask first.' },
+      { slug: 'faq', title: 'FAQ', summary: 'Short answers to the questions accounts teams ask first.' },
     ],
   },
 ];

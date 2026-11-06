@@ -8,7 +8,7 @@ const DOCS = join(import.meta.dirname, '..', 'app', 'docs');
 
 test('every docs page in content.ts has a page.tsx that renders it by slug', () => {
   assert.equal(DOC_GROUPS.length, 6);
-  assert.equal(ALL_DOC_PAGES.length, 30);
+  assert.equal(ALL_DOC_PAGES.length, 29);
   assert.equal(new Set(ALL_DOC_PAGES.map((p) => p.slug)).size, ALL_DOC_PAGES.length);
   for (const p of ALL_DOC_PAGES) {
     const f = join(DOCS, p.slug, 'page.tsx');

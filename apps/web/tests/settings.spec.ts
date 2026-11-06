@@ -94,7 +94,7 @@ test('/security/ relayer URL: saved override is used by /pay/, clearing reverts 
 
 test('home page and footer link the v2 pages and settings', async ({ page }) => {
   await page.goto('/');
-  for (const href of ['/policies/', '/financing/', '/settings/']) {
+  for (const href of ['/policies/', '/settings/']) {
     await expect(page.locator(`main a[href="${href}"]`).first()).toBeVisible();
     await expect(page.getByTestId('footer-links').locator(`a[href="${href}"]`)).toBeVisible();
   }

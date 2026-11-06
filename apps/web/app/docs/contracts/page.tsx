@@ -9,7 +9,6 @@ const ROWS: Row[] = [
   ['PaymentModule v2', configV2.paymentModule, 'wc'],
   ['MandateModule (v1)', config.mandateModule, 'wc'],
   ['MandateModule v2', configV2.mandateModule, 'wc'],
-  ['FinancingModule', configV2.financingModule, 'wc'],
   ['RevocationList (v1)', config.revocationList, 'wc'],
   ['RevocationList v2', configV2.revocationList, 'wc'],
   ['RoleCache', config.roleCache, 'wc'],

@@ -10,7 +10,7 @@ export default function Page() {
       </p>
       <h2>Who does what</h2>
       <ul>
-        <li><b>Approvers</b> approve invoices, payment runs, mandates and financing commitments.</li>
+        <li><b>Approvers</b> approve invoices, payment runs and mandates.</li>
         <li><b>Admins</b> are the company account&apos;s own signers. They add payees, grant temporary access, set contractor expiry and remove people.</li>
         <li><b>Agents</b> are software that pays within a 30-day cap.</li>
       </ul>

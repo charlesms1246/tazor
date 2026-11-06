@@ -15,7 +15,6 @@ const ICONS: Record<string, ReactNode> = {
   runs: <><path d="M3 4h10M3 8h10M3 12h6" /><path d="m11.5 11 1.5 1.5L15 10" /></>,
   mandate: <><path d="M13 8a5 5 0 1 1-1.5-3.5" /><path d="M13 2.5V5h-2.5" /><path d="M8 5.5V8l1.5 1.5" /></>,
   checkout: <><path d="M2.5 3.5h1.5l1.6 7h7l1.4-5H5" /><circle cx="6.5" cy="13" r="1" /><circle cx="11.5" cy="13" r="1" /></>,
-  financing: <><path d="M2.5 13.5h11" /><path d="M4 11V8M7 11V5.5M10 11V7M13 11V3.5" /></>,
   export: <><path d="M8 2.5v7M5 6.5l3 3 3-3" /><path d="M3 11v2.5h10V11" /></>,
   team: <><circle cx="6" cy="5.5" r="2.25" /><path d="M2 13c.4-2.2 2-3.5 4-3.5s3.6 1.3 4 3.5" /><path d="M10.5 3.6a2.2 2.2 0 0 1 0 4M11.5 9.7c1.3.4 2.2 1.6 2.5 3.3" /></>,
   policy: <><path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4z" /><path d="m6 8 1.5 1.5L10.5 6.5" /></>,
@@ -50,7 +49,6 @@ const GROUPS: { label?: string; items: Item[] }[] = [
       { href: '/invoices/', label: 'Invoices', icon: 'invoice' },
       { href: '/mandates/', label: 'Collect', icon: 'mandate' },
       { href: '/checkout/', label: 'Checkout', icon: 'checkout' },
-      { href: '/financing/', label: 'Financing', icon: 'financing' },
     ],
   },
   {

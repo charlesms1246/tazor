@@ -89,7 +89,7 @@ export function ContractsList() {
     ['RevocationList v1', config.revocationList, wc], ['ApproverAccountFactory', config.approverAccountFactory, wc],
     ['TazorAccountFactory', config.tazorAccountFactory, wc], ['RoleCache', config.roleCache, wc], ['WB Soul (simulated mirror)', config.wbSoulMirror, wc],
     ['PaymentModuleV2', configV2.paymentModule, wc], ['MandateModuleV2', configV2.mandateModule, wc],
-    ['FinancingModule', configV2.financingModule, wc], ['RevocationListV2', configV2.revocationList, wc],
+    ['RevocationListV2', configV2.revocationList, wc],
     ['EnsGate (Sepolia)', config.sepolia.ensGate, sep], ['EnsGate v2 (Sepolia)', configV2.ensGateV2, sep],
   ];
   return (

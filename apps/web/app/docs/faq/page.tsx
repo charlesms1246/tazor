@@ -15,7 +15,7 @@ const QA: [string, React.ReactNode][] = [
 export default function Page() {
   return (
     <DocPage slug="faq" related={['what-is-tazor', 'security-model', 'glossary']}>
-      <p>Answers to the questions finance teams usually ask first.</p>
+      <p>Answers to the questions accounts teams usually ask first.</p>
       {QA.map(([q, a]) => (
         <section key={q}>
           <h2>{q}</h2>

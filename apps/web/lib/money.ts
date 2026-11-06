@@ -10,7 +10,7 @@ export function usdtNumber(v: bigint): string {
 export const usdtText = (v: bigint): string => `${usdtNumber(v)} USDT`;
 
 /**
- * Indicative rupee equivalents for Indian finance teams. A STATIC reference rate (not a live quote), shown as "≈ ₹…"
+ * Indicative rupee equivalents for Indian accounts teams. A STATIC reference rate (not a live quote), shown as "≈ ₹…"
  * and labelled indicative wherever it appears. Nothing is converted or settled in rupees.
  */
 export const INR_PER_USDT = 88;

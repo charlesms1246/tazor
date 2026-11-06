@@ -6,8 +6,7 @@ export type EventKind =
   | 'approved' | 'policy-passed' | 'submitted' | 'paid'
   | 'fallback-sent' | 'fallback-delivered' | 'failed'
   | 'mandate-created' | 'collected' | 'mandate-cancelled'
-  | 'role-granted' | 'role-synced' | 'role-revoked'
-  | 'financed' | 'settled';
+  | 'role-granted' | 'role-synced' | 'role-revoked';
 
 export type TimelineEvent = {
   subject: string;

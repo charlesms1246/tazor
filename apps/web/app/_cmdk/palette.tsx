@@ -19,7 +19,6 @@ const PAGES: { href: string; title: string; keywords: string[] }[] = [
   { href: '/', title: 'Home', keywords: ['dashboard', 'balance', 'overview'] },
   { href: '/invoices/', title: 'Invoices', keywords: ['bill', 'send', 'create', 'receive'] },
   { href: '/mandates/', title: 'Collect', keywords: ['mandates', 'direct debit', 'recurring', 'subscription'] },
-  { href: '/financing/', title: 'Financing', keywords: ['invoice financing', 'factoring', 'advance'] },
   { href: '/approvals/', title: 'Approvals', keywords: ['approve', 'sign', 'passkey', 'pay an invoice', 'payment link', 'scan qr', 'paid'] },
   { href: '/runs/', title: 'Payment runs', keywords: ['batch', 'payroll', 'many invoices'] },
   { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'team', 'roles', 'profile'] },

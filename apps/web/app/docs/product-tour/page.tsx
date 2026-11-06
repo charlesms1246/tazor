@@ -13,7 +13,6 @@ export default function Page() {
       <ul>
         <li><a href="/pay/">Pay</a>: open a link, check it, approve with your passkey and pay.</li>
         <li><a href="/runs/">Payment runs</a>: pay many invoices from one buyer with one approval.</li>
-        <li><a href="/financing/">Financing</a>: sell an approved invoice&apos;s claim to get paid early.</li>
       </ul>
       <h2>Control</h2>
       <ul>
