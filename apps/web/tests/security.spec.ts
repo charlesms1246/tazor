@@ -24,7 +24,7 @@ test('security page: four health rows, relayer up, fallback Ready', async ({ pag
   });
 
   await page.goto('/security/');
-  await expect(page.getByTestId('health-row')).toHaveCount(5);
+  await expect(page.getByTestId('health-row')).toHaveCount(6);
   await expect(page.getByTestId('health-relayer')).toHaveText('Up');
   await expect(page.getByTestId('health-whitechain')).toHaveText('Up');
   await expect(page.getByTestId('health-ethereum')).toHaveText('Up');
@@ -33,5 +33,9 @@ test('security page: four health rows, relayer up, fallback Ready', async ({ pag
   await expect(page.getByTestId('health-row').filter({ hasText: 'Whitechain Sepolia' })).toContainText('block 12,345,678');
   await expect(page.locator('[data-tour="health"]')).toBeVisible();
   await expect(page.getByRole('link', { name: 'How the fallback works' })).toHaveAttribute('href', '/docs/censorship-resistance/');
+  await expect(page.getByTestId('health-mirror')).toHaveText('Unknown');
+  await expect(page.locator('h1')).toHaveText('Security & settings');
+  await expect(page.getByTestId('relayer-current')).toBeVisible();
+  await expect(page.locator('[data-tour="fallback"]')).toBeVisible();
   await expect(page.getByTestId('freeze-account')).toBeVisible();
 });

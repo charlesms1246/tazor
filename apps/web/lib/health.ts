@@ -5,7 +5,7 @@ import { getRelayerUrl } from './relayer-url.ts';
 
 export type Health = {
   checkedAt: number;
-  relayer: { configured: boolean; ok: boolean; url: string; ms?: number; roleSync?: boolean; watchRegistries?: string[] };
+  relayer: { configured: boolean; ok: boolean; url: string; ms?: number; roleSync?: boolean; watchRegistries?: string[]; mirrorEnabled?: boolean; mirrorReason?: string };
   whitechain: { ok: boolean; block?: number; ageSec?: number };
   ethereum: { ok: boolean; block?: number };
   fallback: { ready: boolean; reason: string };
@@ -35,6 +35,8 @@ async function relayer(f: typeof fetch): Promise<Health['relayer']> {
       configured: true, ok: res.ok && body?.ok === true, url, ms: Date.now() - start,
       ...(typeof body?.roleSync === 'boolean' ? { roleSync: body.roleSync } : {}),
       ...(Array.isArray(body?.watchRegistries) ? { watchRegistries: body.watchRegistries.map(String) } : {}),
+      ...(typeof body?.mirrorEnabled === 'boolean' ? { mirrorEnabled: body.mirrorEnabled } : {}),
+      ...(typeof body?.mirrorReason === 'string' ? { mirrorReason: body.mirrorReason } : {}),
     };
   } catch {
     return { configured: true, ok: false, url };

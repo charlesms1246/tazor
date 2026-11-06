@@ -1,0 +1,11 @@
+/* Phones: nothing on this page scrolls sideways. */
+.health-table td { overflow-wrap: anywhere; }
+.revocation-row { flex-wrap: wrap; align-items: flex-start; }
+.revocation-row > span:first-child { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.revocation-row .cell-sub.mono { word-break: break-all; }
+.revocation-row > .row { flex: 0 1 auto; }
+.revocation-row .pill { white-space: normal; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; line-height: 16px; }
+@media (max-width: 900px) {
+  .health-table tr > td:nth-child(3) { grid-column: 1 / -1; padding-top: 4px !important; }
+  .health-table .pill { white-space: normal; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; line-height: 16px; text-align: right; }
+}

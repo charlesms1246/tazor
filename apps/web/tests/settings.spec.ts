@@ -58,7 +58,7 @@ async function payOnce(page: Page) {
   await expect(page.getByTestId('tx')).toContainText(TX);
 }
 
-test('/settings/ relayer URL: saved override is used by /pay/, clearing reverts to the default', async ({ page }) => {
+test('/security/ relayer URL: saved override is used by /pay/, clearing reverts to the default', async ({ page }) => {
   const posts: string[] = [];
   await mock(page, posts);
   const cdp = await page.context().newCDPSession(page);
@@ -68,7 +68,7 @@ test('/settings/ relayer URL: saved override is used by /pay/, clearing reverts 
   await page.getByTestId('create').click();
   await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
 
-  await page.goto('/settings/');
+  await page.goto('/security/');
   await expect(page.getByTestId('relayer-current')).toContainText(`${DEFAULT} (default for this build)`);
   await expect(page.getByTestId('addresses')).toContainText('PaymentModuleV2');
   await page.getByTestId('relayer-url').fill('http://evil.example');
@@ -83,7 +83,7 @@ test('/settings/ relayer URL: saved override is used by /pay/, clearing reverts 
   await payOnce(page);
   expect(posts).toEqual([`${CUSTOM}/pay`]);
 
-  await page.goto('/settings/');
+  await page.goto('/security/');
   await page.getByTestId('relayer-clear').click();
   await expect(page.getByTestId('relayer-current')).toContainText(`${DEFAULT} (default for this build)`);
   await payOnce(page);
@@ -96,4 +96,13 @@ test('home page and footer link the v2 pages and settings', async ({ page }) => 
     await expect(page.locator(`main a[href="${href}"]`).first()).toBeVisible();
     await expect(page.getByTestId('footer-links').locator(`a[href="${href}"]`)).toBeVisible();
   }
+});
+
+test('/settings/ redirects to Security & settings, keeping the relayer controls', async ({ page }) => {
+  await page.goto('/settings/');
+  await expect(page).toHaveURL(/\/security\/$/);
+  await expect(page.locator('h1')).toHaveText('Security & settings');
+  await expect(page.getByTestId('relayer-url')).toBeVisible();
+  await expect(page.getByTestId('addresses')).toContainText('PaymentModuleV2');
+  await expect(page.getByTestId('freeze-account')).toHaveCount(1);
 });

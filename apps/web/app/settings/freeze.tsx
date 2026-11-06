@@ -96,7 +96,7 @@ export function FreezeDevice() {
             <div className="stack" style={{ gap: 12 }} data-testid="freeze-confirm">
               <span>Revoke approver <span className="mono break">{prep.me}</span> for <span className="mono break">{prep.r.account}</span> on {prep.v2 ? 'RevocationListV2' : 'RevocationList'} <span className="mono break">{prep.list}</span>? This cannot be undone.</span>
               <span className="row">
-                <button className="btn btn-sm btn-danger" data-testid="freeze-yes" onClick={onConfirm} disabled={busy}>Yes, freeze (Face ID)</button>
+                <button className="btn btn-sm btn-danger" data-testid="freeze-yes" onClick={onConfirm} disabled={busy}>Yes, freeze with passkey</button>
                 <button className="btn btn-sm" onClick={() => setPrep(null)}>Cancel</button>
               </span>
             </div>

@@ -1,6 +1,6 @@
 import type { Health } from '@/lib/health.ts';
 
-export type HealthKey = 'relayer' | 'whitechain' | 'ethereum' | 'fallback' | 'rolesync';
+export type HealthKey = 'relayer' | 'whitechain' | 'ethereum' | 'fallback' | 'rolesync' | 'mirror';
 export type HealthRow = { key: HealthKey; name: string; tone: 'positive' | 'negative' | 'warning' | 'neutral'; status: string; detail: string };
 
 const n = (v: number) => v.toLocaleString('en-US');
@@ -20,10 +20,11 @@ export function healthRows(h: Health): HealthRow[] {
       : { key: 'ethereum', name: 'Ethereum Sepolia', tone: 'negative', status: 'Unreachable', detail: 'The Ethereum Sepolia RPC did not answer from this device.' },
     { key: 'fallback', name: 'Ethereum fallback', tone: h.fallback.ready ? 'positive' : 'warning', status: h.fallback.ready ? 'Ready' : 'Not ready', detail: h.fallback.reason },
     roleSyncRow(h),
+    mirrorRow(h),
   ];
 }
 
-export const HEALTH_KEYS: HealthKey[] = ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync'];
+export const HEALTH_KEYS: HealthKey[] = ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync', 'mirror'];
 
 function roleSyncRow(h: Health): HealthRow {
   const name = 'Role sync';
@@ -35,4 +36,15 @@ function roleSyncRow(h: Health): HealthRow {
   }
   const n = h.relayer.watchRegistries?.length ?? 0;
   return { key: 'rolesync', name, tone: 'positive', status: `Enabled · ${n} ${n === 1 ? 'registry' : 'registries'}`, detail: 'The relayer syncs ENS role changes to Whitechain on demand, plus a daily sweep.' };
+}
+
+function mirrorRow(h: Health): HealthRow {
+  const name = 'Revocation mirror';
+  if (!h.relayer.configured || !h.relayer.ok || h.relayer.mirrorEnabled === undefined) {
+    return { key: 'mirror', name, tone: 'neutral', status: 'Unknown', detail: 'No relayer report. A removal still takes effect on Whitechain at once; any company admin can also remove the role on ENS.' };
+  }
+  if (!h.relayer.mirrorEnabled) {
+    return { key: 'mirror', name, tone: 'warning', status: 'Not authorized', detail: `Removals take effect on Whitechain at once but are not copied to ENS by this relayer${h.relayer.mirrorReason ? `: ${h.relayer.mirrorReason}` : '.'}` };
+  }
+  return { key: 'mirror', name, tone: 'positive', status: 'Enabled', detail: 'The relayer copies Whitechain removals to the company’s ENS name.' };
 }

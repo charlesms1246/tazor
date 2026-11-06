@@ -13,7 +13,7 @@ const base: Health = {
 
 test('health rows: four rows with status and detail text', () => {
   const r = healthRows(base);
-  assert.deepEqual(r.map((x) => x.key), ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync']);
+  assert.deepEqual(r.map((x) => x.key), ['relayer', 'whitechain', 'ethereum', 'fallback', 'rolesync', 'mirror']);
   assert.equal(r[0].detail, 'https://relayer.example · 120 ms');
   assert.equal(r[1].detail, 'block 12,345,678 · 3 s ago');
   assert.equal(r[2].detail, 'block 12,074,179');
@@ -34,4 +34,13 @@ test('role sync row: unknown, not enabled, enabled with registry count', () => {
   const on = healthRows({ ...base, relayer: { ...base.relayer, roleSync: true, watchRegistries: ['0x1', '0x2'] } })[4];
   assert.deepEqual([on.status, on.tone], ['Enabled · 2 registries', 'positive']);
   assert.equal(healthRows({ ...base, relayer: { ...base.relayer, roleSync: true, watchRegistries: ['0x1'] } })[4].status, 'Enabled · 1 registry');
+});
+
+test('mirror row: unknown without a report, not authorized with the reason, enabled', () => {
+  assert.equal(healthRows(base)[5].status, 'Unknown');
+  const off = healthRows({ ...base, relayer: { ...base.relayer, mirrorEnabled: false, mirrorReason: 'the relayer address 0x63C4 is not an APPROVER admin' } })[5];
+  assert.deepEqual([off.status, off.tone], ['Not authorized', 'warning']);
+  assert.match(off.detail, /0x63C4 is not an APPROVER admin/);
+  assert.deepEqual(healthRows({ ...base, relayer: { ...base.relayer, mirrorEnabled: true } })[5].status, 'Enabled');
+  assert.equal(healthRows({ ...base, relayer: { configured: true, ok: false, url: 'x', mirrorEnabled: true } })[5].status, 'Unknown');
 });

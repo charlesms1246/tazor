@@ -55,7 +55,7 @@ for (const [label, co, list] of [['v1', V1_CO, V1_LIST], ['v2', V2_CO, V2_LIST]]
     const posts: Record<string, unknown>[] = [];
     const revoked = { v: false };
     await setup(page, posts, revoked);
-    await page.goto('/settings/');
+    await page.goto('/security/');
     await page.getByTestId('freeze-account').fill(co);
     await page.getByTestId('freeze-prepare').click();
     await expect(page.getByTestId('freeze-confirm')).toContainText(list);
