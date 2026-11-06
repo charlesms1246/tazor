@@ -1,0 +1,68 @@
+{
+  "startedAt": "2026-11-06T12:06:24Z",
+  "company": "acme v1 + acme-p2",
+  "salt": "extras",
+  "relayer": "https://tazor-relayer.vercel.app",
+  "txs": [
+    {
+      "step": 1,
+      "label": "payRun 2x",
+      "chain": "whitechain",
+      "hash": "0xbddc161dd3a00c3b706c69ea57d65ea97c153f8b1fdad7ef3baf936133aeeb8d"
+    },
+    {
+      "step": 2,
+      "label": "fund acme-p2 0.5 USDT",
+      "chain": "whitechain",
+      "hash": "0x03928db0510bbd9190d5de4e4d94fd41105e6a8669dd19042a2f34a0e3fbdbf1"
+    },
+    {
+      "step": 2,
+      "label": "payRun 2x",
+      "chain": "whitechain",
+      "hash": "0x0bccf0ea6c3b6157671e6546fc9f1a447975a537ffb1989de435d7f95c7459f4"
+    },
+    {
+      "step": 3,
+      "label": "handleOps (sponsored addSigners)",
+      "chain": "whitechain",
+      "hash": "0x5a7bfbaaf6c7985e12a31d5ce166efd619d14b7f74bd2e74972a31483f587251"
+    },
+    {
+      "step": 4,
+      "label": "deploy soul-less approver",
+      "chain": "whitechain",
+      "hash": "0x54f775bbaa20999f4d39f5572ea30ce211eb27009cb96399f6d903c795644123"
+    },
+    {
+      "step": 5,
+      "label": "registerSoul (counterfactual)",
+      "chain": "whitechain",
+      "hash": "0x8cfcccf7a2d027014e76a2f630421001969397be37aa086e603b4ba069fa43c8"
+    },
+    {
+      "step": 5,
+      "label": "IsVerified (counterfactual)",
+      "chain": "whitechain",
+      "hash": "0xa3a966b18655298a76848f90a76994f3bea6e66e7a9c1ccb820dea1f4edf9836"
+    },
+    {
+      "step": 5,
+      "label": "provisionalGrant (Priya -> counterfactual)",
+      "chain": "whitechain",
+      "hash": "0x1ee5f78049d840a699da996d6ccd2b3061426ae8f25737b7aadbaa289981c5f1"
+    },
+    {
+      "step": 5,
+      "label": "approver deploy (6492)",
+      "chain": "whitechain",
+      "hash": "0xe61c51aed6ecce9a5c166a9035e7d656e8e45a0d3ab000671bf0a6fc4fc4f255"
+    },
+    {
+      "step": 5,
+      "label": "payRun 1x",
+      "chain": "whitechain",
+      "hash": "0x012162d9efaccf3f8b5efc6619df9178572a0b00f24db267134b12ce65f4146b"
+    }
+  ]
+}
