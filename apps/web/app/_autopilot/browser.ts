@@ -30,7 +30,7 @@ function setValue(el: HTMLElement, value: string) {
 }
 
 export const browserDom: Dom = {
-  path: () => location.pathname,
+  path: () => location.pathname + location.search,
   exists: (t) => !!findTestId(t),
   enabled: (t) => { const el = findTestId(t); return !!el && !(el as HTMLButtonElement).disabled && el.getAttribute('aria-disabled') !== 'true'; },
   text: (t) => findTestId(t)?.innerText ?? null,

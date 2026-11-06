@@ -158,7 +158,9 @@ export function createRunner(steps: Step[], deps: Deps) {
     switch (a.do) {
       case 'goto': {
         const url = val(a.path, s.ctx);
-        if (pathOf(url) === pathOf(deps.dom.path()) && !url.includes('#')) return 'next';
+        // already there: same page, and the target asks for no other ?query (a new query is a different view, so it navigates)
+        const query = (u: string) => (u.split('#')[0].split('?')[1] ?? '');
+        if (pathOf(url) === pathOf(deps.dom.path()) && !url.includes('#') && (!query(url) || query(url) === query(deps.dom.path()))) return 'next';
         s.action++;
         emit();
         if (deps.navigate(url)) return 'unload';

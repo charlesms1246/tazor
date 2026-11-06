@@ -114,6 +114,16 @@ test('goto on the current page without a hash is a no-op; a hash change does not
   assert.deepEqual(w.navs, ['/pay/#v1.a.b']);
 });
 
+test('goto the same page with a different query navigates; the same query or none does not', async () => {
+  const w = world();
+  w.setPath('/checkout/?tab=orders');
+  const steps: Step[] = [{ id: 'x', title: 'X', why: '', actions: [{ do: 'goto', path: '/checkout/?tab=orders' }, { do: 'goto', path: '/checkout/' }, { do: 'goto', path: '/checkout/?tab=agents' }, { do: 'log', text: 'done' }] }];
+  const r = createRunner(steps, w.deps(false));
+  r.start('presenter');
+  await settle(r, w, (s) => s?.status === 'done');
+  assert.deepEqual(w.navs, ['/checkout/?tab=agents']);
+});
+
 test('userTap waits for the person, then continues on the next page state', async () => {
   const w = world();
   w.el.set('approve', {});
