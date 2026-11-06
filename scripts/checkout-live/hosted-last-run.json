@@ -1,0 +1,79 @@
+{
+  "ranAt": "2026-11-06T18:20:14.551Z",
+  "relayer": "https://tazor-relayer.vercel.app",
+  "customer": "0xA7F68e5D2ACFE5273DD0C845ac7115E60b4f2Ef9",
+  "merchant": "0x6B4E065d08D2cC7723635c6df0CC5268C706cD93",
+  "payMs": 3972,
+  "pay": "https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa",
+  "refund": "https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6",
+  "status": "partially-refunded",
+  "stage": "sequencer",
+  "webhookStorage": "memory",
+  "webhooks": [
+    {
+      "type": "order.finality",
+      "verified": {
+        "ok": true,
+        "event": {
+          "id": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352:sequencer",
+          "type": "order.finality",
+          "created": 1793989214,
+          "data": {
+            "orderId": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352",
+            "stage": "sequencer",
+            "block": "12392838"
+          },
+          "chainId": 1874,
+          "txHash": "0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa",
+          "explorer": "https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa"
+        },
+        "timestamp": 1793989214
+      }
+    },
+    {
+      "type": "order.refunded",
+      "verified": {
+        "ok": true,
+        "event": {
+          "id": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352:refund:0",
+          "type": "order.refunded",
+          "created": 1793989213,
+          "data": {
+            "orderId": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352",
+            "merchant": "0x6B4E065d08D2cC7723635c6df0CC5268C706cD93",
+            "payer": "0xA7F68e5D2ACFE5273DD0C845ac7115E60b4f2Ef9",
+            "amount": "20000",
+            "totalRefunded": "20000"
+          },
+          "chainId": 1874,
+          "txHash": "0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6",
+          "explorer": "https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6"
+        },
+        "timestamp": 1793989213
+      }
+    },
+    {
+      "type": "order.paid",
+      "verified": {
+        "ok": true,
+        "event": {
+          "id": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352:paid",
+          "type": "order.paid",
+          "created": 1793989206,
+          "data": {
+            "orderId": "0xdf1dbcceb1416ebec87420ae31b74be5f0d9f472cfd472e2ac6751f9b9409352",
+            "merchant": "0x6B4E065d08D2cC7723635c6df0CC5268C706cD93",
+            "payer": "0xA7F68e5D2ACFE5273DD0C845ac7115E60b4f2Ef9",
+            "amount": "120000",
+            "ref": "0xb17fb2ebc378f5b52858fd01e9c821c56ea15cfba45211c3bef460e58f5381d8"
+          },
+          "chainId": 1874,
+          "txHash": "0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa",
+          "explorer": "https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa"
+        },
+        "timestamp": 1793989206
+      }
+    }
+  ],
+  "pass": true
+}
