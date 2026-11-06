@@ -1,0 +1,408 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulRegistry",
+        "name": "soulRegistry",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes20",
+        "name": "previousValue",
+        "type": "bytes20"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes20",
+        "name": "newValue",
+        "type": "bytes20"
+      }
+    ],
+    "name": "AttributeValueChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum SoulFeatureRegistry.Status",
+        "name": "previous",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum SoulFeatureRegistry.Status",
+        "name": "next",
+        "type": "uint8"
+      }
+    ],
+    "name": "FeatureStatusChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "attributeBySoulAtIndex",
+    "outputs": [
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      }
+    ],
+    "name": "attributesCountBySoul",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "count",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      }
+    ],
+    "name": "featurePausedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      }
+    ],
+    "name": "featureStatus",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      }
+    ],
+    "name": "pauseFeature",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      }
+    ],
+    "name": "registerFeature",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes20",
+        "name": "value",
+        "type": "bytes20"
+      }
+    ],
+    "name": "setAttribute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "soulAndValueByAttributeAtIndex",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes20",
+        "name": "",
+        "type": "bytes20"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      }
+    ],
+    "name": "soulAttributeSetAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      }
+    ],
+    "name": "soulAttributeUpdatedAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      }
+    ],
+    "name": "soulAttributeValue",
+    "outputs": [
+      {
+        "internalType": "bytes20",
+        "name": "value",
+        "type": "bytes20"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "soulByAttributeAtIndex",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "soulId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulAttribute",
+        "name": "attribute",
+        "type": "address"
+      }
+    ],
+    "name": "soulsCountByAttribute",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "count",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISoulFeature",
+        "name": "feature",
+        "type": "address"
+      }
+    ],
+    "name": "unpauseFeature",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

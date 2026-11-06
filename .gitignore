@@ -18,7 +18,8 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 
-# foundry
+# foundry (dependencies reinstall via contracts/install-deps.sh)
+contracts/lib/
 cache/
 broadcast/*/dry-run/
 

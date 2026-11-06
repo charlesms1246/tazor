@@ -1,0 +1,36 @@
+{
+  "soulRegistryFunctions": [
+    "assignAddress(uint256,address)",
+    "changePrimaryAddress(uint256,address)",
+    "config()",
+    "isAddressUsed(address)",
+    "isSoul(uint256)",
+    "isSoul(address)",
+    "lastSoulId()",
+    "owner()",
+    "registerSoul(address)",
+    "renounceOwnership()",
+    "revokeAddress(address)",
+    "soulAddresses(uint256)",
+    "soulOf(address)",
+    "soulOfRevoked(address)",
+    "soulPrimaryAddress(uint256)",
+    "transferOwnership(address)"
+  ],
+  "soulRegistryEvents": [
+    "AddressAssigned(address,uint256)",
+    "AddressRevoked(address,uint256)",
+    "OwnershipTransferred(address,address)",
+    "PrimaryAddressChanged(uint256,address,address)"
+  ],
+  "attributeRegistryFunctions": [
+    "setAttribute(uint256,address,bytes20)",
+    "soulAttributeValue(uint256,address)"
+  ],
+  "attributeRegistryEvents": [
+    "AttributeValueChanged(uint256,address,bytes20,bytes20)"
+  ],
+  "configFunctions": [
+    "maxAddressesPerSoul()"
+  ]
+}
