@@ -47,11 +47,23 @@ Whitechain confirms a payment in about a second, then posts it to Ethereum (`saf
 
 The pay button has a `ship-above` attribute and a `tazor-ready` event; webhooks send `order.ready`; the receipt shows all three stages.
 
-## How the business pays gas, and what stops relayer drain
+## Under the hood: payments nobody notices (Scale)
 
+Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, never writes down a seed phrase and never picks a chain:
+- **No WBT:** the customer signs an EIP-3009 `receiveWithAuthorization` on the track USDT, and our relayer submits it and pays the WBT. The nonce commits to merchant, order and amount, so the relayer can't redirect or change it.
+- **No seed phrase:**
+  - **demo wallet:** a testnet wallet kept in the page, with no extension;
+  - **passkeys:** B2B approvers sign with Face ID or fingerprint (P-256, verified on-chain);
+  - **any wallet:** EIP-1193 or ERC-1271.
+- **No chain to choose:** pay from an exchange balance with a plain transfer to the order's own deposit address.
+- **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is ours (`/x402/supported`, `/verify`, `/settle`), and the agent has a hard spend cap.
+
+**How the business pays gas, and what stops relayer drain:**
 - The relayer holds WBT, funded by the operator (faucet on testnet; WBT from WhiteBIT on mainnet). `/health` shows the gas runway.
 - Every request is checked before it costs gas: the signature, the payer's balance, that the authorization is unused, a validity window of at most 1 h, and an `eth_call` simulation.
 - There are limits per IP, per payer, per merchant and per order, plus a daily WBT budget and a balance floor. A failed check costs us nothing.
+- For B2B accounts, an ERC-4337 paymaster caps sponsorship per verified WB Soul, so a farm of fresh wallets gets nothing.
+- The relayer is a convenience, not a gatekeeper: anyone can submit the same signed payment.
 
 ## Also built (one slide)
 
