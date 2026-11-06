@@ -20,6 +20,7 @@ import { decodeRunDigest, encodePayRun, encodeRunDigestCall, payRunRelayerBody, 
 import { loadPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { Timeline } from '../_ui/timeline.tsx';
+import '../_invoice/touch.css';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -148,7 +149,7 @@ export default function RunsPage() {
   const total = run?.auths.reduce((s, a) => s + a.amount, 0n) ?? 0n;
   const errorNotice = error && <Notice tone="negative" testId="run-error">{error}</Notice>;
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader title="Payment runs" subtitle="Approve many invoices with one signature; each link is decrypted and checked exactly as on the Pay page." />
 
       <Card title="Invoices in this run" subtitle="Paste one payment link per line. Every invoice must be paid by the same buyer account.">
@@ -186,7 +187,7 @@ export default function RunsPage() {
 
           <Card title="Approve and pay" subtitle={<>{run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} <Addr value={run.module} href={`${config.explorer}/address/${run.module}`} /></>}>
             <div className="stack">
-              <Notice tone="positive" testId="run-guard-ok">The contract run digest matches these invoices: <span className="mono break">{run.digest}</span></Notice>
+              <Notice tone="positive" testId="run-guard-ok"><span>The contract run digest matches these invoices: <span className="mono break">{run.digest}</span></span></Notice>
               <div className="row">
                 <button data-testid="run-approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy}>Approve run with Face ID</button>
                 {mine && <Pill tone="positive">Approved on this device</Pill>}
@@ -205,7 +206,7 @@ export default function RunsPage() {
                 <button data-testid="run-calldata" className="btn" onClick={onCopy} disabled={busy || !approvals?.length}>Copy calldata</button>
               </div>
               {errorNotice}
-              {tx && <Notice tone="positive" testId="run-tx">Transaction <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer" className="mono break">{tx}</a></Notice>}
+              {tx && <Notice tone="positive" testId="run-tx"><span>Transaction <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer" className="mono break">{tx}</a></span></Notice>}
               {calldata && (
                 <div className="well">
                   <p className="small muted">To <span className="mono">{run.module}</span> on Whitechain</p>

@@ -5,6 +5,7 @@ import { formatUnits } from 'viem';
 import { INBOX_CHANGED, loadInbox, type InboxItem, type InboxStatus } from '@/lib/inbox.ts';
 import { Card, Empty, PageHeader, Pill } from '../_ui/index.tsx';
 import './approvals.css';
+import '../_invoice/touch.css';
 
 const TABS: { status: InboxStatus; label: string }[] = [
   { status: 'needs-approval', label: 'Needs approval' },
@@ -46,7 +47,7 @@ export default function ApprovalsPage() {
   const shown = items.filter((i) => i.status === tab);
 
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader title="Approvals" subtitle="Invoices, payment runs, mandates and role changes waiting for an approver on this device." />
 
       <div data-tour="approvals">

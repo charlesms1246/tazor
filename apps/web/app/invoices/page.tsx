@@ -17,6 +17,7 @@ import { Timeline } from '../_ui/timeline.tsx';
 import { COMPANIES, companyByAccount, useCompany } from '@/lib/company.ts';
 import { recordEvent } from '@/lib/events.ts';
 import { INVOICE_STEPS, partyName, pendingSteps, subjectOf, useEvents } from '@/lib/story.ts';
+import '../_invoice/touch.css';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -154,7 +155,7 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader title="Invoices" subtitle="Create a payment link; your customer approves it with a passkey and pays in USDT on Whitechain." />
 
       <div className="inv-split">
@@ -256,7 +257,7 @@ export default function InvoicesPage() {
               <Notice tone="positive">
                 <span className="stack" style={{ gap: 8 }}>
                   <span>Invoice {created.invoice.id} is ready. Send this link to your customer:</span>
-                  <span className="mono break" data-testid="inv-link">{created.link}</span>
+                  <span className="mono break inv-link-text" data-testid="inv-link" title={created.link}>{created.link}</span>
                   <span className="row">
                     <CopyButton value={created.link} label="Copy link" />
                     <a className="btn btn-sm" data-testid="inv-open" href={created.link} target="_blank" rel="noreferrer">Open</a>

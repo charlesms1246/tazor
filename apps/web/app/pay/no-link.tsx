@@ -8,6 +8,7 @@ import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, Empty, Field, Notice, PageHeader } from '../_ui/index.tsx';
 import { ScanQr } from './scan.tsx';
 import '../_invoice/paper.css';
+import '../_invoice/touch.css';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -39,7 +40,7 @@ export function NoLink() {
   };
 
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader title="Pay an invoice" subtitle="Open the payment link your supplier sent you to check it and approve it with your passkey." />
 
       <div className="grid-2 stretch">

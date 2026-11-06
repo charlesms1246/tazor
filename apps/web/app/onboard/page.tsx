@@ -7,6 +7,7 @@ import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { loadPasskey, savePasskey, type StoredPasskey } from '@/lib/storage.ts';
 import { Addr, Card, Notice, PageHeader, Pill } from '../_ui/index.tsx';
+import '../_invoice/touch.css';
 
 export default function OnboardPage() {
   const [stored, setStored] = useState<StoredPasskey | null>(null);
@@ -49,7 +50,7 @@ export default function OnboardPage() {
   const created = !!stored;
   const deployed = !!deploy;
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader
         title="Approver onboarding"
         subtitle="Create a passkey on this device; your approver account is derived from it and deployed for you."

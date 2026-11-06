@@ -1,0 +1,9 @@
+/* phone and tablet: 44px tap targets on the Receive/Pay pages (scoped by .tz-touch on the page root) */
+@media (max-width: 900px) {
+  .tz-touch .btn, .tz-touch .select, .tz-touch .tab, .tz-touch input[type="file"] { min-height: 44px; }
+  .tz-touch .btn-sm { padding: 0 14px; }
+  .tz-touch .copy { position: relative; }
+  .tz-touch .copy::after { content: ""; position: absolute; inset: -12px; }
+  .tz-touch .row { row-gap: 8px; }
+  .tz-touch .inv-link-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+}

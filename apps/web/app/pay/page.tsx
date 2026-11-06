@@ -26,6 +26,7 @@ import { Timeline } from '../_ui/timeline.tsx';
 import { eventsFor, recordEvent, type TimelineEvent } from '@/lib/events.ts';
 import { loadInbox, upsertInbox } from '@/lib/inbox.ts';
 import { INVOICE_STEPS, inboxForInvoice, pendingSteps, recordOpened, shortAddr, subjectOf, useEvents } from '@/lib/story.ts';
+import '../_invoice/touch.css';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -277,12 +278,12 @@ export default function PayPage() {
   const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore;
 
   return (
-    <div className="page">
+    <div className="page tz-touch">
       <PageHeader
         title={`Invoice ${i.id}`}
         subtitle={<>From {i.supplierName}. Check what you are paying, then approve it with your passkey.</>}
       />
-      {v2 && <Notice tone="info" testId="v2-account">v2 company: signed for PaymentModuleV2 <span className="mono break">{configV2.paymentModule}</span> (EIP-712 domain version 2).</Notice>}
+      {v2 && <Notice tone="info" testId="v2-account"><span>v2 company: signed for PaymentModuleV2 <span className="mono break">{configV2.paymentModule}</span> (EIP-712 domain version 2).</span></Notice>}
 
       <div className="pay-split">
         <div className="stack">
@@ -312,7 +313,7 @@ export default function PayPage() {
               </dl>
               {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
               {guard.status === 'refused' && <Notice tone="negative" testId="guard-refused">Refusing to sign: {guard.reason}</Notice>}
-              {guard.status === 'ok' && <Notice tone="positive" testId="guard-ok">The contract digest matches this invoice: <span className="mono break">{guard.digest}</span></Notice>}
+              {guard.status === 'ok' && <Notice tone="positive" testId="guard-ok"><span>The contract digest matches this invoice: <span className="mono break">{guard.digest}</span></span></Notice>}
               <div className="row">
                 <button data-testid="approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy || guard.status !== 'ok'}>Approve with Face ID</button>
               </div>
@@ -334,14 +335,14 @@ export default function PayPage() {
               </div>
               {error && <Notice tone="negative" testId="error">{error}</Notice>}
               {tx && (
-                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx">
+                <Notice tone={tx.status === 'reverted' ? 'negative' : tx.status === 'success' ? 'positive' : 'info'} testId="tx"><span>
                   Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="mono break">{tx.hash}</a>{' '}
                   {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
                   {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
-                </Notice>
+                </span></Notice>
               )}
               {(calldata || l1) && pendingDeploys.map((u) => (
-                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first">Not deployed yet: first send to the ApproverAccountFactory <span className="mono">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></Notice>
+                <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first"><span>Not deployed yet: first send to the ApproverAccountFactory <span className="mono">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></span></Notice>
               ))}
               {calldata && <p className="small muted">Calldata ready: see Technical details below.</p>}
             </div>
@@ -380,9 +381,9 @@ export default function PayPage() {
                   <p className="small muted">The raw calldata is under Technical details below.</p>
                   {l1.hash && <p>Ethereum tx <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer" className="mono break">{l1.hash}</a></p>}
                   {l1.started && (
-                    <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status">{l1.l2Tx
+                    <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status"><span>{l1.l2Tx
                       ? <>Delivered on Whitechain in {l1.seconds?.toFixed(0)} s: <a href={`${config.explorer}/tx/${l1.l2Tx}`} target="_blank" rel="noreferrer" className="mono break">{l1.l2Tx}</a></>
-                      : 'Waiting for the deposit to reach Whitechain…'}</Notice>
+                      : 'Waiting for the deposit to reach Whitechain…'}</span></Notice>
                   )}
                 </div>
               )}
