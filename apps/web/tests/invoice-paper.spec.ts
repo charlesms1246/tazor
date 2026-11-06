@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 
 test('/invoices/: the paper updates live while typing', async ({ page }) => {
   await page.goto('/invoices/');
-  const paper = page.getByTestId('invoice-paper');
+  const paper = page.getByTestId('inv-preview').getByTestId('invoice-paper');
   await expect(paper.getByTestId('paper-stamp')).toHaveText('DRAFT');
   await expect(paper.getByTestId('paper-number')).toHaveText('Assigned on create');
   await expect(paper.getByTestId('paper-qr-placeholder')).toHaveText('QR appears when you create the link');
@@ -37,7 +37,7 @@ test('/invoices/: 18% tax on 100 shows 18.00 and a total of 118.00, and the link
   await page.getByTestId('inv-line-desc-0').fill('Freight');
   await page.getByTestId('inv-line-price-0').fill('100');
   await page.getByTestId('inv-tax-rate').fill('18');
-  const paper = page.getByTestId('invoice-paper');
+  const paper = page.getByTestId('inv-preview').getByTestId('invoice-paper');
   await expect(paper.getByTestId('paper-subtotal')).toHaveText('100.00');
   await expect(paper.getByTestId('paper-tax')).toHaveText('18.00');
   await expect(paper).toContainText('GST 18%');
@@ -60,7 +60,7 @@ test('/invoices/: after create the QR is drawn and the stamp says SENT; a row re
   await page.getByTestId('inv-line-price-0').fill('1.2');
   await page.getByTestId('inv-create').click();
 
-  const paper = page.getByTestId('invoice-paper');
+  const paper = page.getByTestId('inv-preview').getByTestId('invoice-paper');
   await expect(paper.getByTestId('paper-stamp')).toHaveText('SENT');
   await expect(paper.locator('svg[data-testid="paper-qr"]')).toBeVisible();
   await expect(paper.getByTestId('paper-qr-placeholder')).toHaveCount(0);
@@ -71,8 +71,10 @@ test('/invoices/: after create the QR is drawn and the stamp says SENT; a row re
   await page.reload();
   await expect(paper.getByTestId('paper-stamp')).toHaveText('DRAFT');
   await page.getByTestId('inv-row').first().click();
-  await expect(paper.getByTestId('paper-stamp')).toHaveText('SENT');
-  await expect(paper.locator('svg[data-testid="paper-qr"]')).toBeVisible();
+  const drawer = page.getByTestId('inv-drawer');
+  await expect(drawer.getByTestId('paper-stamp')).toHaveText('SENT');
+  await expect(drawer.locator('svg[data-testid="paper-qr"]')).toBeVisible();
   await page.getByTestId('inv-view-close').click();
+  await expect(drawer).toHaveCount(0);
   await expect(paper.getByTestId('paper-stamp')).toHaveText('DRAFT');
 });

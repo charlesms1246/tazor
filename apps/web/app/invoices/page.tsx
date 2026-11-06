@@ -1,23 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatUnits } from 'viem';
 import { config } from '@/lib/config.ts';
 import { invoiceHash } from '@/lib/invoice.ts';
 import { encodeInvoiceLink } from '@/lib/invoice-link.ts';
 import {
   buildInvoice, draftTax, formTotal, invoiceStatus, lineTotal, loadInvoices, loadLogo, LOGO_MAX_BYTES, LOGO_TYPES, newInvoiceId,
-  parseRate, parseUsdt, saveInvoice, saveLogo, withTax, type InvoiceForm, type LineForm, type StoredInvoice,
+  applyFormEdit, parseRate, parseUsdt, prefillForm, saveInvoice, saveLogo, supplierAccountWarning, withTax, type InvoiceForm, type LineForm, type StoredInvoice,
 } from '@/lib/invoices-store.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { InvoicePaper, paperFromInvoice, printInvoice, type PaperInvoice } from '../_invoice/paper.tsx';
+import { Timeline } from '../_ui/timeline.tsx';
+import { COMPANIES, companyByAccount, useCompany } from '@/lib/company.ts';
+import { recordEvent } from '@/lib/events.ts';
+import { INVOICE_STEPS, partyName, pendingSteps, subjectOf, useEvents } from '@/lib/story.ts';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 const blankLine = (): LineForm => ({ description: '', quantity: '1', unitPrice: '' });
+
+type ListTab = 'all' | 'sent' | 'paid' | 'overdue';
+const LIST_TABS: { id: ListTab; label: string }[] = [
+  { id: 'all', label: 'All' }, { id: 'sent', label: 'Sent' }, { id: 'paid', label: 'Paid' }, { id: 'overdue', label: 'Overdue' },
+];
+const STATUS_PILL = { paid: { tone: 'positive', text: 'Paid' }, sent: { tone: 'info', text: 'Sent' }, overdue: { tone: 'negative', text: 'Overdue' } } as const;
 
 export default function InvoicesPage() {
   const [form, setForm] = useState<InvoiceForm>({
@@ -33,12 +43,38 @@ export default function InvoicesPage() {
   const [logo, setLogo] = useState<string | null>(null);
   const [logoError, setLogoError] = useState('');
   const [viewing, setViewing] = useState<StoredInvoice | null>(null);
+  const [listTab, setListTab] = useState<ListTab>('all');
+  const [query, setQuery] = useState('');
+  const company = useCompany();
+  const touched = useRef(new Set<keyof InvoiceForm>());
+  const drawerEvents = useEvents(viewing ? subjectOf(viewing.invoice) : null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const [preview, setPreview] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => { setList(loadInvoices()); setPayments(loadPayments()); setLogo(loadLogo()); }, []);
 
-  const set = (patch: Partial<InvoiceForm>) => { setForm({ ...form, ...patch }); setError(''); setDirty(true); };
+  // the selected company is the supplier; its fields (and the other company as the customer) fill in until edited
+  useEffect(() => {
+    setForm((f) => prefillForm(f, company, COMPANIES.find((c) => c.id !== company.id) ?? null, touched.current));
+  }, [company]);
+
+  useEffect(() => {
+    if (!viewing) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewing(null); };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [viewing]);
+
+  const set = (patch: Partial<InvoiceForm>) => {
+    const next = applyFormEdit(form, patch, touched.current);
+    for (const k of Object.keys(patch) as (keyof InvoiceForm)[]) touched.current.add(k);
+    setForm(next); setError(''); setDirty(true);
+  };
+  const supplierWarning = supplierAccountWarning(form, company);
+  const billToOptions = COMPANIES.filter((c) => c.id !== company.id);
+  const billTo = billToOptions.find((c) => c.account.toLowerCase() === form.customer.trim().toLowerCase())?.account ?? '';
   const setLine = (n: number, patch: Partial<LineForm>) => set({ lines: form.lines.map((l, i) => (i === n ? { ...l, ...patch } : l)) });
   const tax = draftTax(form, taxRate, taxLabel);
   const total = formTotal(form) + (tax?.amount ?? 0n);
@@ -70,12 +106,28 @@ export default function InvoicesPage() {
     })),
     memo: form.memo, tax,
   };
-  const shown = viewing ?? (dirty ? null : created);
+  const shown = dirty ? null : created;
   const paper = shown ? paperFromInvoice(shown.invoice, shown.createdAt) : draft;
   const shownStatus = shown ? invoiceStatus(shown.invoice, payments) : 'draft';
-  const paidTx = shown && shownStatus === 'paid'
-    ? payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(shown.invoice); } catch { return false; } })?.txHash ?? null
-    : null;
+  const txOf = (s: StoredInvoice | null) => (s && invoiceStatus(s.invoice, payments) === 'paid'
+    ? payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(s.invoice); } catch { return false; } })?.txHash ?? null
+    : null);
+  const paidTx = txOf(shown);
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const rowStatus = (s: StoredInvoice): 'paid' | 'sent' | 'overdue' =>
+    invoiceStatus(s.invoice, payments) === 'paid' ? 'paid' : s.invoice.dueDate < nowSec ? 'overdue' : 'sent';
+  const inTab = (s: StoredInvoice, t: ListTab) => t === 'all' || rowStatus(s) === t;
+  const q = query.trim().toLowerCase();
+  const matches = (s: StoredInvoice) => !q || [
+    s.invoice.id, s.invoice.buyerAccount, partyName(s.invoice.buyerAccount), formatUnits(s.invoice.amount, 6), s.invoice.memo,
+  ].some((v) => v.toLowerCase().includes(q));
+  const rows = list.filter((s) => inTab(s, listTab) && matches(s));
+  const tabStats = (t: ListTab) => {
+    const xs = list.filter((s) => inTab(s, t));
+    return { count: xs.length, total: xs.reduce((a, s) => a + s.invoice.amount, 0n) };
+  };
+  const openDrawer = (s: StoredInvoice) => setViewing(s);
 
   const onCreate = async () => {
     setBusy(true); setError(''); setCreated(null);
@@ -86,6 +138,10 @@ export default function InvoicesPage() {
       const link = await encodeInvoiceLink(r.invoice, location.origin);
       const stored = { invoice: r.invoice, link, createdAt: Math.floor(Date.now() / 1000) };
       if (!saveInvoice(stored)) setError('Created, but this browser would not save it to the list; copy the link now.');
+      const subject = subjectOf(r.invoice);
+      const to = partyName(r.invoice.buyerAccount);
+      recordEvent({ subject, kind: 'created', at: stored.createdAt * 1000, title: `${r.invoice.id} created by ${r.invoice.supplierName}`, actor: r.invoice.supplierName, detail: `${formatUnits(r.invoice.amount, 6)} USDT` });
+      recordEvent({ subject, kind: 'sent', at: Date.now(), title: `${r.invoice.id} sent to ${to}`, detail: 'payment link generated' });
       setCreated(stored);
       setViewing(null);
       setDirty(false);
@@ -102,10 +158,17 @@ export default function InvoicesPage() {
       <PageHeader title="Invoices" subtitle="Create a payment link; your customer approves it with a passkey and pays in USDT on Whitechain." />
 
       <div className="inv-split">
-        <Card title="Create invoice" subtitle="The link carries the invoice encrypted; only someone with the link can read it.">
+        <div data-tour="invoice-form">
+        <Card title="Create invoice" subtitle={<>You are invoicing as <b>{company.name}</b>. The link carries the invoice encrypted; only someone with the link can read it.</>}>
           <div className="stack">
+            <Field label="Bill to">
+              <select data-testid="inv-billto" className="select" value={billTo} onChange={(e) => set({ customer: e.target.value })}>
+                {billToOptions.map((c) => <option key={c.id} value={c.account}>{c.name} ({c.ens})</option>)}
+                <option value="">Other address</option>
+              </select>
+            </Field>
             <div className="fields-2">
-              <Field label="Customer company account" hint="The Tazor account that will pay.">
+              <Field label="Customer company account" hint={companyByAccount(form.customer) ? `The Tazor account that will pay (${companyByAccount(form.customer)!.name}).` : 'The Tazor account that will pay.'}>
                 <input data-testid="inv-customer" className="input mono" value={form.customer} onChange={(e) => set({ customer: e.target.value })} placeholder="0x…" />
               </Field>
               <Field label="Payee" hint="Where the USDT goes.">
@@ -114,8 +177,9 @@ export default function InvoicesPage() {
               <Field label="Supplier name">
                 <input data-testid="inv-supplier-name" className="input" value={form.supplierName} onChange={(e) => set({ supplierName: e.target.value })} placeholder="Your company name" />
               </Field>
-              <Field label="Supplier account" hint="Optional; defaults to the payee.">
+              <Field label="Supplier account" hint="Follows the payee until you edit it.">
                 <input data-testid="inv-supplier-account" className="input mono" value={form.supplierAccount} onChange={(e) => set({ supplierAccount: e.target.value })} placeholder="0x…" />
+                {supplierWarning && <span className="small" data-testid="inv-supplier-warning" style={{ color: 'var(--pill-warning-ink)' }}>{supplierWarning}</span>}
               </Field>
             </div>
 
@@ -203,7 +267,7 @@ export default function InvoicesPage() {
             )}
           </div>
         </Card>
-
+        </div>
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="paper-toggle">
@@ -211,16 +275,7 @@ export default function InvoicesPage() {
               {preview ? 'Hide invoice' : 'Preview invoice'}
             </button>
           </div>
-          <div className="paper-col paper-sticky" data-open={preview || viewing ? 'true' : 'false'} data-testid="inv-preview">
-            {viewing && (
-              <div className="spread">
-                <span className="small muted">Viewing {viewing.invoice.id} (read-only)</span>
-                <span className="row" style={{ gap: 8 }}>
-                  <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
-                  <button type="button" className="btn btn-sm btn-ghost" data-testid="inv-view-close" onClick={() => setViewing(null)}>Back to editing</button>
-                </span>
-              </div>
-            )}
+          <div className={viewing ? 'paper-col paper-sticky no-print' : 'paper-col paper-sticky'} data-open={preview ? 'true' : 'false'} data-testid="inv-preview" data-tour="invoice-paper">
             <InvoicePaper invoice={paper} status={shownStatus} link={shown?.link ?? null} txHash={paidTx} logo={logo} />
           </div>
         </div>
@@ -232,30 +287,81 @@ export default function InvoicesPage() {
             <Empty><span data-testid="inv-empty">No invoices created on this device yet. Create one above to get a payment link.</span></Empty>
           </div>
         ) : (
-          <div className="table-wrap"><table className="table table-stack">
-            <thead><tr><th>Invoice</th><th className="num">Amount</th><th>Status</th><th>Link</th></tr></thead>
-            <tbody>
-              {list.map((s) => {
-                const paid = invoiceStatus(s.invoice, payments) === 'paid';
-                return (
-                  <tr key={s.link} data-testid="inv-row" className="inv-row" data-selected={viewing?.link === s.link ? 'true' : undefined} onClick={() => { setViewing(s); setPreview(true); }} style={{ cursor: 'pointer' }}>
-                    <td>{s.invoice.id}<span className="cell-sub">To <Addr value={s.invoice.buyerAccount} href={`${config.explorer}/address/${s.invoice.buyerAccount}`} /> · due {day(s.invoice.dueDate)}</span></td>
-                    <td className="num">{amt(s.invoice.amount)}</td>
-                    <td><Pill tone={paid ? 'positive' : 'info'} testId="inv-status">{paid ? 'Paid' : 'Sent'}</Pill></td>
-                    <td>
-                      <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => { setViewing(s); setPreview(true); }}>View</button>
-                        <CopyButton value={s.link} label="Copy link" />
-                        <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table></div>
+          <>
+            <div className="list-bar">
+              <div className="tabs" role="tablist">
+                {LIST_TABS.map((t) => {
+                  const st = tabStats(t.id);
+                  return (
+                    <button key={t.id} role="tab" className="tab" aria-selected={listTab === t.id} data-testid={`inv-tab-${t.id}`} onClick={() => setListTab(t.id)}>
+                      {t.label}<span className="tab-count" data-testid={`inv-tab-count-${t.id}`}>{st.count}</span>
+                      <span className="tab-sum" data-testid={`inv-tab-total-${t.id}`}>{formatUnits(st.total, 6)} USDT</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <input data-testid="inv-search" className="input list-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, number or amount" aria-label="Search invoices" />
+            </div>
+            {rows.length === 0 ? (
+              <div style={{ padding: '16px 24px 24px' }}><Empty><span data-testid="inv-filter-empty">No invoices match{q ? ` "${query.trim()}"` : ''} in this tab.</span></Empty></div>
+            ) : (
+              <div className="table-wrap"><table className="table table-stack">
+                <thead><tr><th>Invoice</th><th>Customer</th><th className="num">Amount</th><th>Due</th><th>Status</th><th>Link</th></tr></thead>
+                <tbody>
+                  {rows.map((s) => {
+                    const st = STATUS_PILL[rowStatus(s)];
+                    return (
+                      <tr key={s.link} data-testid="inv-row" className="inv-row" data-selected={viewing?.link === s.link ? 'true' : undefined} onClick={() => openDrawer(s)}>
+                        <td>{s.invoice.id}<span className="cell-sub">{s.invoice.memo || s.invoice.lines[0]?.description}</span></td>
+                        <td>{partyName(s.invoice.buyerAccount)}<span className="cell-sub mono">{s.invoice.buyerAccount.slice(0, 6)}…{s.invoice.buyerAccount.slice(-4)}</span></td>
+                        <td className="num">{amt(s.invoice.amount)}</td>
+                        <td className="num">{day(s.invoice.dueDate)}</td>
+                        <td><Pill tone={st.tone} testId="inv-status">{st.text}</Pill></td>
+                        <td>
+                          <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => openDrawer(s)}>View</button>
+                            <CopyButton value={s.link} label="Copy link" />
+                            <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table></div>
+            )}
+          </>
         )}
       </Card>
+
+      {viewing && (
+        <>
+          <div className="drawer-overlay" data-testid="inv-drawer-overlay" onClick={() => setViewing(null)} />
+          <aside className="drawer" role="dialog" aria-modal="true" aria-label={`Invoice ${viewing.invoice.id}`} data-testid="inv-drawer">
+            <div className="drawer-head">
+              <span className="row" style={{ gap: 8 }}>
+                <span style={{ fontWeight: 600 }}>{viewing.invoice.id}</span>
+                <Pill tone={STATUS_PILL[rowStatus(viewing)].tone}>{STATUS_PILL[rowStatus(viewing)].text}</Pill>
+              </span>
+              <button ref={closeRef} type="button" className="btn btn-sm btn-ghost" data-testid="inv-view-close" onClick={() => setViewing(null)}>Close</button>
+            </div>
+            <div className="drawer-body">
+              <div className="row" style={{ gap: 8 }}>
+                <CopyButton value={viewing.link} label="Copy link" />
+                <a className="btn btn-sm" data-testid="inv-drawer-open" href={viewing.link} target="_blank" rel="noreferrer">Open</a>
+                <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
+              </div>
+              <div className="paper-mini">
+                <InvoicePaper invoice={paperFromInvoice(viewing.invoice, viewing.createdAt)} status={invoiceStatus(viewing.invoice, payments)} link={viewing.link} txHash={txOf(viewing)} logo={logo} />
+              </div>
+              <div>
+                <h3 className="drawer-h">Activity</h3>
+                <Timeline subject={subjectOf(viewing.invoice)} pending={pendingSteps(drawerEvents, INVOICE_STEPS)} testId="inv-timeline" />
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

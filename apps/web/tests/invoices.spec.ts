@@ -14,6 +14,9 @@ test('/invoices/: create an invoice, and its link opens /pay/ with that invoice 
   await page.getByTestId('inv-customer').fill(CUSTOMER);
   await page.getByTestId('inv-payee').fill(PAYEE);
   await page.getByTestId('inv-supplier-name').fill('Bluejay Logistics');
+  // the supplier account follows the typed payee, not the selected company (it drives the supplier check)
+  await expect(page.getByTestId('inv-supplier-account')).toHaveValue(PAYEE);
+  await expect(page.getByTestId('inv-supplier-warning')).toHaveCount(0);
   await page.getByTestId('inv-line-desc-0').fill('Freight');
   await page.getByTestId('inv-line-qty-0').fill('2');
   await page.getByTestId('inv-line-price-0').fill('0.6');
