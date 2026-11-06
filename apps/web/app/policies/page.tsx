@@ -13,6 +13,20 @@ import {
 import { ethCall } from '@/lib/rpc.ts';
 import { loadPasskey } from '@/lib/storage.ts';
 import { sendOnWhitechain } from '@/lib/wallet-wc.ts';
+import { decodeFunctionResult, encodeFunctionData, parseAbi } from 'viem';
+import { ApproversPanel } from './approvers.tsx';
+
+const registryAbi = parseAbi(['function registryOf(address account) view returns (address)']);
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
+async function v1Registry(account: Address): Promise<Address | null> {
+  if (!config.paymentModule) return null;
+  try {
+    const reg = decodeFunctionResult({ abi: registryAbi, functionName: 'registryOf', data: await ethCall(config.paymentModule, encodeFunctionData({ abi: registryAbi, functionName: 'registryOf', args: [account] })) });
+    return reg === ZERO_ADDR ? null : reg;
+  } catch {
+    return null;
+  }
+}
 
 const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -79,6 +93,7 @@ export default function PoliciesPage() {
   const [exit, setExit] = useState<readonly [Address, bigint] | null>(null);
   const [payees, setPayees] = useState<{ payee: Address; addedAt: bigint }[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [v1, setV1] = useState<{ account: Address; registry: Address } | null>(null);
   const [tick, setTick] = useState(0);
 
   const load = useCallback(async () => {
@@ -86,9 +101,15 @@ export default function PoliciesPage() {
     if (!isAddress(input)) return setLoadError('Enter a company account address.');
     const a = getAddress(input);
     setLoadError('');
+    setV1(null);
     try {
       const c = decodeConfigV2(await ethCall(pm, encodeConfigV2Of(a)));
-      if (c.registry === '0x0000000000000000000000000000000000000000') throw new Error('This account has no PaymentModuleV2 configuration (not a v2 company).');
+      if (c.registry === ZERO_ADDR) {
+        const reg = await v1Registry(a);
+        if (!reg) throw new Error('This account has no PaymentModule configuration (not a v2 company, and not a v1 company either).');
+        setAccount(null); setCfg(null);
+        return setV1({ account: a, registry: reg });
+      }
       setAccount(a);
       setCfg(c);
       setWin(decodeWindowAvailable(await ethCall(pm, encodeWindowAvailable(a))));
@@ -127,6 +148,13 @@ export default function PoliciesPage() {
         <button data-testid="load" onClick={load}>Load</button>
       </p>
       {loadError && <p data-testid="load-error" style={{ color: 'crimson' }}>{loadError}</p>}
+
+      {v1 && (
+        <>
+          <p data-testid="v1-account">v1 company (PaymentModule {config.paymentModule}): limits and payee rules are v2 features; showing approvers only.</p>
+          <ApproversPanel account={v1.account} registry={v1.registry} revocationList={config.revocationList} />
+        </>
+      )}
 
       {account && cfg && pm && (
         <>
@@ -220,6 +248,8 @@ export default function PoliciesPage() {
           <p>The exit moves the whole USDT balance to one of the company&apos;s own exit accounts after {cfg.exitDelay} s; any valid approver can cancel it before then.</p>
           {exitAction.error && <p style={{ color: 'crimson' }}>{exitAction.error}</p>}
           {exitAction.out && <Calldata p={exitAction.out} id="exit" />}
+
+          <ApproversPanel account={account} registry={cfg.registry} revocationList={configV2.revocationList} />
         </>
       )}
     </main>
