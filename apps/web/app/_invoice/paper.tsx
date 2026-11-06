@@ -67,7 +67,8 @@ function Party({ label, value, gstin }: { label: string; value: string; gstin?: 
   );
 }
 
-function Qr({ link }: { link: string }) {
+/** A QR code (SVG) for a link. */
+export function Qr({ link, testId = 'paper-qr' }: { link: string; testId?: string }) {
   const path = useMemo(() => {
     try {
       const q = qrcode(0, 'L');
@@ -83,7 +84,7 @@ function Qr({ link }: { link: string }) {
   }, [link]);
   if (!path) return <div className="ip-qr-box ip-faint">Link too long for a QR code</div>;
   return (
-    <svg data-testid="paper-qr" className="ip-qr" viewBox={`-2 -2 ${path.n + 4} ${path.n + 4}`} role="img" aria-label="QR code for the payment link" shapeRendering="crispEdges">
+    <svg data-testid={testId} className="ip-qr" viewBox={`-2 -2 ${path.n + 4} ${path.n + 4}`} role="img" aria-label="QR code for the payment link" shapeRendering="crispEdges">
       <rect x={-2} y={-2} width={path.n + 4} height={path.n + 4} className="ip-qr-bg" />
       <path d={path.d} className="ip-qr-fg" />
     </svg>

@@ -23,7 +23,8 @@ import { isChainEvent, useHistory, useLatestEvents } from '@/lib/chain-history.t
 import { approvalRows, chainPaidMap, companyLedger, summarize } from '@/lib/ledger.ts';
 import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
-import { INR_RATE_NOTE, inrText } from '@/lib/money.ts';
+import { INR_RATE_NOTE, inrText, usdtNumber } from '@/lib/money.ts';
+import { allCheckoutLogs, checkoutAddress, checkoutTotals, decodeCheckoutLogs, depositCheckoutAddress, merchantView } from '@/lib/checkout.ts';
 
 const PAY_TIME = TIMINGS.find((t) => t.action.startsWith('Pay an approved'))?.tazor ?? '';
 
@@ -80,6 +81,16 @@ export default function Home() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const latest = useLatestEvents(ACCOUNT, 8);
   const history = useHistory(ACCOUNT);
+  // Checkout revenue for this company (orders paid to it minus refunds), read from Whitechain's explorer
+  const [checkoutSum, setCheckoutSum] = useState<ReturnType<typeof checkoutTotals> | null>(null);
+  useEffect(() => {
+    if ((!checkoutAddress() && !depositCheckoutAddress()) || !company.account || /^0x0{40}$/.test(company.account)) return;
+    let live = true;
+    allCheckoutLogs(4)
+      .then((logs) => { if (live) setCheckoutSum(checkoutTotals(merchantView(decodeCheckoutLogs(logs), [company.account, ...company.aliases]).orders)); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [company.account, company.aliases]);
   const [health, setHealth] = useState<Health | null>(null);
   const [people, setPeople] = useState<Person[] | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -212,6 +223,9 @@ export default function Home() {
           <span className="lane-label">Receivables</span>
           <span className="lane-value num">{usdt2dp(openTotal)}<span className="kpi-unit">USDT</span></span>
           <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''} · ${inrText(openTotal)}`}</span>
+          {checkoutSum && checkoutSum.orders > 0 && (
+            <span className="lane-sub" data-testid="lane-checkout">Checkout: {usdtNumber(checkoutSum.net)} USDT net from {checkoutSum.orders} order{checkoutSum.orders === 1 ? '' : 's'}{checkoutSum.refunded > 0n ? ` · ${usdtNumber(checkoutSum.refunded)} refunded` : ''}</span>
+          )}
           {overdue.length > 0 && <span className="pill pill-negative lane-pill">Overdue</span>}
         </a>
         <a className="lane" href="/approvals/" data-testid="lane-payables">
