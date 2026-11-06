@@ -21,7 +21,7 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
   3. "Refund 0.05" (right): the customer card shows the refund;
   4. "Accountant export (CSV)".
 
-  Both demo wallets live in your browser, are testnet-only, and are topped up with test USDT by our sandbox. Live run: pay [`0x0750…304b`](https://explorer.testnet.whitechain.io/tx/0x0750f8241c6093f45048908fbc0aa37a1aafdebb895d8185aa866dfa321a304b), refund [`0x2d24…9496`](https://explorer.testnet.whitechain.io/tx/0x2d24a044e637d714ce09ab4438bf57961c9f71870729ef69a3f5f75eddd19496).
+  Both demo wallets live in your browser, are testnet-only, and are topped up with test USDT by Tazor's sandbox. Live run: pay [`0x0750…304b`](https://explorer.testnet.whitechain.io/tx/0x0750f8241c6093f45048908fbc0aa37a1aafdebb895d8185aa866dfa321a304b), refund [`0x2d24…9496`](https://explorer.testnet.whitechain.io/tx/0x2d24a044e637d714ce09ab4438bf57961c9f71870729ef69a3f5f75eddd19496).
 - **The merchant console and receipts:** https://tazor-app.vercel.app/checkout/
 - **The whole story in one click:** https://tazor-app.vercel.app/autopilot/
 - **Reproduce from a terminal:** `scripts/hosted-checkout-live.ts` (pay → refund → webhooks) and `scripts/accountant-export.ts`.
@@ -34,14 +34,14 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 ## Trust model, in a few lines
 
 - **Tazor can't take or redirect money.** The contracts have no owner and no upgrade key. A payment signature names the merchant and amount, and a refund can only go to the payer.
-- **Our relayer can only refuse to submit.** Anyone can submit the same signed payment instead, and pausing the relayer never strands a customer.
+- **Tazor's relayer can only refuse to submit.** Anyone can submit the same signed payment instead, and pausing the relayer never strands a customer.
 - **Whitechain's sequencer** confirms in about a second. If it ever refused a transaction, it could be forced in from Ethereum through the OptimismPortal, but **forced inclusion takes hours, not seconds** (up to the ~12 h sequencing window). It is a last resort, not a payment path.
 - **Tether** can freeze USDT, as on every chain.
 - **On testnet,** WB Soul (WhiteBIT's verification) is a clearly labelled mirror, and pay-from-exchange is simulated with a plain transfer.
 
 ## Finality: merchants decide by amount
 
-Whitechain confirms a payment in about a second, then posts it to Ethereum (`safe`) and later finalizes it. On testnet we saw the lag vary from about 15 to 45 minutes, which Whitechain DevRel told us is normal. So the merchant chooses by amount:
+Whitechain confirms a payment in about a second, then posts it to Ethereum (`safe`) and later finalizes it. On testnet I saw the lag vary from about 15 to 45 minutes, which Whitechain DevRel told me is normal. So the merchant chooses by amount:
 - **Small payments** (default: under 100 USDT) are ready to ship as soon as Whitechain confirms them.
 - **Big payments** wait until Whitechain has posted them to Ethereum.
 
@@ -50,18 +50,18 @@ The pay button has a `ship-above` attribute and a `tazor-ready` event; webhooks 
 ## Under the hood: payments nobody notices (Scale)
 
 Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, never writes down a seed phrase and never picks a chain:
-- **No WBT:** the customer signs an EIP-3009 `receiveWithAuthorization` on the track USDT, and our relayer submits it and pays the WBT. The nonce commits to merchant, order and amount, so the relayer can't redirect or change it.
+- **No WBT:** the customer signs an EIP-3009 `receiveWithAuthorization` on the track USDT, and Tazor's relayer submits it and pays the WBT. The nonce commits to merchant, order and amount, so the relayer can't redirect or change it.
 - **No seed phrase:**
   - **demo wallet:** a testnet wallet kept in the page, with no extension;
   - **passkeys:** B2B approvers sign with Face ID or fingerprint (P-256, verified on-chain);
   - **any wallet:** EIP-1193 or ERC-1271.
 - **No chain to choose:** pay from an exchange balance with a plain transfer to the order's own deposit address.
-- **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is ours (`/x402/supported`, `/verify`, `/settle`), and the agent has a hard spend cap.
+- **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is Tazor's own (`/x402/supported`, `/verify`, `/settle`), and the agent has a hard spend cap.
 
 **How the business pays gas, and what stops relayer drain:**
 - The relayer holds WBT, funded by the operator (faucet on testnet; WBT from WhiteBIT on mainnet). `/health` shows the gas runway.
 - Every request is checked before it costs gas: the signature, the payer's balance, that the authorization is unused, a validity window of at most 1 h, and an `eth_call` simulation.
-- There are limits per IP, per payer, per merchant and per order, plus a daily WBT budget and a balance floor. A failed check costs us nothing.
+- There are limits per IP, per payer, per merchant and per order, plus a daily WBT budget and a balance floor. A failed check costs nothing.
 - For B2B accounts, an ERC-4337 paymaster caps sponsorship per verified WB Soul, so a farm of fresh wallets gets nothing.
 - The relayer is a convenience, not a gatekeeper: anyone can submit the same signed payment.
 
@@ -69,9 +69,9 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 
 - **Subscriptions:** permit-based pulls that can't run early or exceed the plan, cancel anytime by signature. The relayer's cron renews them and sends reminders. Live renewal: [`0x3c0b…06d1`](https://explorer.testnet.whitechain.io/tx/0x3c0b7ce52ce4cd1d817090dd5efe87ceb7ac3382776bab91d3f068b7b95406d1).
 - **Pay from an exchange:** every order has its own deposit address, so a plain transfer pays it, and any extra goes back in the same tx ([`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d)). Simulated on testnet; whether WhiteBIT withdrawals can target it is being checked with the Whitechain team.
-- **AI agents over x402** (`eip155:1874`, through a facilitator we run, with a spend cap): [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea).
+- **AI agents over x402** (`eip155:1874`, through a facilitator I run, with a spend cap): [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea).
 - **B2B invoices** approved by WhiteBIT-verified people with Face ID or fingerprint passkeys. Company roles live on ENS (details below).
-- **An Ethereum fallback** for when our servers are gone: [details below](#crops).
+- **An Ethereum fallback** for when Tazor's servers are gone: [details below](#crops).
 
 ## Checkout contracts and tests
 
@@ -92,7 +92,7 @@ Reproduce: `scripts/checkout-live.ts`, `scripts/hosted-checkout-live.ts`, `scrip
 | Flow | Transactions | Measured |
 |---|---|---|
 | Payment via the relayer | [`0xbcee…4f21`](https://explorer.testnet.whitechain.io/tx/0xbceeaa443a3e17a19037a677a459a88dcd11a7e17b01ebd431118c997ce84f21) | 3.6 s, 168,817 gas |
-| Payment with our servers down, via Ethereum | Sepolia [`0x2e38…1019`](https://sepolia.etherscan.io/tx/0x2e387ff547f1100cc6ef5baf780acaf19a220b0b0ce7d140b7dc06e8ec561019) → Whitechain [`0xa00d…a30e`](https://explorer.testnet.whitechain.io/tx/0xa00dbd6923b79335f4ee60733adaa0f68652a47915141ddba0e6719b48eea30e) | 69 s, 465k L1 gas + 144k L2 gas |
+| Payment with Tazor's servers down, via Ethereum | Sepolia [`0x2e38…1019`](https://sepolia.etherscan.io/tx/0x2e387ff547f1100cc6ef5baf780acaf19a220b0b0ce7d140b7dc06e8ec561019) → Whitechain [`0xa00d…a30e`](https://explorer.testnet.whitechain.io/tx/0xa00dbd6923b79335f4ee60733adaa0f68652a47915141ddba0e6719b48eea30e) | 69 s, 465k L1 gas + 144k L2 gas |
 | ENS role proven onto Whitechain | [`0xd670…a440`](https://explorer.testnet.whitechain.io/tx/0xd67061dda74f7918c4409163d669fba2034f2ab6d6be9b401a3cef9b87d9a440) | ~0.96M gas |
 | Automatic role sync by the watcher | Sepolia [`0x2f3e…f85e`](https://sepolia.etherscan.io/tx/0x2f3ec2c6e08d5cb6e4b3bca91e412a75bb164d943c30efb6a7db712bada7f85e) → Whitechain [`0xddfb…7ef5`](https://explorer.testnet.whitechain.io/tx/0xddfb4170e6ab70e9c884ba394d5a12e6d3e7885ab9ad35716e6dfdd7d4747ef5) | 84 s |
 | Remove an approver | [`0x027e…d6ef`](https://explorer.testnet.whitechain.io/tx/0x027e1cfd06b86adaadab600b98b9444c98178c56ff038ef09daacb3df6ecd6ef) | 3.06 s; their next payment is refused |
@@ -221,7 +221,7 @@ cd packages/ens && pnpm install && pnpm test:fork
   - Sepolia: `NEXT_PUBLIC_SEPOLIA_RPC`, `NEXT_PUBLIC_ENS_GATE`.
 - **Relayer:** reads `RELAYER_PRIVATE_KEY`, `WC_RPC`, `PAYMENT_MODULE`, `APPROVER_ACCOUNT_FACTORY`, `REVOCATION_LIST`, `MANDATE_MODULE` and `PORT`.
 
-Our name is **`taz0r.eth` with a zero**. `tazor.eth`, with the letter o, belongs to someone else, so always follow a link rather than typing the address.
+The name is **`taz0r.eth` with a zero**. `tazor.eth`, with the letter o, belongs to someone else, so always follow a link rather than typing the address.
 
 ## Verify it yourself
 
@@ -292,16 +292,16 @@ cd apps/web && NEXT_PUBLIC_BUILD_TIME=2026-11-07T00:00:00Z pnpm build:ipfs
   - finality chosen by amount.
   Subscriptions and pay-from-exchange are extra credit past the first payment.
 - **ENS: Best Use of ENSv2.** For the B2B approvals, a company's ENSv2 sub-registry is its authority, and its roles are proven onto Whitechain by storage proof.
-- **Ethereum Foundation: Best CROPS App.** We claim **C** and **S** (below).
+- **Ethereum Foundation: Best CROPS App.** I claim **C** and **S** (below).
 
 ## CROPS
 
-We claim **C (censorship resistance)** and **S (security)** as the lead properties. O and P are documented here, not claimed.
+I claim **C (censorship resistance)** and **S (security)** as the lead properties. O and P are documented here, not claimed.
 
 - **C: Censorship resistance.**
-  - **We are optional:** we run the relayer, the `taz0r.eth` contenthash and the IPFS pin. None is required: the app exports the raw calldata for any wallet, and a **signed payment** can be delivered from the standalone `fallback.html` (one file, no external scripts) or `apps/web/scripts/forward.ts`, through any Ethereum wallet, with no Tazor website or server involved.
-  - **The fallback:** if our whole stack is gone, or Whitechain's sequencer censors the payment, `EnsGate.forward` on Ethereum checks the approvers' ENS roles natively and deposits the payment through the OptimismPortal; the passkey signatures, WB Soul, revocation list and limits are then checked on Whitechain by `payFromL1`, so a forged forward only wastes its sender's gas. Only that contract's alias can trigger `payFromL1`. The live fallback ran with the relayer bypassed: 69 s from Ethereum to Whitechain, because the sequencer picked up the portal deposit normally. **If the sequencer itself refused the payment, forced inclusion takes hours, not seconds** (bounded by the ~12 h sequencing window).
-- **O: Openness.** MIT licence. Everything builds from this repo plus pinned public dependencies: OpenZeppelin, forge-std, and Unruggable Gateways at a fixed commit with our patch. The app build is reproducible to the same CID. There are no trackers or analytics.
+  - **Tazor is optional:** I run the relayer, the `taz0r.eth` contenthash and the IPFS pin. None is required: the app exports the raw calldata for any wallet, and a **signed payment** can be delivered from the standalone `fallback.html` (one file, no external scripts) or `apps/web/scripts/forward.ts`, through any Ethereum wallet, with no Tazor website or server involved.
+  - **The fallback:** if Tazor's whole stack is gone, or Whitechain's sequencer censors the payment, `EnsGate.forward` on Ethereum checks the approvers' ENS roles natively and deposits the payment through the OptimismPortal; the passkey signatures, WB Soul, revocation list and limits are then checked on Whitechain by `payFromL1`, so a forged forward only wastes its sender's gas. Only that contract's alias can trigger `payFromL1`. The live fallback ran with the relayer bypassed: 69 s from Ethereum to Whitechain, because the sequencer picked up the portal deposit normally. **If the sequencer itself refused the payment, forced inclusion takes hours, not seconds** (bounded by the ~12 h sequencing window).
+- **O: Openness.** MIT licence. Everything builds from this repo plus pinned public dependencies: OpenZeppelin, forge-std, and Unruggable Gateways at a fixed commit with my patch. The app build is reproducible to the same CID. There are no trackers or analytics.
 - **P: Privacy.**
   - Invoice contents stay in the URL fragment, so the relayer, eth.limo and IPFS gateways never receive them.
   - **RPC providers** see your IP and the calls you make.
@@ -310,11 +310,11 @@ We claim **C (censorship resistance)** and **S (security)** as the lead properti
   - **Explorers:** the app reads public chain history from Blockscout (Whitechain and Sepolia) to show activity and the ENS directory.
   - **Vercel** hosts the pitch build and sees page loads; the IPFS build at `taz0r.eth.limo` avoids that.
 - **S: Security.**
-  - **Keys:** approver keys are passkeys in the platform keychain (synced across the user's own devices, never sent to us). Signatures are verified on-chain with the P-256 precompile.
+  - **Keys:** approver keys are passkeys in the platform keychain (synced across the user's own devices, never sent to Tazor). Signatures are verified on-chain with the P-256 precompile.
   - **Controls:** the phone recomputes what is signed from the link; revocation is local and instant (3.06 s measured); there is no owner or upgrade key over company funds.
   - **Trust assumptions:**
     - WhiteBIT decides who is verified.
-    - Whitechain's proposer is permissioned, and its Guardian can pause withdrawals or blacklist dispute games. So we only claim that payments get in (deposits have no filter, per Whitechain DevRel), not that withdrawals get out.
+    - Whitechain's proposer is permissioned, and its Guardian can pause withdrawals or blacklist dispute games. So I only claim that payments get in (deposits have no filter, per Whitechain DevRel), not that withdrawals get out.
     - Tether can freeze USDT.
     - Whoever controls the `taz0r.eth` contenthash could serve a different app. What-you-sign-is-what-you-see limits that, and the reproducible build can be compared against the CID.
 
@@ -341,7 +341,7 @@ We claim **C (censorship resistance)** and **S (security)** as the lead properti
 
 ## After the event: the Builders Program
 
-We plan to apply. The milestone that makes the strongest case is **one real merchant on Whitechain mainnet**:
+I plan to apply. The milestone that makes the strongest case is **one real merchant on Whitechain mainnet**:
 1. **Mainnet checkout:** deploy `TazorCheckout` (ownerless, about 0.3M gas per payment, far below mainnet's 16.7M per-tx cap) once mainnet USDT is confirmed with the Whitechain team.
 2. **One real merchant:** their shop takes live USDT payments with the 15-line button, issues refunds, and their accountant uses the export, with webhooks into their order system.
 3. **Pay with WhiteBIT:** if WhiteBIT withdrawals can target a per-order deposit address (being checked by the Whitechain team), WhiteBIT users pay from their exchange balance.
@@ -351,7 +351,7 @@ We plan to apply. The milestone that makes the strongest case is **one real merc
 
 - **No external audit yet:** 320+ Foundry tests (including negative and fork tests) and 139 live on-chain checks, but no third-party audit or static-analysis report.
 - **WB Soul is simulated on testnet:** WB Soul exists only on mainnet, so a clearly labelled mirror with the same interface stands in on testnet (confirmed OK by Whitechain DevRel). The mainnet-fork test exercises the real registry.
-- **Smart-account binding is an open question for WhiteBIT:** our approvers are ERC-1271 accounts. If WhiteBIT can't bind contract addresses, the person's already-bound wallet uses EIP-7702 (`Approver7702`, live on testnet) and keeps its address.
+- **Smart-account binding is an open question for WhiteBIT:** Tazor's approvers are ERC-1271 accounts. If WhiteBIT can't bind contract addresses, the person's already-bound wallet uses EIP-7702 (`Approver7702`, live on testnet) and keeps its address.
 - **v1 vs v2:** the first live payments use PaymentModule v1. v2 adds the policy features above and runs alongside it; new companies should use v2.
 - **Agent caps are native, not ERC-7715:** the agent cap is enforced by PaymentModuleV2, not by an ERC-7715/7710 permission.
 - **Mandate pulls don't count toward company limits:** they have their own per-period cap.
