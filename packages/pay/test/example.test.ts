@@ -12,13 +12,12 @@ test('merchant demo: the integration is the stated number of lines (≤ 20) and 
   assert.equal(lines.length, stated, 'header count matches the block');
   assert.ok(stated <= 20);
   assert.match(block, /<script src="\.\/tazor-pay\.js"><\/script>/);
-  assert.match(block, /<tazor-pay-button[\s\S]*supplier-name=[\s\S]*payee=[\s\S]*buyer=[\s\S]*lines=/);
+  assert.match(block, /<tazor-pay-button[\s\S]*mode="wallet"[\s\S]*merchant="0x[0-9a-fA-F]{40}"[\s\S]*amount="0\.20"[\s\S]*order-ref="BJ-1042"/);
   assert.match(block, /addEventListener\('tazor-paid'/);
-  // the lines attribute is valid JSON and adds up to the total shown on the page
-  const json = JSON.parse(/lines='([^']+)'/.exec(block)![1]) as { quantity?: number; unitPrice: string }[];
-  const total = json.reduce((s, l) => s + (l.quantity ?? 1) * Math.round(Number(l.unitPrice) * 1e6), 0);
-  assert.equal(total, 1_550_000);
-  assert.match(html, /1\.55 <span class="unit">USDT<\/span>/);
+  // the amount the button charges is the total shown on the page, and the line items add up to it
+  const rows = [...html.matchAll(/<td class="num">(\d+)<\/td><td class="num">(\d+\.\d+)<\/td>/g)].map((m) => Number(m[1]) * Math.round(Number(m[2]) * 1e6));
+  assert.equal(rows.reduce((a, b) => a + b, 0), 200_000);
+  assert.match(html, /0\.20 <span class="unit">USDT<\/span>/);
 });
 
 test('the docs page shows exactly the demo integration', () => {

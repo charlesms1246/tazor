@@ -1,10 +1,33 @@
 // <tazor-pay-button>: a framework-free custom element that creates a Tazor payment link, opens it, and waits for payment.
 import { createInvoiceLink, DEFAULT_EXPLORER, watchPayment, type InvoiceInput, type InvoiceLink, type LineInput, type Payment } from './core.ts';
+import { CHECKOUT, EXPLORER, orderId, orderRef, payOrder, walletSigner, watchOrder, type Eip1193, type Order, type Stage } from './checkout.ts';
+import { addressQrSvg, depositOrder, watchDeposit, type DepositOrder, type DepositStatus } from './deposit.ts';
 
 export const ATTRIBUTES = [
   'supplier-name', 'supplier-account', 'payee', 'buyer', 'amount', 'lines', 'memo', 'due', 'app-url', 'label',
   'invoice-id', 'tax-rate', 'tax-label', 'explorer', 'target',
+  // mode="wallet": gasless wallet checkout (one signature, no gas)
+  'mode', 'merchant', 'order-ref', 'deadline', 'relayer', 'checkout',
+  // offer "Pay from WhiteBIT or any exchange" (plain USDT transfer to a per-order address); "false" hides it
+  'deposit',
 ] as const;
+
+export type WalletPaidDetail = { orderId: `0x${string}`; txHash: `0x${string}`; explorerUrl: string; payer: string; amount: string; ref: string };
+
+const STAGE_TEXT: Record<Stage, string> = { pending: 'Submitted', sequencer: 'Confirmed on Whitechain', ethereum: 'Posted to Ethereum', finalized: 'Final' };
+
+/** The order a wallet-mode button pays: amount in USDT, order-ref your order number, deadline in minutes from now (default 30). */
+export function orderFromAttributes(get: (name: string) => string | null, now = Math.floor(Date.now() / 1000)): Order {
+  const merchant = get('merchant')?.trim();
+  if (!merchant || !/^0x[0-9a-fA-F]{40}$/.test(merchant)) throw new Error('<tazor-pay-button mode="wallet"> needs merchant="0x…"');
+  const amount = get('amount')?.trim() ?? '';
+  if (!/^\d+(\.\d{1,6})?$/.test(amount) || Number(amount) <= 0) throw new Error('amount must be a USDT amount like "1.55"');
+  const [w, f = ''] = amount.split('.');
+  const ref = get('order-ref')?.trim();
+  if (!ref) throw new Error('<tazor-pay-button mode="wallet"> needs order-ref (your order number)');
+  const minutes = Number(get('deadline') ?? 30);
+  return { merchant: merchant as `0x${string}`, amount: BigInt(w) * 1_000_000n + BigInt(f.padEnd(6, '0')), ref: orderRef(ref), deadline: BigInt(now + Math.round((Number.isFinite(minutes) && minutes > 0 ? minutes : 30) * 60)) };
+}
 
 export type PaidDetail = Payment & { invoiceHash: `0x${string}`; explorerUrl: string; url: string; id: string };
 
@@ -26,7 +49,24 @@ button[data-state="paid"] .mark { background: var(--tazor-paid, #0b7350); color:
 .status[data-state="paid"] { color: var(--tazor-paid, #0b7350); font-weight: 600; }
 .status[data-state="error"] { color: var(--tazor-error, #c4342c); }
 a { color: inherit; }
+.alt { background: none; color: var(--tazor-bg, #080a28); border: 1px solid var(--tazor-border, #c7d0dc); min-height: 40px; font-weight: 500; }
+.alt:hover { background: var(--tazor-raised, #f3f5f6); }
+.dep { display: grid; gap: 10px; margin-top: 6px; padding: 14px; max-width: 360px; border: 1px solid var(--tazor-border, #e6e6ec); border-radius: var(--tazor-radius, 12px); font-size: 14px; }
+.dep input { min-height: 40px; padding: 0 10px; border: 1px solid var(--tazor-border, #c7d0dc); border-radius: 10px; font: 13px ui-monospace, Menlo, monospace; }
+.dep .qr { width: 168px; height: 168px; } .dep .qr svg { width: 100%; height: 100%; }
+.dep .kv { display: grid; grid-template-columns: 80px 1fr; gap: 6px 10px; align-items: center; }
+.dep .k { color: var(--tazor-muted, #4a5567); font-size: 13px; }
+.dep .copy { min-height: 30px; padding: 0 10px; font-size: 12px; font-weight: 500; }
+.dep .note { font-size: 12px; color: var(--tazor-muted, #4a5567); }
+.dep ol { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
+.dep li[data-on="true"] { color: var(--tazor-paid, #0b7350); font-weight: 600; }
+.mono { font-family: ui-monospace, Menlo, monospace; }
 `;
+
+const DEPOSIT_STEPS: [DepositStatus['status'][], string][] = [
+  [['waiting'], 'Waiting for your transfer'], [['received'], 'Transfer received'], [['paid'], 'Paid to the merchant'], [['ethereum', 'finalized'], 'Posted to Ethereum'],
+];
+const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const due14 = () => new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
 
@@ -77,16 +117,127 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
 
     connectedCallback() {
       this.#render();
-      this.link.then(() => this.#render(), (e) => this.#fail(e));
+      if (!this.#wallet()) this.link.then(() => this.#render(), (e) => this.#fail(e));
     }
     disconnectedCallback() { this.#stop?.(); }
     attributeChangedCallback(name: string, old: string | null, value: string | null) {
       if (old === value || this.#state === 'paid' || name === 'label') return void (this.isConnected && this.#render());
       this.#link = null;
-      if (this.isConnected) this.link.then(() => this.#render(), (e) => this.#fail(e));
+      if (this.isConnected && !this.#wallet()) this.link.then(() => this.#render(), (e) => this.#fail(e));
+      else if (this.isConnected) this.#render();
+    }
+
+    #wallet = () => this.getAttribute('mode') === 'wallet';
+    #stage: Stage | null = null;
+    #dep: { open: boolean; refundTo: string; busy: boolean; error: string; order?: DepositOrder; address?: string; id?: string; qr?: string; status?: DepositStatus } = { open: false, refundTo: '', busy: false, error: '' };
+
+    async #openDeposit() {
+      this.#dep = { ...this.#dep, open: true, error: '' };
+      // prefill the refund address with an already-connected wallet, without asking for a connection
+      const eth = (globalThis as { ethereum?: Eip1193 }).ethereum;
+      if (!this.#dep.refundTo && eth) { try { const [a] = (await eth.request({ method: 'eth_accounts' })) as string[]; if (a) this.#dep.refundTo = a; } catch { /* no wallet connected */ } }
+      this.#render();
+    }
+
+    async #startDeposit() {
+      const refundTo = this.#dep.refundTo.trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(refundTo)) { this.#dep.error = 'Enter the Whitechain address where a refund (or any excess) should go.'; return this.#render(); }
+      this.#dep = { ...this.#dep, busy: true, error: '' }; this.#render();
+      try {
+        const o = orderFromAttributes((n) => this.getAttribute(n));
+        const d = await depositOrder({ merchant: o.merchant, amount: o.amount, ref: o.ref, deadline: o.deadline, refundTo, relayer: this.getAttribute('relayer') || undefined });
+        this.#dep = { ...this.#dep, busy: false, order: d.order, address: d.depositAddress, id: d.orderId, qr: await addressQrSvg(d.depositAddress), status: { status: 'waiting' } };
+        this.#render();
+        this.#stop?.();
+        this.#stop = watchDeposit(d.order, (st) => {
+          this.#dep.status = st;
+          if ((st.status === 'paid' || st.status === 'ethereum' || st.status === 'finalized') && this.#state !== 'paid') {
+            this.#state = 'paid';
+            this.#txUrl = st.explorer || (st.txHash ? `${this.getAttribute('explorer') ?? EXPLORER}/tx/${st.txHash}` : '');
+            const detail = { method: 'deposit', orderId: d.orderId, txHash: st.txHash ?? '', explorerUrl: this.#txUrl, payer: refundTo, amount: this.getAttribute('amount') ?? '', ref: this.getAttribute('order-ref') ?? '' };
+            this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
+          }
+          this.#render();
+        }, { relayer: this.getAttribute('relayer') || undefined });
+      } catch (e) {
+        this.#dep = { ...this.#dep, busy: false, error: e instanceof Error ? e.message : String(e) };
+        this.#render();
+      }
+    }
+
+    #renderDeposit(wrap: Element) {
+      if (!this.#wallet() || this.getAttribute('deposit') === 'false' || this.#state === 'paid' && !this.#dep.open) return;
+      if (!this.#dep.open) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'alt'; b.setAttribute('part', 'deposit-button'); b.textContent = 'Pay from WhiteBIT or any exchange';
+        b.addEventListener('click', () => void this.#openDeposit());
+        wrap.append(b);
+        return;
+      }
+      const box = document.createElement('div');
+      box.className = 'dep'; box.setAttribute('part', 'deposit');
+      const el = (tag: string, cls = '', text = '') => { const x = document.createElement(tag); if (cls) x.className = cls; if (text) x.textContent = text; return x; };
+      const copy = (value: string, label: string) => {
+        const b = el('button', 'alt copy', label) as HTMLButtonElement; b.type = 'button';
+        b.addEventListener('click', () => { navigator.clipboard?.writeText(value).then(() => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = label; }, 1200); }, () => undefined); });
+        return b;
+      };
+      if (!this.#dep.address) {
+        box.append(el('b', '', 'Pay by transfer'));
+        box.append(el('span', 'note', 'First, where should a refund (or any excess) go? Your Whitechain address:'));
+        const input = el('input') as HTMLInputElement;
+        input.value = this.#dep.refundTo; input.placeholder = '0x…'; input.spellcheck = false; input.setAttribute('aria-label', 'Refund address');
+        input.addEventListener('input', () => { this.#dep.refundTo = input.value; });
+        const go = el('button', '', this.#dep.busy ? 'Preparing…' : 'Show the payment address') as HTMLButtonElement;
+        go.type = 'button'; go.disabled = this.#dep.busy;
+        go.addEventListener('click', () => void this.#startDeposit());
+        box.append(input, go);
+      } else {
+        const amount = this.getAttribute('amount') ?? '';
+        const qr = el('div', 'qr'); qr.innerHTML = this.#dep.qr ?? ''; qr.setAttribute('aria-label', 'QR code of the payment address');
+        const kv = el('div', 'kv');
+        const addrRow = el('span'); addrRow.append(el('span', 'mono', shortAddr(this.#dep.address)), document.createTextNode(' '), copy(this.#dep.address, 'Copy address'));
+        const amtRow = el('span'); amtRow.append(el('b', '', `${amount} USDT`), document.createTextNode(' '), copy(amount, 'Copy amount'));
+        kv.append(el('span', 'k', 'Send'), amtRow, el('span', 'k', 'Token'), el('span', '', 'USDT'), el('span', 'k', 'Network'), el('span', '', 'Whitechain'), el('span', 'k', 'To'), addrRow);
+        box.append(el('b', '', 'Withdraw from WhiteBIT (or send from any wallet)'), qr, kv);
+        box.append(el('span', 'note', `Send exactly ${amount} USDT on Whitechain. Any extra comes back to ${shortAddr(this.#dep.refundTo)}; so does everything if the order expires. Testnet: any USDT transfer on Whitechain Sepolia stands in for the WhiteBIT withdrawal.`));
+        const ol = el('ol');
+        const cur = this.#dep.status?.status ?? 'waiting';
+        const reached = DEPOSIT_STEPS.findIndex(([ks]) => ks.includes(cur));
+        DEPOSIT_STEPS.forEach(([, label], i) => { const li = el('li', '', label); li.dataset.on = String(i <= reached); ol.append(li); });
+        if (cur === 'returned') ol.append(el('li', '', 'Returned to your refund address'));
+        if (cur === 'expired') ol.append(el('li', '', 'Expired: anything sent goes back to your refund address'));
+        box.append(ol);
+      }
+      if (this.#dep.error) box.append(el('span', 'note', this.#dep.error));
+      wrap.append(box);
+    }
+
+    async #payWithWallet() {
+      if (this.#state === 'paid' || this.#state === 'waiting') return;
+      const eth = (globalThis as { ethereum?: Eip1193 }).ethereum;
+      try {
+        if (!eth) throw new Error('No browser wallet found. Install one, or pay with a Tazor company account.');
+        const order = orderFromAttributes((n) => this.getAttribute(n));
+        const checkout = (this.getAttribute('checkout') || CHECKOUT) as `0x${string}`;
+        const relayer = this.getAttribute('relayer') || undefined;
+        this.#state = 'waiting'; this.#stage = null; this.#render();
+        const wallet = await walletSigner(eth);
+        const sub = await payOrder({ order, wallet, checkout, relayer });
+        const id = sub.id ?? orderId(order, checkout);
+        this.#txUrl = sub.explorer || `${this.getAttribute('explorer') ?? EXPLORER}/tx/${sub.txHash}`;
+        this.#state = 'paid'; this.#stage = sub.stage ?? 'pending'; this.#render();
+        const detail: WalletPaidDetail = { orderId: id, txHash: sub.txHash, explorerUrl: this.#txUrl, payer: wallet.address, amount: this.getAttribute('amount') ?? '', ref: this.getAttribute('order-ref') ?? '' };
+        this.dispatchEvent(new CustomEvent('tazor-paid', { detail, bubbles: true, composed: true }));
+        this.#stop?.();
+        this.#stop = watchOrder(id, (st) => { this.#stage = st; this.#render(); this.dispatchEvent(new CustomEvent('tazor-finality', { detail: { orderId: id, stage: st }, bubbles: true, composed: true })); }, { checkout, relayer });
+      } catch (e) {
+        this.#fail(e);
+      }
     }
 
     async #open() {
+      if (this.#wallet()) return this.#payWithWallet();
       if (this.#state === 'paid') return;
       // open the window synchronously (inside the click) so popup blockers allow it; navigate once the link is ready
       const popup = this.getAttribute('target') === 'popup';
@@ -134,14 +285,20 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
       const labelEl = this.#root.querySelector('[part="label"]')!;
       const status = this.#root.querySelector('.status')!;
       labelEl.textContent = this.#state === 'paid' ? 'Paid' : label;
-      button.disabled = this.#state === 'paid';
+      button.disabled = this.#state === 'paid' || (this.#wallet() && this.#state === 'waiting');
       button.dataset.state = this.#state;
       button.addEventListener('click', () => void this.#open());
-      this.#link?.then((l) => { if (this.#state === 'idle') status.textContent = `${l.amount} USDT on Whitechain · approve with a passkey`; }, () => undefined);
-      if (this.#state === 'waiting') status.textContent = 'Waiting for payment…';
+      this.#renderDeposit(this.#root.querySelector('.wrap')!);
+      if (this.#wallet()) {
+        if (this.#state === 'idle') status.textContent = `${this.getAttribute('amount') ?? ''} USDT · one signature in your wallet, no gas`;
+        if (this.#state === 'waiting') status.textContent = 'Sign in your wallet (no gas, no transaction from you)…';
+      } else {
+        this.#link?.then((l) => { if (this.#state === 'idle') status.textContent = `${l.amount} USDT on Whitechain · approve with a passkey`; }, () => undefined);
+        if (this.#state === 'waiting') status.textContent = 'Waiting for payment…';
+      }
       if (this.#state === 'error') status.textContent = this.#error || 'Something went wrong';
       if (this.#state === 'paid') {
-        status.textContent = 'Paid ✓ · ';
+        status.textContent = this.#wallet() && this.#stage ? `Paid ✓ · ${STAGE_TEXT[this.#stage]} · ` : 'Paid ✓ · ';
         const a = document.createElement('a');
         a.href = this.#txUrl; a.target = '_blank'; a.rel = 'noreferrer'; a.textContent = 'View tx'; a.setAttribute('part', 'tx');
         status.append(a);
