@@ -12,7 +12,7 @@ Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everythin
 | **2. The merchant refunds part of it** | One click and one signature from the merchant. The contract sends the refund **only to the original payer** and never more than was paid. The customer can check it on a public receipt read from Whitechain. | [`0x891a…f9a6`](https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6): 0.02 USDT back |
 | **3. The accountant gets the export** | Every payment and refund for the merchant, read straight from Whitechain, as CSV with dates, gross, refunds and net (also Tally, Xero, QuickBooks and camt.054-style from the app's Reports). | [`scripts/checkout-live/accountant-export.csv`](scripts/checkout-live/accountant-export.csv) |
 
-The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`, `order.finality`). In the live run all three signatures verified ([`hosted-last-run.json`](scripts/checkout-live/hosted-last-run.json)).
+The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `order.refunded` and `order.finality`. In the live hosted run, the paid, refunded and finality signatures all verified ([`hosted-last-run.json`](scripts/checkout-live/hosted-last-run.json)).
 
 **Try it (testnet only):**
 - **The shop, in about a minute, with no wallet extension:** https://bluejay-shop.vercel.app
@@ -49,7 +49,7 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 | Pay its Chinese component suppliers | **B2B payment runs** approved by verified people with Face ID or fingerprint |
 | Keep export and tax records | The **accountant export**: every payment and refund with date, gross, refund, net and transaction |
 
-**Pricing:** 0.5% per payment, gas included, no monthly fee. Cards charge 2–3%, and SWIFT costs a 1–3% FX spread plus wire fees.
+**Pricing:** 0.5% per payment, gas included, no monthly fee. Cards charge 2–3%, and SWIFT costs a 1–3% FX spread plus wire fees. The fee is billed to the merchant monthly from the export, not taken on-chain: the contracts move 100% of the payment to the merchant, and nothing is charged on testnet.
 
 **Go-to-market, in three phases** (each a Builders Program milestone):
 1. **One real merchant (months 0–3):** Healthsoft live on Whitechain mainnet. Then its supply chain: each merchant brings its suppliers and distributors, who start receiving and paying in USDT on Whitechain. Target: 10 cross-border SMEs.
@@ -66,7 +66,6 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 **Why it grows Whitechain:**
 - Every merchant brings its counterparties onto the chain.
 - Every payment settles in USDT on Whitechain.
-- Tazor buys WBT for gas.
 
 **Metrics:**
 - merchants live;
@@ -75,7 +74,7 @@ The shop is told at each step by signed webhooks (`order.paid`, `order.refunded`
 - time from sign-up to first payment (target under 10 minutes);
 - refund rate.
 
-**Compliance:** businesses only, with KYB at onboarding and WB Soul-verified approvers. Each market launches where cross-border USDT settlement fits local rules (in India: FEMA and the tax treatment of digital assets), with the partner's own counsel.
+**Compliance:** businesses only. KYB at onboarding is planned for mainnet (not built yet), and B2B approvers are WB Soul-verified people. Each market launches where cross-border USDT settlement fits local rules (in India: FEMA and the tax treatment of digital assets), with the partner's own counsel.
 
 ## Trust model, in a few lines
 
@@ -101,8 +100,8 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
   - **demo wallet:** a testnet wallet kept in the page, with no extension;
   - **passkeys:** B2B approvers sign with Face ID or fingerprint (P-256, verified on-chain);
   - **any wallet:** EIP-1193 or ERC-1271.
-- **No chain to choose:** pay from an exchange balance with a plain transfer to the order's own deposit address.
-- **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is Tazor's own (`/x402/supported`, `/verify`, `/settle`), and the agent has a hard spend cap.
+- **No chain to choose:** pay with a plain transfer to the order's own deposit address. On testnet any transfer stands in for an exchange withdrawal; whether WhiteBIT withdrawals can target these addresses is being checked with the Whitechain team.
+- **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is Tazor's own (`/x402/supported`, `/verify`, `/settle`), and the agent refuses any price above its spend cap (enforced in the agent before it signs, not on-chain).
 
 **How the business pays gas, and what stops relayer drain:**
 - The relayer holds WBT, funded by the operator (faucet on testnet; WBT from WhiteBIT on mainnet). `/health` shows the gas runway.
@@ -189,7 +188,7 @@ Company `acme-p2` runs PaymentModuleV2 + MandateModuleV2. The demo uses short ti
 
 | Action | Typical bank | Tazor (measured) |
 |---|---|---|
-| Pay an approved invoice | SEPA Instant: up to 10 s | 3.6 s |
+| Pay a cross-border supplier | SWIFT: 1–3 business days, with a 1–3% FX spread | 3.6 s, in USDT |
 | Pay with the provider's servers down | Not possible | 69 s via an Ethereum portal deposit (hours if the sequencer itself refused it) |
 | Change who may approve | 7–10 working days | 84 s, automatic sync after the ENS change (100 s in a scripted run with a 15 s wait) |
 | Remove a person | 7–10 working days | 3.06 s |
@@ -249,7 +248,7 @@ flowchart LR
   - Endpoints: `/pay`, `/pay/calldata`, `/payrun`, `/approver`, `/revoke`, `/mandate`, `/pull`, `/rpc` (ERC-7677), `/userop`, `/sync` (ENS role sync on demand), `/watch` (daily sweep), `/mirror`, and `/sandbox/*` for the Autopilot sandbox.
   - Role sync proves ENS roles in-process; anyone can also submit the proof.
 - `packages/pay/`: `@tazor/pay`, the drop-in SDK: `createInvoiceLink`, `watchPayment`, and a `<tazor-pay-button>` web component.
-- `examples/merchant-demo/`: a separate merchant site that integrates the SDK in 16 lines.
+- `examples/merchant-demo/`: a separate merchant site that integrates the SDK in 15 lines.
 - `packages/ens/`: company tooling on ENSv2.
 - `packages/prover/`: ENS storage proofs for Whitechain.
 - `infra/`: docker-compose for the relayer.
