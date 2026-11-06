@@ -74,7 +74,7 @@ contract TazorCheckoutForkTest is Test {
     function test_cannotRedirectSignatureToAnotherMerchant() public {
         TazorCheckout.Order memory o = _order(1e6);
         bytes memory sig = _sign3009(payerKey, o.amount, block.timestamp + 1 hours, checkout.payNonce(o));
-        TazorCheckout.Order memory evil = o;
+        TazorCheckout.Order memory evil = _order(1e6);
         evil.merchant = relayer;
         vm.expectRevert();
         checkout.pay(evil, payer, 0, block.timestamp + 1 hours, sig);
