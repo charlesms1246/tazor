@@ -14,6 +14,9 @@ importers:
       '@fontsource-variable/onest':
         specifier: ^5.3.1
         version: 5.3.1
+      '@fontsource/tektur':
+        specifier: ^5.3.0
+        version: 5.3.0
       next:
         specifier: 16.4.5
         version: 16.4.5(@playwright/test@1.65.0)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -59,6 +62,9 @@ packages:
 
   '@fontsource-variable/onest@5.3.1':
     resolution: {integrity: sha512-xaaw6G4HDB2/RczsWLD/2bnib4ykmQlTlBUN3GOEOiyErilZukQWVJG95h9zwAy0i8KY+QzDa+COPfqhI72Acw==}
+
+  '@fontsource/tektur@5.3.0':
+    resolution: {integrity: sha512-Yp5ejjv/9+bxoT2zl6aKI3uBkuwLJ/aA+yAf1e9iUoaj6iE26QDL78pKTbpZj0+sm3gSOjy0p1XyKmnIGyCD9Q==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -801,6 +807,8 @@ snapshots:
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
   '@fontsource-variable/onest@5.3.1': {}
+
+  '@fontsource/tektur@5.3.0': {}
 
   '@img/colour@1.1.0':
     optional: true

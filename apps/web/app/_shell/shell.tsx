@@ -22,15 +22,12 @@ const ICONS: Record<string, ReactNode> = {
 
 const Icon = ({ name }: { name: string }) => <svg viewBox="0 0 16 16" aria-hidden="true">{ICONS[name]}</svg>;
 
-export function Mark({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" aria-hidden="true">
-      <rect width="28" height="28" rx="8" fill="#07081e" />
-      <path d="M8 9h12" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M14 9v11" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M17.5 21.5 22 14" stroke="#dcf218" strokeWidth="2.6" strokeLinecap="round" />
-    </svg>
-  );
+export function Mark({ size = 32 }: { size?: number }) {
+  return <img className="mark" src="/brand/tazor-tile.png" width={size} height={size} alt="" aria-hidden="true" />;
+}
+
+export function Wordmark() {
+  return <span className="wordmark">tazor</span>;
 }
 
 type Item = { href: string; label: string; icon: string; short?: string };
@@ -117,7 +114,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = raw.endsWith('/') ? raw : `${raw}/`;
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
-  const current = [...GROUPS.flatMap((g) => g.items), ...FOOT].find((it) => isActive(path, it.href));
 
   return (
     <>
@@ -127,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <span className="tb-long">· WB Soul verification is simulated · test USDT only</span>
       </div>
       <div className="mobile-bar">
-        <a href="/" className="brand" aria-label="Tazor home"><Mark size={26} /><span className="brand-name">{current?.label ?? 'Tazor'}</span></a>
+        <a href="/" className="brand" aria-label="Tazor home"><Mark size={28} /><Wordmark /></a>
         <button type="button" className="btn btn-ghost btn-sm" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen((o) => !o)}>
           <span className="nav-item" style={{ margin: 0, padding: 0, height: 'auto', color: 'inherit', background: 'none' }}><Icon name={open ? 'close' : 'menu'} /></span>
         </button>
@@ -138,7 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <div className="shell">
         <aside className="sidebar">
-          <a href="/" className="brand"><Mark /><span className="brand-name">Tazor</span></a>
+          <a href="/" className="brand" aria-label="Tazor home"><Mark /><Wordmark /></a>
           <Switcher />
           <NavLinks path={path} />
           <div className="sidebar-meta">Built on Whitechain · roles on ENS</div>
