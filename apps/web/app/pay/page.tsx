@@ -22,10 +22,11 @@ import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/p
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { NoLink } from './no-link.tsx';
 import { InvoicePaper, issuedFromId, paperFromInvoice } from '../_invoice/paper.tsx';
-import { Timeline } from '../_ui/timeline.tsx';
+import { HistoryTimeline } from '../_invoice/history.tsx';
+import { useSubjectHistory } from '@/lib/chain-history.ts';
 import { eventsFor, recordEvent, type TimelineEvent } from '@/lib/events.ts';
 import { loadInbox, upsertInbox } from '@/lib/inbox.ts';
-import { INVOICE_STEPS, inboxForInvoice, pendingSteps, recordOpened, shortAddr, subjectOf, useEvents } from '@/lib/story.ts';
+import { INVOICE_STEPS, inboxForInvoice, recordOpened, shortAddr, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
@@ -51,7 +52,7 @@ export default function PayPage() {
   const [v2, setV2] = useState<boolean | null>(null);
   const [paidBefore, setPaidBefore] = useState<Hex | null>(null);
   const subject = typeof state === 'object' ? subjectOf(state.invoice) : null;
-  const events = useEvents(subject);
+  const history = useSubjectHistory(subject, typeof state === 'object' ? state.invoice.buyerAccount : null);
   /** Adds an event to this invoice's timeline (no-op before an invoice is loaded). */
   const story = (kind: TimelineEvent['kind'], title: string, extra: Partial<TimelineEvent> = {}) => {
     if (subject) recordEvent({ subject, kind, at: Date.now(), title, ...extra });
@@ -275,7 +276,8 @@ export default function PayPage() {
 
   const pm = (v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)';
   const explorer = (a: string) => `${config.explorer}/address/${a}`;
-  const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore;
+  const chainPaid = history.events.find((e) => e.kind === 'paid' && e.tx)?.tx as Hex | undefined;
+  const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore ?? chainPaid ?? null;
 
   return (
     <div className="page tz-touch">
@@ -349,7 +351,7 @@ export default function PayPage() {
           </Card>
 
           <Card title="Activity" subtitle="What happened to this invoice, as seen from this device.">
-            <Timeline subject={subject ?? undefined} pending={pendingSteps(events, INVOICE_STEPS)} testId="pay-timeline" />
+            <HistoryTimeline events={history.events} loading={history.loading} error={history.error} steps={INVOICE_STEPS} testId="pay-timeline" />
           </Card>
 
           <div data-tour="pay-fallback">

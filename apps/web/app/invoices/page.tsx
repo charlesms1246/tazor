@@ -13,10 +13,11 @@ import { loadPayments } from '@/lib/storage.ts';
 import type { PaymentRecord } from '@/lib/export.ts';
 import { Addr, Card, CopyButton, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { InvoicePaper, paperFromInvoice, printInvoice, type PaperInvoice } from '../_invoice/paper.tsx';
-import { Timeline } from '../_ui/timeline.tsx';
+import { HistoryTimeline } from '../_invoice/history.tsx';
+import { useHistory, useSubjectHistory } from '@/lib/chain-history.ts';
 import { COMPANIES, companyByAccount, useCompany } from '@/lib/company.ts';
 import { recordEvent } from '@/lib/events.ts';
-import { INVOICE_STEPS, partyName, pendingSteps, subjectOf, useEvents } from '@/lib/story.ts';
+import { INVOICE_STEPS, partyName, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
 
 const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
@@ -48,7 +49,8 @@ export default function InvoicesPage() {
   const [query, setQuery] = useState('');
   const company = useCompany();
   const touched = useRef(new Set<keyof InvoiceForm>());
-  const drawerEvents = useEvents(viewing ? subjectOf(viewing.invoice) : null);
+  const drawerHistory = useSubjectHistory(viewing ? subjectOf(viewing.invoice) : null, viewing?.invoice.buyerAccount);
+  const chain = useHistory(company.account);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [preview, setPreview] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -109,15 +111,22 @@ export default function InvoicesPage() {
   };
   const shown = dirty ? null : created;
   const paper = shown ? paperFromInvoice(shown.invoice, shown.createdAt) : draft;
-  const shownStatus = shown ? invoiceStatus(shown.invoice, payments) : 'draft';
-  const txOf = (s: StoredInvoice | null) => (s && invoiceStatus(s.invoice, payments) === 'paid'
-    ? payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(s.invoice); } catch { return false; } })?.txHash ?? null
-    : null);
+  // paid if this device recorded the payment, or the chain shows an InvoicePaid for this invoice hash
+  const chainPaid = new Map(chain.events.filter((e) => e.kind === 'paid' && e.tx).map((e) => [e.subject.toLowerCase(), e.tx!]));
+  const txOf = (s: StoredInvoice | null): string | null => {
+    if (!s) return null;
+    if (invoiceStatus(s.invoice, payments) === 'paid') {
+      return payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(s.invoice); } catch { return false; } })?.txHash ?? null;
+    }
+    return chainPaid.get(subjectOf(s.invoice)) ?? null;
+  };
+  const isPaid = (s: StoredInvoice) => invoiceStatus(s.invoice, payments) === 'paid' || chainPaid.has(subjectOf(s.invoice));
+  const shownStatus = shown ? (isPaid(shown) ? 'paid' : 'sent') : 'draft';
   const paidTx = txOf(shown);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const rowStatus = (s: StoredInvoice): 'paid' | 'sent' | 'overdue' =>
-    invoiceStatus(s.invoice, payments) === 'paid' ? 'paid' : s.invoice.dueDate < nowSec ? 'overdue' : 'sent';
+    isPaid(s) ? 'paid' : s.invoice.dueDate < nowSec ? 'overdue' : 'sent';
   const inTab = (s: StoredInvoice, t: ListTab) => t === 'all' || rowStatus(s) === t;
   const q = query.trim().toLowerCase();
   const matches = (s: StoredInvoice) => !q || [
@@ -353,11 +362,11 @@ export default function InvoicesPage() {
                 <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
               </div>
               <div className="paper-mini">
-                <InvoicePaper invoice={paperFromInvoice(viewing.invoice, viewing.createdAt)} status={invoiceStatus(viewing.invoice, payments)} link={viewing.link} txHash={txOf(viewing)} logo={logo} />
+                <InvoicePaper invoice={paperFromInvoice(viewing.invoice, viewing.createdAt)} status={isPaid(viewing) ? 'paid' : 'sent'} link={viewing.link} txHash={txOf(viewing)} logo={logo} />
               </div>
               <div>
                 <h3 className="drawer-h">Activity</h3>
-                <Timeline subject={subjectOf(viewing.invoice)} pending={pendingSteps(drawerEvents, INVOICE_STEPS)} testId="inv-timeline" />
+                <HistoryTimeline events={drawerHistory.events} loading={drawerHistory.loading} error={drawerHistory.error} steps={INVOICE_STEPS} testId="inv-timeline" />
               </div>
             </div>
           </aside>

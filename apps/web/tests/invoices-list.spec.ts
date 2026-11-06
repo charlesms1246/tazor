@@ -1,3 +1,4 @@
+import { mockExplorer } from './explorer-mock.ts';
 import { test, expect, type Page } from '@playwright/test';
 
 const ACME = '0xb99A12652BEe98429ae31EA0529A0b63f1073721';
@@ -15,6 +16,7 @@ const create = async (page: Page, desc: string, price: string, due: string) => {
 };
 
 test('/invoices/: tabs count and total, search filters, and the drawer shows the invoice timeline', async ({ page }) => {
+  await mockExplorer(page);
   await page.goto('/invoices/');
   await create(page, 'Freight', '10', '2099-01-31');
   await create(page, 'Storage', '2.5', '2020-01-31');
@@ -55,6 +57,7 @@ test('/invoices/: tabs count and total, search filters, and the drawer shows the
 });
 
 test('/invoices/: the selected company prefills the supplier, and Bill to offers the other company', async ({ page }) => {
+  await mockExplorer(page);
   await page.addInitScript(() => localStorage.setItem('tazor.company.v1', 'bluejay'));
   await page.goto('/invoices/');
   await expect(page.getByTestId('inv-supplier-name')).toHaveValue('Bluejay Logistics');

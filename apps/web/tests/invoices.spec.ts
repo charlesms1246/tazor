@@ -1,9 +1,11 @@
+import { mockExplorer } from './explorer-mock.ts';
 import { test, expect } from '@playwright/test';
 
 const CUSTOMER = '0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6';
 const PAYEE = '0xc1dce946D192e344251972470237F1471C93876c';
 
 test('/invoices/: create an invoice, and its link opens /pay/ with that invoice loaded', async ({ page }) => {
+  await mockExplorer(page);
   // the Pay page reads the chain for its guards; nothing here needs real answers
   for (const url of ['https://rpc.testnet.whitechain.io/', 'https://ethereum-sepolia-rpc.publicnode.com/']) {
     await page.route(url, (route) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, result: null }) }));
@@ -44,6 +46,7 @@ test('/invoices/: create an invoice, and its link opens /pay/ with that invoice 
 });
 
 test('/invoices/: a bad form shows the problem inside the form', async ({ page }) => {
+  await mockExplorer(page);
   await page.goto('/invoices/');
   await page.getByTestId('inv-customer').fill('0x1234');
   await page.getByTestId('inv-create').click();

@@ -1,3 +1,4 @@
+import { mockExplorer } from './explorer-mock.ts';
 import { test, expect, type Page } from '@playwright/test';
 
 const CUSTOMER = '0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6';
@@ -10,6 +11,7 @@ const fillParties = async (page: Page) => {
 };
 
 test.beforeEach(async ({ page }) => {
+  await mockExplorer(page);
   for (const url of ['https://rpc.testnet.whitechain.io/', 'https://ethereum-sepolia-rpc.publicnode.com/']) {
     await page.route(url, (route) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, result: null }) }));
   }

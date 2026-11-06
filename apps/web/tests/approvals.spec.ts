@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encodeInvoiceLink } from '../lib/invoice-link.ts';
 import { WHITECHAIN_SEPOLIA_USDT } from '../lib/invoice-auth.ts';
 import { invoiceHash, type Invoice } from '../lib/invoice.ts';
+import { mockExplorer } from './explorer-mock.ts';
 
 const invoice: Invoice = {
   id: 'INV-20261106-A1B2', supplierName: 'Bluejay Logistics', supplierAccount: '0xc1dce946D192e344251972470237F1471C93876c',
@@ -11,6 +12,7 @@ const invoice: Invoice = {
 };
 
 const mockRpc = async (page: Page) => {
+  await mockExplorer(page);
   for (const url of ['https://rpc.testnet.whitechain.io/', 'https://ethereum-sepolia-rpc.publicnode.com/']) {
     await page.route(url, (route) => route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, result: null }) }));
   }
@@ -52,6 +54,7 @@ test('/approvals/: a seeded paid item shows under Paid, not under Needs approval
     id: invoiceHash(invoice).toLowerCase(), kind: 'invoice', title: 'Invoice INV-PAID-1', counterparty: 'Bluejay Logistics',
     amount: '1200000', dueDate: 1798761600, href: '/pay/#v1.x.y', createdAt: Date.now(), status: 'paid', approvals: 2, required: 2,
   };
+  await mockExplorer(page);
   await page.addInitScript((v) => localStorage.setItem('tazor.inbox.v1', v), JSON.stringify([item]));
   await page.goto('/approvals/');
   await expect(page.getByTestId('approval-empty')).toBeVisible();

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { formatUnits, getAddress, isAddress, isHex, parseUnits, type Hex } from 'viem';
+import { formatUnits, getAddress, isAddress, isHex, parseUnits, type Address, type Hex } from 'viem';
 import { signDigestWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
@@ -13,7 +13,8 @@ import { mergeApprovals, parseApprovals, serializeApproval, type Approval } from
 import { ethCall } from '@/lib/rpc.ts';
 import { loadMandates, loadPasskey, saveMandate, type StoredMandate } from '@/lib/storage.ts';
 import { Addr, Card, Empty, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
-import { Timeline } from '../_ui/timeline.tsx';
+import { HistoryTimeline } from '../_invoice/history.tsx';
+import { useSubjectHistory } from '@/lib/chain-history.ts';
 import { recordEvent } from '@/lib/events.ts';
 import { usdt2dp } from '@/lib/export.ts';
 import { companyByAccount } from '@/lib/company.ts';
@@ -157,6 +158,12 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
 
 type Row = StoredMandate & { state?: ReturnType<typeof decodeMandateOf>; available?: bigint; error?: string };
 
+/** A mandate's activity: this device's events merged with what the chain shows (created, collected, cancelled). */
+function MandateHistory({ id, account }: { id: string; account: Address | null }) {
+  const h = useSubjectHistory(id, account);
+  return <HistoryTimeline events={h.events} loading={h.loading} error={h.error} testId="mandate-timeline" />;
+}
+
 function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
@@ -215,7 +222,7 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
     </tr>
     {open && (
       <tr data-testid="mandate-detail">
-        <td colSpan={5}><Timeline subject={row.id} testId="mandate-timeline" /></td>
+        <td colSpan={5}><MandateHistory id={row.id} account={s?.account ?? null} /></td>
       </tr>
     )}
     </>
