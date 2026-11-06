@@ -48,3 +48,14 @@ test('same-block events keep chain order even when the explorer lists them newes
   assert.equal(orders[0].method, 'transfer');
   assert.equal(orders[0].returned, 250_000n);
 });
+
+test('ready to ship: the web copy matches the SDK for every stage, threshold edge and policy', () => {
+  const stages = [null, 'pending', 'sequencer', 'ethereum', 'finalized'] as const;
+  const amounts = [0n, 1_550_000n, 99_999_999n, 100_000_000n, 100_000_001n, 5_000_000_000n, '99.99', '100', '250.5'];
+  const policies = [undefined, { waitForEthereumAbove: '10' }, { waitForEthereumAbove: '100', waitForFinalAbove: '1000' }];
+  for (const st of stages) for (const a of amounts) for (const p of policies) {
+    assert.deepEqual(web.readyToShip(a, st, p), sdk.readyToShip(a, st, p), `${String(a)} @ ${st} ${JSON.stringify(p)}`);
+  }
+  assert.equal(web.readyToShip(100_000_000n, 'sequencer').ready, false, '100 USDT is inclusive: it waits');
+  assert.equal(web.stageOf({ block: 10, safe: 10, finalized: 5 }), 'ethereum');
+});

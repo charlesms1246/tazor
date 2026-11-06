@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAddress, isAddress, type Address, type Hex } from 'viem';
 import { config } from '@/lib/config.ts';
 import {
-  allCheckoutLogs, cancelSubscription, chargeSubscription, checkoutAddress, decodeCheckoutLogs, depositCheckoutAddress, merchantView, methodLabel,
-  nextCharge, refundOrder, shortRef, walletSigner, type OrderRow, type SubRow,
+  allCheckoutLogs, cancelSubscription, chargeSubscription, checkoutAddress, checkoutLedger, checkoutMerchants, decodeCheckoutLogs, DEFAULT_SHIP_POLICY,
+  DEMO_MERCHANTS, DEMO_PAYTO, demoName, demoOn, depositCheckoutAddress, loadWatch, merchantView, methodLabel, nextCharge, readFinality, readyToShip,
+  refundOrder, saveWatch, setDemoOn, shortRef, stageOf, toCheckoutCsv, walletSigner, type OrderRow, type SubRow,
 } from '@/lib/checkout.ts';
 import { companyByAccount, useCompany } from '@/lib/company.ts';
 import { ensLabelOf } from '@/lib/ens-directory.ts';
@@ -19,22 +20,13 @@ import { toast, Toasts } from '../_invoice/toast.tsx';
 import { Card, Empty, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import '../_invoice/touch.css';
 import '../_checkout/checkout.css';
+import { downloadCsv } from '../_checkout/ledger.tsx';
 
 type Tab = 'orders' | 'subscriptions' | 'webhooks' | 'agents';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'orders', label: 'Orders' }, { id: 'subscriptions', label: 'Subscriptions' }, { id: 'webhooks', label: 'Webhooks' }, { id: 'agents', label: 'Agents' },
 ];
-const WATCH_KEY = 'tazor.checkout.watch.v1';
-const DEMO_KEY = 'tazor.checkout.demo.v1';
-/** Live demo merchants with real orders on Whitechain, shown by default so the console never opens empty. */
-const DEMO_MERCHANTS: { name: string; account: Address }[] = [
-  { name: 'Bluejay demo shop', account: '0xc1dce946D192e344251972470237F1471C93876c' },
-  { name: 'Sandbox merchant', account: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93' },
-];
-/** The demo x402 resource server's payTo. */
-const DEMO_PAYTO: Address = '0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6';
 const isTab = (t: string | null): t is Tab => t === 'orders' || t === 'subscriptions' || t === 'webhooks' || t === 'agents';
-const demoName = (a: string) => DEMO_MERCHANTS.find((d) => d.account.toLowerCase() === a.toLowerCase())?.name ?? (a.toLowerCase() === DEMO_PAYTO.toLowerCase() ? 'Demo AI resource' : null);
 const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 const nameOf = (a: string) => companyByAccount(a)?.name ?? ensLabelOf(a) ?? null;
 const every = (s: number) => (s % 86400 === 0 ? `${s / 86400} day${s === 86400 ? '' : 's'}` : s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`);
@@ -64,7 +56,7 @@ export default function CheckoutPage() {
     if (/^0x[0-9a-f]{64}$/.test(o)) setFocus(o);
     const t = q.get('tab');
     if (isTab(t)) setTabState(t);
-    try { if (localStorage.getItem(DEMO_KEY) === 'off') setDemo(false); } catch { /* private mode */ }
+    setDemo(demoOn());
     const read = () => { const h = location.hash.slice(1); if (isTab(h)) setTabState(h); };
     read();
     addEventListener('hashchange', read);
@@ -79,6 +71,7 @@ export default function CheckoutPage() {
   };
   const [watch, setWatch] = useState<Address[]>([]);
   const [add, setAdd] = useState('');
+  const [heads, setHeads] = useState<{ safe: number | null; finalized: number | null } | null>(null);
   const [data, setData] = useState<{ orders: OrderRow[]; subs: SubRow[] } | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -86,19 +79,21 @@ export default function CheckoutPage() {
   const [hooks, setHooks] = useState<{ items: Delivery[]; note?: string } | null | 'error'>(null);
   const [agents, setAgents] = useState<Settlement[] | null | 'error'>(null);
 
-  useEffect(() => { try { setWatch(JSON.parse(localStorage.getItem(WATCH_KEY) ?? '[]')); } catch { /* none */ } }, []);
+  useEffect(() => { setWatch(loadWatch()); }, []);
   const ready = !company.status || company.status === 'ready';
   const demoAccounts = demo ? DEMO_MERCHANTS.map((d) => d.account) : [];
   const own: Address[] = [...(linked ? [linked] : []), ...(ready ? [company.account, ...company.aliases] : [])];
-  const merchants: Address[] = [...new Map([...own, ...watch, ...demoAccounts].map((a) => [a.toLowerCase(), a])).values()];
+  const merchants: Address[] = checkoutMerchants({ own, watch, demo });
   const ownSet = new Set(own.map((a) => a.toLowerCase()));
-  const toggleDemo = () => { const next = !demo; setDemo(next); try { localStorage.setItem(DEMO_KEY, next ? 'on' : 'off'); } catch { /* storage full */ } };
+  const toggleDemo = () => { const next = !demo; setDemo(next); setDemoOn(next); };
 
   const load = useCallback(async () => {
     if (!checkout) return;
     setError('');
     try {
-      setData(merchantView(decodeCheckoutLogs(await allCheckoutLogs(8)), merchants));
+      const [logs, f] = await Promise.all([allCheckoutLogs(8), readFinality(0).catch(() => null)]);
+      setData(merchantView(decodeCheckoutLogs(logs), merchants));
+      if (f) setHeads(f);
     } catch (e) {
       setError(msg(e));
     }
@@ -145,7 +140,7 @@ export default function CheckoutPage() {
     if (!isAddress(add.trim())) return toast('Enter a merchant address (0x…)', 'error');
     const next = [...new Set([...watch, getAddress(add.trim())])];
     setWatch(next); setAdd('');
-    try { localStorage.setItem(WATCH_KEY, JSON.stringify(next)); } catch { /* storage full */ }
+    saveWatch(next);
   };
 
   /** The merchant's browser wallet signs; the relayer submits (gasless for the merchant). */
@@ -203,7 +198,11 @@ export default function CheckoutPage() {
 
         {tab === 'orders' && (data === null && !error ? <p className="muted" style={{ padding: 'var(--card-pad)' }}>Reading orders…</p> : orders.length === 0 ? (
           <div style={{ padding: 'var(--card-pad)' }}><Empty><span data-testid="co-orders-empty">No checkout orders paid to these addresses yet.</span></Empty></div>
-        ) : (
+        ) : (<>
+          <div className="co-orders-bar">
+            <span className="small muted">Payments under {DEFAULT_SHIP_POLICY.waitForEthereumAbove} USDT are ready to ship at once; bigger ones wait until Whitechain posts them to Ethereum (about 10 minutes).</span>
+            <button type="button" className="btn btn-sm" data-testid="co-csv" onClick={() => downloadCsv(`tazor-checkout-${new Date().toISOString().slice(0, 10)}.csv`, toCheckoutCsv(checkoutLedger(orders)))}>Download CSV</button>
+          </div>
           <div className="table-wrap"><table className="table table-stack co-orders" data-testid="co-orders">
             <thead><tr><th>Order</th><th>Customer</th><th className="num">Amount</th><th className="num">Refunded</th><th>Status</th><th /></tr></thead>
             <tbody>
@@ -218,7 +217,12 @@ export default function CheckoutPage() {
                       <span className="cell-sub" data-testid="co-order-method">{methodLabel(o.method)}{o.method === 'transfer' ? ' (deposit address)' : ''}</span></td>
                     <td className="num">{usdtText(o.amount)}<span className="cell-sub"><Inr v={o.amount} /></span>{o.returned > 0n && <span className="cell-sub" data-testid="co-order-returned">{usdtText(o.returned)} extra sent back</span>}</td>
                     <td className="num">{o.refunded > 0n ? usdtText(o.refunded) : <span className="faint">—</span>}</td>
-                    <td><Pill tone={status === 'Paid' ? 'positive' : status === 'Refunded' ? 'neutral' : 'warning'} testId="co-order-status">{status}</Pill></td>
+                    <td><Pill tone={status === 'Paid' ? 'positive' : status === 'Refunded' ? 'neutral' : 'warning'} testId="co-order-status">{status}</Pill>
+                      {(() => {
+                        const ship = readyToShip(o.amount, heads ? stageOf({ block: o.block, ...heads }) : 'sequencer');
+                        return <span className={`cell-sub co-ship${ship.ready ? '' : ' co-ship-wait'}`} data-testid="co-order-ship" data-ready={ship.ready ? 'true' : 'false'} title={ship.reason}>
+                          {ship.ready ? 'Ready to ship' : `Wait: big payment (${DEFAULT_SHIP_POLICY.waitForEthereumAbove} USDT and above)`}</span>;
+                      })()}</td>
                     <td>
                       <span className="row" style={{ gap: 6 }}>
                         <a className="btn btn-sm" href={`/receipt/?order=${o.id}`} data-testid="co-receipt">Receipt</a>
@@ -249,7 +253,7 @@ export default function CheckoutPage() {
               })}
             </tbody>
           </table></div>
-        ))}
+        </>))}
 
         {tab === 'subscriptions' && (data === null && !error ? <p className="muted" style={{ padding: 'var(--card-pad)' }}>Reading subscriptions…</p> : subs.length === 0 ? (
           <div style={{ padding: 'var(--card-pad)' }}><Empty><span data-testid="co-subs-empty">No subscriptions to these addresses yet.</span></Empty></div>

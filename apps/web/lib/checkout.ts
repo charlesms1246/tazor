@@ -269,14 +269,57 @@ export async function readFinality(block: number): Promise<Finality> {
 export const finalityStage = (f: Finality): 0 | 1 | 2 | 3 =>
   (f.finalized !== null && f.finalized >= f.block ? 3 : f.safe !== null && f.safe >= f.block ? 2 : 1);
 
+// ---- ready to ship (the same policy as the SDK's readyToShip; tests/checkout-sdk.test.ts keeps them equal)
+
+export type Stage = 'pending' | 'sequencer' | 'ethereum' | 'finalized';
+export type ShipPolicy = { waitForEthereumAbove: string; waitForFinalAbove?: string };
+export const DEFAULT_SHIP_POLICY: ShipPolicy = { waitForEthereumAbove: '100' };
+export type ReadyStage = 'sequencer' | 'ethereum' | 'finalized';
+export type ShipDecision = { ready: boolean; waitFor: ReadyStage; reason: string };
+
+const toUnits = (v: bigint | string): bigint => {
+  if (typeof v === 'bigint') return v;
+  if (!/^\d+(\.\d{1,6})?$/.test(v.trim())) throw new Error(`not a USDT amount: ${v}`);
+  const [w, f = ''] = v.trim().split('.');
+  return BigInt(w) * 1_000_000n + BigInt(f.padEnd(6, '0'));
+};
+const RANK: Record<Stage, number> = { pending: 0, sequencer: 1, ethereum: 2, finalized: 3 };
+
+/** The stage a payment of `amount` (base units, or a USDT decimal string) must reach before shipping. */
+export function requiredStage(amount: bigint | string, policy: Partial<ShipPolicy> = DEFAULT_SHIP_POLICY): ReadyStage {
+  const a = toUnits(amount);
+  const p = { ...DEFAULT_SHIP_POLICY, ...policy };
+  if (p.waitForFinalAbove !== undefined && a >= toUnits(p.waitForFinalAbove)) return 'finalized';
+  return a >= toUnits(p.waitForEthereumAbove) ? 'ethereum' : 'sequencer';
+}
+
+/** Is a payment of `amount` at `stage` ready to ship under `policy`? With what to wait for, in words. */
+export function readyToShip(amount: bigint | string, stage: Stage | null, policy: Partial<ShipPolicy> = DEFAULT_SHIP_POLICY): ShipDecision {
+  const p = { ...DEFAULT_SHIP_POLICY, ...policy };
+  const waitFor = requiredStage(amount, p);
+  const ready = !!stage && RANK[stage] >= RANK[waitFor];
+  const above = waitFor === 'finalized' ? p.waitForFinalAbove! : p.waitForEthereumAbove;
+  const reason = ready
+    ? waitFor === 'sequencer' ? `Ready to ship: under ${p.waitForEthereumAbove} USDT, confirmation on Whitechain is enough`
+      : waitFor === 'ethereum' ? `Ready to ship: posted to Ethereum (${above} USDT and above wait for this)`
+      : `Ready to ship: final (${above} USDT and above wait for this)`
+    : !stage || stage === 'pending' ? 'Waiting for the payment to be confirmed on Whitechain'
+      : waitFor === 'ethereum' ? `Payment received; waiting for Whitechain to post it to Ethereum (big payments only: ${above} USDT and above)`
+      : `Payment received; waiting for it to be final (${above} USDT and above)`;
+  return { ready, waitFor, reason };
+}
+
+/** The finality stage name of a block given the safe/finalized heads. */
+export const stageOf = (f: Finality): Stage => (['pending', 'sequencer', 'ethereum', 'finalized'] as const)[finalityStage(f)];
+
 export const blockTime = (block: number) =>
   rpc<{ timestamp: Hex } | null>('eth_getBlockByNumber', [toHex(block), false]).then((b) => (b ? Number(BigInt(b.timestamp)) * 1000 : null));
 
 // ---- merchant views
 
 export type OrderRow = {
-  id: Hex; method: PayMethod; merchant: Address; payer: Address; amount: bigint; ref: Hex; paidAt: number | null; tx: Hex;
-  refunded: bigint; refunds: { amount: bigint; tx: Hex; at: number | null }[]; returned: bigint;
+  id: Hex; method: PayMethod; merchant: Address; payer: Address; amount: bigint; ref: Hex; paidAt: number | null; tx: Hex; block: number;
+  refunded: bigint; refunds: { amount: bigint; tx: Hex; at: number | null; to: Address }[]; returned: bigint;
 };
 export type SubRow = { id: Hex; merchant: Address; payer: Address; amount: bigint; period: number; cycles: number; charged: number; cancelled: boolean; started: number | null; charges: { cycle: number; amount: bigint; tx: Hex; at: number | null }[] };
 
@@ -288,8 +331,8 @@ export function merchantView(events: CheckoutEvent[], merchants: Address[]): { o
   const orders = new Map<string, OrderRow>();
   const subs = new Map<string, SubRow>();
   for (const e of [...events].sort(byChain)) {
-    if (e.kind === 'paid' && mine(e.merchant)) orders.set(e.id, { id: e.id, method: e.method, merchant: e.merchant, payer: e.payer, amount: e.amount, ref: e.ref, paidAt: e.at ?? null, tx: e.tx, refunded: 0n, refunds: [], returned: 0n });
-    if (e.kind === 'refunded') { const o = orders.get(e.id); if (o) { o.refunds.push({ amount: e.amount, tx: e.tx, at: e.at ?? null }); o.refunded = e.totalRefunded; } }
+    if (e.kind === 'paid' && mine(e.merchant)) orders.set(e.id, { id: e.id, method: e.method, merchant: e.merchant, payer: e.payer, amount: e.amount, ref: e.ref, paidAt: e.at ?? null, tx: e.tx, block: e.block, refunded: 0n, refunds: [], returned: 0n });
+    if (e.kind === 'refunded') { const o = orders.get(e.id); if (o) { o.refunds.push({ amount: e.amount, tx: e.tx, at: e.at ?? null, to: e.payer }); o.refunded = e.totalRefunded; } }
     if (e.kind === 'returned') { const o = orders.get(e.id); if (o) o.returned += e.amount; }
     if (e.kind === 'subscribed' && mine(e.merchant)) subs.set(e.id, { id: e.id, merchant: e.merchant, payer: e.payer, amount: e.amount, period: e.period, cycles: e.cycles, charged: 0, cancelled: false, started: e.at ?? null, charges: [] });
     if (e.kind === 'charged') { const s = subs.get(e.id); if (s) { s.charged = Math.max(s.charged, e.cycle); s.charges.push({ cycle: e.cycle, amount: e.amount, tx: e.tx, at: e.at ?? null }); } }
@@ -310,4 +353,75 @@ export function checkoutTotals(orders: OrderRow[]) {
   const paid = orders.reduce((s, o) => s + o.amount, 0n);
   const refunded = orders.reduce((s, o) => s + o.refunded, 0n);
   return { orders: orders.length, paid, refunded, net: paid - refunded };
+}
+
+// ---- which merchants a page shows (shared by Checkout and Reports so their numbers match)
+
+/** Live demo merchants with real orders on Whitechain Sepolia, shown by default so pages never open empty. */
+export const DEMO_MERCHANTS: { name: string; account: Address }[] = [
+  { name: 'Bluejay demo shop', account: '0xc1dce946D192e344251972470237F1471C93876c' },
+  { name: 'Sandbox merchant', account: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93' },
+];
+/** The demo x402 resource server's payTo. */
+export const DEMO_PAYTO: Address = '0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6';
+export const demoName = (a: string) =>
+  DEMO_MERCHANTS.find((d) => d.account.toLowerCase() === a.toLowerCase())?.name ?? (a.toLowerCase() === DEMO_PAYTO.toLowerCase() ? 'Demo AI resource' : null);
+
+const WATCH_KEY = 'tazor.checkout.watch.v1';
+const DEMO_KEY = 'tazor.checkout.demo.v1';
+const store = () => (typeof localStorage === 'undefined' ? null : localStorage);
+export function loadWatch(): Address[] {
+  try { const v = JSON.parse(store()?.getItem(WATCH_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((a): a is Address => typeof a === 'string' && a.startsWith('0x')) : []; } catch { return []; }
+}
+export function saveWatch(list: Address[]) { try { store()?.setItem(WATCH_KEY, JSON.stringify(list)); } catch { /* storage full */ } }
+export function demoOn(): boolean { try { return store()?.getItem(DEMO_KEY) !== 'off'; } catch { return true; } }
+export function setDemoOn(on: boolean) { try { store()?.setItem(DEMO_KEY, on ? 'on' : 'off'); } catch { /* storage full */ } }
+
+/** The merchant addresses to show: yours (and a linked one), watched ones, and the demo merchants when on. Deduplicated. */
+export function checkoutMerchants(o: { own: Address[]; watch: Address[]; demo: boolean }): Address[] {
+  const all = [...o.own, ...o.watch, ...(o.demo ? DEMO_MERCHANTS.map((d) => d.account) : [])];
+  return [...new Map(all.map((a) => [a.toLowerCase(), a])).values()];
+}
+
+// ---- the accountant's ledger: one row per payment and per refund
+
+export type LedgerRow = {
+  /** ms */
+  at: number | null;
+  type: 'Payment' | 'Refund';
+  /** who paid, or who the refund went to */
+  customer: Address;
+  merchant: Address;
+  order: Hex;
+  method: PayMethod;
+  gross: bigint;
+  refund: bigint;
+  net: bigint;
+  tx: Hex;
+};
+
+/** Payments and refunds for these orders, oldest first. Excess sent back on exchange payments was never part of the sale, so it is not a row. */
+export function checkoutLedger(orders: OrderRow[]): LedgerRow[] {
+  const rows: LedgerRow[] = [];
+  for (const o of orders) {
+    rows.push({ at: o.paidAt, type: 'Payment', customer: o.payer, merchant: o.merchant, order: o.id, method: o.method, gross: o.amount, refund: 0n, net: o.amount, tx: o.tx });
+    for (const r of o.refunds) rows.push({ at: r.at, type: 'Refund', customer: r.to, merchant: o.merchant, order: o.id, method: o.method, gross: 0n, refund: r.amount, net: -r.amount, tx: r.tx });
+  }
+  return rows.sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+}
+
+export const ledgerTotals = (rows: LedgerRow[]) => rows.reduce(
+  (t, r) => ({ gross: t.gross + r.gross, refund: t.refund + r.refund, net: t.net + r.net }), { gross: 0n, refund: 0n, net: 0n });
+
+const amt = (v: bigint) => { const neg = v < 0n; const a = neg ? -v : v; const w = a / 1_000_000n; const f = (a % 1_000_000n).toString().padStart(6, '0').replace(/0{1,4}$/, ''); return `${neg ? '-' : ''}${w}.${f.length < 2 ? f.padEnd(2, '0') : f}`; };
+const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
+/** CSV for accounting tools: one row per payment and refund, amounts in USDT, transaction links on the explorer. */
+export function toCheckoutCsv(rows: LedgerRow[], explorer = config.explorer): string {
+  const head = ['Date (UTC)', 'Type', 'Customer', 'Merchant', 'Order', 'Paid with', 'Gross USDT', 'Refund USDT', 'Net USDT', 'Transaction'];
+  const lines = rows.map((r) => [
+    r.at ? new Date(r.at).toISOString().replace('T', ' ').slice(0, 19) : '', r.type, r.customer, r.merchant, r.order, methodLabel(r.method),
+    amt(r.gross), amt(r.refund), amt(r.net), `${explorer}/tx/${r.tx}`,
+  ].map((v) => cell(String(v))).join(','));
+  return [head.join(','), ...lines].join('\n') + '\n';
 }

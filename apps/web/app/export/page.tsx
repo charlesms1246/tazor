@@ -10,6 +10,8 @@ import { configV2 } from '@/lib/config-v2.ts';
 import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 import { counterpartyOf, directionOf, toStatementCsv } from '@/lib/statement.ts';
 import { Addr, Card, Empty, Field, Notice, PageHeader, short } from '../_ui/index.tsx';
+import { CheckoutLedger } from '../_checkout/ledger.tsx';
+import '../_invoice/touch.css';
 
 function download(name: string, type: string, body: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
@@ -122,8 +124,9 @@ export default function ExportPage() {
   const stamp = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="page">
-      <PageHeader title="Reports" subtitle="Accounting files built on this device from your payments. Nothing is uploaded." />
+    <div className="page tz-touch">
+      <PageHeader title="Reports" subtitle="Accounting files for your sales and payments: Checkout sales read from Whitechain, invoices from this device. Nothing is uploaded." />
+      <CheckoutLedger />
       {payments.length === 0 ? (
         <div data-tour="reports"><Card>
           <div data-testid="empty"><Empty>No paid invoices recorded on this device yet. Pay an invoice and it appears here, ready to export.</Empty></div>

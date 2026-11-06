@@ -41,3 +41,20 @@
   .co-orders td:nth-child(6) { justify-self: end; }
 }
 .co-orders tr[data-focus="true"] { background: var(--pill-info-bg); }
+.ck-table tr[data-ck-focus="true"] { background: var(--pill-info-bg); }
+.ck-table tfoot td { border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) {
+  .ck-table tr { column-gap: 16px; }
+  .ck-table td:nth-child(1), .ck-table td:nth-child(2) { grid-column: 1 / -1; }
+  .ck-table td.num { text-align: left; }
+  .ck-table tfoot td:empty { display: none; }
+  .ck-table tfoot td:first-child { grid-column: 1 / -1; }
+}
+.co-orders-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px var(--card-pad) 0; }
+.co-ship { color: var(--positive); }
+.co-ship-wait { color: var(--pill-warning-ink, #9a5b00); }
+@media (max-width: 900px) {
+  .ck-table td[data-label]::before { content: attr(data-label) " "; color: var(--muted); font-weight: 400; }
+  .ck-table tbody td[data-label="Gross"] .faint, .ck-table tbody td[data-label="Refund"] .faint { display: none; }
+  .ck-table tbody td[data-label]:has(> .faint:only-child) { display: none; }
+}
