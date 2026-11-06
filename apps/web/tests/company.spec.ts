@@ -179,14 +179,16 @@ test('drawer Sync now syncs a person on demand', async ({ page }) => {
   expect(bodies.some((b) => String(b.account).toLowerCase() === CFO)).toBe(true);
 });
 
-test('ENS directory: people from registry logs, fallback labels marked, subnames with contractor expiry and agent namespace', async ({ page }) => {
+test('ENS directory: people and labels from ENS, role bits from tazor.roles, subnames with contractor expiry and agent namespace', async ({ page }) => {
   await mock(page);
   await page.goto('/company/');
   await expect(page.getByTestId('person-row')).toHaveCount(4);
   const priya = page.locator(`[data-testid="person-row"][data-address="${PRIYA}"]`);
   await expect(priya).toContainText('Priya (Finance)');
-  await expect(priya.getByTestId('person-label-fallback')).toHaveText('demo label · no ENS name record yet');
-  await expect(page.getByTestId('company-source')).toContainText('demo fallback for name, role, account');
+  await expect(page.getByTestId('person-label-fallback')).toHaveCount(0);
+  await expect(page.getByTestId('company-source')).toContainText('ENS records');
+  await expect(page.getByTestId('company-role-bits')).toContainText('APPROVER 64 · TAZOR_ADMIN 68 · AGENT 72');
+  await expect(page.getByTestId('company-role-bits')).toContainText('matches the contracts');
   const rows = page.getByTestId('subname-row');
   await expect(rows).toHaveCount(2);
   const meera = page.locator('[data-testid="subname-row"][data-label="contractor-meera"]');
@@ -196,4 +198,18 @@ test('ENS directory: people from registry logs, fallback labels marked, subnames
   const agent = page.locator('[data-testid="subname-row"][data-label="ap-agent"]');
   await expect(agent).toContainText('Agent namespace');
   await expect(agent.getByTestId('agent-limits')).toBeVisible();
+});
+
+test('no hard-coded companies: the static HTML names none, and ENS unreachable shows "Couldn\'t read ENS" with Retry', async ({ page, request }) => {
+  const html = await (await request.get('/company/')).text();
+  expect(html).not.toContain('Acme Industries');
+  expect(html).not.toContain('Bluejay Logistics');
+
+  // start without the cached directory and with ENS (Blockscout logs) down
+  await page.addInitScript(() => localStorage.removeItem('tazor.ens-directory.v2'));
+  await page.route('https://eth-sepolia.blockscout.com/**', (r) => r.fulfill({ status: 503, body: '{}' }));
+  await page.goto('/company/');
+  await expect(page.getByTestId('ens-error')).toContainText("Couldn't read ENS");
+  await expect(page.getByText('Acme Industries')).toHaveCount(0);
+  await expect(page.getByTestId('ens-retry')).toBeVisible();
 });

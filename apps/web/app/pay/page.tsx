@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { isCompanyAccount, useCompanies } from '@/lib/company.ts';
 import { formatEther, formatUnits, type Hex } from 'viem';
 import { invoiceHash, type Invoice } from '@/lib/invoice.ts';
-import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
+import { decodeInvoiceLinkMeta } from '@/lib/invoice-link.ts';
+import type { GstMeta } from '@/lib/gst.ts';
 import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/invoice-auth.ts';
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
@@ -41,8 +42,10 @@ import { elapsed } from '@/lib/events.ts';
 import { partyName } from '@/lib/story.ts';
 import { usdtNumber } from '@/lib/money.ts';
 import { AddrChip } from '../_human/chip.tsx';
+import { signedPaymentFrom } from '@/lib/signed-payment.ts';
+import { Inr } from '../_invoice/inr.tsx';
 
-type Loaded = { invoice: Invoice; auth: InvoiceAuth };
+type Loaded = { invoice: Invoice; auth: InvoiceAuth; gst?: GstMeta | null };
 type L1 = { via?: 'blockscout' | 'wallet'; data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
 type Guard = { status: 'checking' } | { status: 'ok'; digest: Hex } | { status: 'refused'; reason: string };
 
@@ -83,10 +86,10 @@ export default function PayPage() {
 
   useEffect(() => {
     const load = () => (location.hash.length <= 1 ? Promise.resolve(setState('none')) :
-      decodeInvoiceLink(location.href)
-        .then((invoice) => {
+      decodeInvoiceLinkMeta(location.href)
+        .then(({ invoice, gst }) => {
           const { nonce, expiry } = defaultAuthParams(invoice);
-          setState({ invoice, auth: buildInvoiceAuth(invoice, nonce, expiry) });
+          setState({ invoice, auth: buildInvoiceAuth(invoice, nonce, expiry), gst });
         })
         .catch(() => setState('invalid')));
     load();
@@ -359,6 +362,7 @@ export default function PayPage() {
           <span className="pay-success-check" aria-hidden="true">✓</span>
           <div className="pay-success-body">
             <h2 data-testid="pay-success-amount">Paid {amountText} USDT to {i.supplierName}</h2>
+            <p className="small muted" style={{ margin: '0 0 4px' }}><Inr v={i.amount} /> (indicative)</p>
             <p className="muted" data-testid="pay-success-time">
               {l1?.l2Tx && l1.seconds !== undefined ? `Delivered via Ethereum in ${l1.seconds.toFixed(0)} s` : settledIn !== null ? `Settled on Whitechain in ${settledIn.toFixed(1)} s` : 'Settled on Whitechain'}
               {' · '}<a href={`${config.explorer}/tx/${paidTx}`} target="_blank" rel="noreferrer" data-testid="pay-success-tx">View transaction</a>
@@ -374,7 +378,7 @@ export default function PayPage() {
 
       <div className="pay-split">
         <div className="stack">
-          <InvoicePaper invoice={paperFromInvoice(i)} status={paidTx ? 'paid' : 'sent'} link={location.href} txHash={paidTx} />
+          <InvoicePaper invoice={paperFromInvoice(i, undefined, state.gst)} status={paidTx ? 'paid' : 'sent'} link={location.href} txHash={paidTx} />
           <p className="small muted">Decrypted from the link on this device; nothing was sent to a server.</p>
         </div>
 
@@ -395,7 +399,7 @@ export default function PayPage() {
                     </span>
                   </span>
                 </dd>
-                <dt>Amount</dt><dd className="num" data-testid="amount">{amt(i.amount)}</dd>
+                <dt>Amount</dt><dd className="num"><span data-testid="amount">{amt(i.amount)}</span><Inr v={i.amount} testId="amount-inr" /></dd>
                 <dt>Due</dt><dd className="num">{day(i.dueDate)}</dd>
               </dl>
               {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
@@ -555,6 +559,12 @@ export default function PayPage() {
                   <div className="row">
                     <button data-testid="send-l1" className="btn btn-sm" onClick={onSendL1} disabled={busy || !!l1.hash}>Send with this site&apos;s wallet connection</button>
                     <button data-testid="copy-l1" className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>
+                    {gate && (v2 ? configV2.paymentModule : config.paymentModule) && approvals?.length && label.trim() && (
+                      <button data-testid="copy-signed" className="btn" title="Paste it into the standalone page (/fallback.html) or scripts/forward.ts: works without Tazor's servers"
+                        onClick={() => copy(signedPaymentFrom({ gate, paymentModule: (v2 ? configV2.paymentModule : config.paymentModule)!, whitechainChainId: config.chainId, label: label.trim(), auth, approvals: inner, invoiceId: i.id, supplier: i.supplierName }), 'Signed payment')}>
+                        Copy signed payment
+                      </button>
+                    )}
                     <button data-testid="watch-l1" className="btn" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
                   </div>
                   <p className="small muted">The raw calldata is under For developers below.</p>

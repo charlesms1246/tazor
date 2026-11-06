@@ -6,7 +6,7 @@ import { ethCall } from '@/lib/rpc.ts';
 import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { loadMandates, loadPasskey, loadPayments } from '@/lib/storage.ts';
-import { loadInvoices, invoiceStatus, type StoredInvoice } from '@/lib/invoices-store.ts';
+import { loadInvoices, type StoredInvoice } from '@/lib/invoices-store.ts';
 import { usdt2dp, type PaymentRecord } from '@/lib/export.ts';
 import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 import { dailyFlows, niceMax, sumFlows, type DayFlow } from '@/lib/dashboard.ts';
@@ -14,14 +14,16 @@ import { TIMINGS } from '@/lib/timings.ts';
 import { Card, CopyButton, Notice, PageHeader, short } from './_ui/index.tsx';
 import { Timeline } from './_ui/timeline.tsx';
 import { startTour } from './_tour/tour.tsx';
-import { isCompanyAccount, useCompany } from '@/lib/company.ts';
+import { useCompany, useDirectoryStatus } from '@/lib/company.ts';
 import { DemoControls } from './_demo/demo-banner.tsx';
 import { DEMO_CHANGED } from '@/lib/demo-seed.ts';
-import { pendingInbox, loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
+import { loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
 import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
-import { useLatestEvents } from '@/lib/chain-history.ts';
+import { isChainEvent, useHistory, useLatestEvents } from '@/lib/chain-history.ts';
+import { approvalRows, chainPaidMap, companyLedger, summarize } from '@/lib/ledger.ts';
 import { checkHealth, type Health } from '@/lib/health.ts';
 import { loadPeople, type Person } from '@/lib/people.ts';
+import { INR_RATE_NOTE, inrText } from '@/lib/money.ts';
 
 const PAY_TIME = TIMINGS.find((t) => t.action.startsWith('Pay an approved'))?.tazor ?? '';
 
@@ -71,11 +73,13 @@ function FlowChart({ rows }: { rows: DayFlow[] }) {
 
 export default function Home() {
   const company = useCompany();
+  const dir = useDirectoryStatus();
   const ACCOUNT = company.account;
   const COMPANY = company.ens;
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const latest = useLatestEvents(ACCOUNT, 8);
+  const history = useHistory(ACCOUNT);
   const [health, setHealth] = useState<Health | null>(null);
   const [people, setPeople] = useState<Person[] | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -102,11 +106,12 @@ export default function Home() {
 
   useEffect(() => {
     setBalance(null); setActivity(null);
+    if (company.status && company.status !== 'ready') return;
     refresh();
     loadActivity();
     setPeople(null);
     loadPeople(ACCOUNT).then(setPeople).catch(() => setPeople([]));
-  }, [ACCOUNT]);
+  }, [ACCOUNT, company.status]);
 
   useEffect(() => {
     checkHealth().then(setHealth);
@@ -129,14 +134,17 @@ export default function Home() {
   const totals = flows ? sumFlows(flows) : null;
 
   const now = Date.now() / 1000;
-  const mine = (a: string) => isCompanyAccount(company, a);
-  const open = invoices.filter((s) => (mine(s.invoice.supplierAccount) || mine(s.invoice.payee)) && invoiceStatus(s.invoice, payments) !== 'paid');
-  const overdue = open.filter((s) => s.invoice.dueDate < now);
-  const awaiting = open.filter((s) => s.invoice.dueDate >= now);
-  const openTotal = open.reduce((s, i) => s + i.invoice.amount, 0n);
+  // the same numbers as /invoices and /approvals (lib/ledger.ts): device invoices + chain payments, one row per invoice
+  const ledger = companyLedger({ company, invoices, payments, inbox, chainPaid: chainPaidMap(history.events), now });
+  const receivables = summarize(ledger.sent);
+  const open = ledger.sent.filter((r) => r.status !== 'paid');
+  const overdue = ledger.sent.filter((r) => r.status === 'overdue');
+  const openTotal = receivables.openTotal;
 
-  const pending = pendingInbox(inbox);
-  const pendingTotal = pending.reduce((s, i) => s + (i.amount ? BigInt(i.amount) : 0n), 0n);
+  const pending = approvalRows(inbox, history.events, company).rows.filter((r) => r.status === 'needs-approval');
+  const pendingTotal = pending.reduce((s, i) => { try { return s + (i.amount ? BigInt(i.amount) : 0n); } catch { return s; } }, 0n);
+  // a company that already moved money on chain is set up; the checklist is for new companies only
+  const activeOnChain = (activity?.length ?? 0) > 0 || history.events.some(isChainEvent);
   const approvers = people?.filter((p) => p.roles.some((r) => /approver/i.test(r)) && p.whitechain !== 'revoked') ?? [];
   const syncing = people?.filter((p) => p.whitechain === 'syncing').length ?? 0;
   const revoked = people?.filter((p) => p.whitechain === 'revoked').length ?? 0;
@@ -155,6 +163,8 @@ export default function Home() {
       <PageHeader title="Home" subtitle={<>{COMPANY} · {company.role} · Whitechain Sepolia</>}
         actions={<button type="button" className="btn" data-testid="start-tour" onClick={() => startTour()}>Take the tour</button>} />
 
+      {company.status === 'loading' && <div className="notice" data-testid="home-loading">Reading your companies from ENS…</div>}
+      {company.status === 'error' && <div className="notice notice-negative" data-testid="home-ens-error">Couldn't read your companies from ENS. <button className="btn btn-sm" onClick={dir.retry}>Retry</button></div>}
       <div className="home-top">
         <section className="hero-card" aria-label="Balance" data-tour="balance">
           <div className="hero-label">Available balance</div>
@@ -166,6 +176,7 @@ export default function Home() {
             </span>
             <span className="hero-unit">USDT</span>
           </div>
+          {balance !== null && <div className="hero-inr" style={{ fontSize: 13, opacity: 0.75, marginTop: 2 }} title={INR_RATE_NOTE} data-testid="balance-inr">{inrText(balance)} · indicative</div>}
           <div className="hero-meta">
             <span className="mono">{short(ACCOUNT)}</span>
             <CopyButton value={ACCOUNT} label="Copy account address" />
@@ -200,7 +211,7 @@ export default function Home() {
         <a className="lane" href="/invoices/" data-testid="lane-receivables">
           <span className="lane-label">Receivables</span>
           <span className="lane-value num">{usdt2dp(openTotal)}<span className="kpi-unit">USDT</span></span>
-          <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''}`}</span>
+          <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''} · ${inrText(openTotal)}`}</span>
           {overdue.length > 0 && <span className="pill pill-negative lane-pill">Overdue</span>}
         </a>
         <a className="lane" href="/approvals/" data-testid="lane-payables">
@@ -254,7 +265,7 @@ export default function Home() {
         </Card>
 
         <div className="stack">
-          {ready && doneCount < steps.length && (
+          {ready && doneCount < steps.length && !activeOnChain && (
             <Card title="Get set up" subtitle={`${doneCount} of ${steps.length} done`} testId="setup">
               <div className="progress" aria-hidden="true"><span style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
               <ul className="checklist">

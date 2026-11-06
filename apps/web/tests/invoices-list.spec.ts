@@ -37,7 +37,9 @@ test('/invoices/: tabs count and total, search filters, and the drawer shows the
   await page.getByTestId('inv-tab-all').click();
   await page.getByTestId('inv-search').fill('2.5');
   await expect(page.getByTestId('inv-row')).toHaveCount(1);
-  await page.getByTestId('inv-search').fill('acme');
+  // as Acme these are bills, listed by supplier
+  await expect(page.getByTestId('inv-row').first()).toHaveAttribute('data-side', 'bills');
+  await page.getByTestId('inv-search').fill('bluejay');
   await expect(page.getByTestId('inv-row')).toHaveCount(2);
   await page.getByTestId('inv-search').fill('no such invoice');
   await expect(page.getByTestId('inv-filter-empty')).toBeVisible();
@@ -66,4 +68,25 @@ test('/invoices/: the selected company prefills the supplier, and Bill to offers
   await expect(page.getByTestId('inv-customer')).toHaveValue(ACME);
   await page.getByTestId('inv-billto').selectOption('');
   await expect(page.getByTestId('inv-customer')).toHaveValue('');
+});
+
+test('/invoices/: one invoice is "sent" for Bluejay and a "bill to pay" for Acme', async ({ page }) => {
+  await mockExplorer(page);
+  // init scripts run on every navigation: only seed the company once, so the switch to Acme below survives the reload
+  await page.addInitScript(() => { if (!localStorage.getItem('tazor.company.v1')) localStorage.setItem('tazor.company.v1', 'bluejay'); });
+  await page.goto('/invoices/');
+  await create(page, 'Freight', '1', '2099-01-31');
+  await expect(page.getByTestId('inv-side-sent')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('inv-row')).toHaveAttribute('data-side', 'sent');
+  await expect(page.getByTestId('inv-status')).toHaveText('Sent');
+
+  await page.evaluate(() => { localStorage.setItem('tazor.company.v1', 'acme'); });
+  await page.reload();
+  await expect(page.getByTestId('inv-side-bills')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('inv-row')).toHaveAttribute('data-side', 'bills');
+  await expect(page.getByTestId('inv-status')).toHaveText('To pay');
+  await expect(page.getByTestId('inv-pay')).toHaveAttribute('href', /\/pay\/#v1\./);
+  await page.getByTestId('inv-side-sent').click();
+  await expect(page.getByTestId('inv-empty')).toContainText('Acme Industries is the buyer');
+  await expect(page.getByTestId('inv-switch-supplier')).toHaveText('Switch to Bluejay Logistics to send an invoice');
 });

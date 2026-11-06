@@ -6,6 +6,7 @@ import { COMPANIES, setCompany, useCompany } from '@/lib/company.ts';
 import { CommandPalette, openPalette } from '../_cmdk/palette.tsx';
 import { Tour } from '../_tour/tour.tsx';
 import { AutopilotPanel } from '../_autopilot/panel.tsx';
+import { RelayerOffBanner } from '../security/relayer-off.tsx';
 
 const ICONS: Record<string, ReactNode> = {
   home: <path d="M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H9.5v-4h-3v4H3a.5.5 0 0 1-.5-.5z" />,
@@ -121,7 +122,7 @@ function Switcher() {
       <button type="button" className="switcher" data-testid="company-switcher" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className="switcher-avatar">{company.name.slice(0, 1)}</span>
         <span className="switcher-text">
-          <span className="switcher-name">{company.ens}</span>
+          <span className="switcher-name">{company.status === 'loading' ? <span className="skeleton" style={{ width: 120 }} /> : company.status === 'error' ? 'ENS unavailable' : company.ens}</span>
           <span className="switcher-sub">{company.role} · Whitechain Sepolia</span>
         </span>
         <svg className="switcher-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6.5 3-3 3 3M5 9.5l3 3 3-3" /></svg>
@@ -161,6 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <span>Whitechain Sepolia</span>
         <span className="tb-long">· WB Soul verification is simulated · test USDT only</span>
       </div>
+      <RelayerOffBanner />
       <div className="mobile-bar">
         <a href="/" className="brand" aria-label="Tazor home"><Mark size={28} /><Wordmark /></a>
         <span className="row" style={{ gap: 4 }}>

@@ -18,7 +18,6 @@ const ROWS: Row[] = [
   ['EntryPoint v0.8', config.entryPoint, 'wc'],
   ['WB Soul mirror (simulated)', config.wbSoulMirror, 'wc'],
   ['USDT (testnet)', configV2.usdt, 'wc'],
-  ['Demo company account', configV2.demoAccount, 'wc'],
   ['EnsGate (Ethereum Sepolia)', config.sepolia.ensGate, 'sepolia'],
   ['EnsGate v2 (Ethereum Sepolia)', configV2.ensGateV2, 'sepolia'],
 ];

@@ -12,13 +12,15 @@ const mockRpc = async (page: Page) => {
 
 const usdt = async (page: Page, testId: string) => Number((await page.getByTestId('inv-preview').getByTestId(testId).textContent())!.replace(/,/g, ''));
 
-test('/invoices/: "Fill with sample data" as Acme switches the supplier to Bluejay, and the link opens /pay/ with the guided steps', async ({ page }) => {
+test('/invoices/: "Fill with sample data" as Acme switches the company to Bluejay, and the link opens /pay/ with the guided steps', async ({ page }) => {
   await mockExplorer(page);
   await mockRpc(page);
   await page.goto('/invoices/');
   await page.getByTestId('inv-fill-sample').click();
 
-  await expect(page.getByTestId('inv-sample-hint')).toContainText('the supplier was switched');
+  // the selected company never bills itself: as Acme, the fill switches to Bluejay with a visible notice
+  await expect(page.getByTestId('inv-sample-hint')).toContainText('Switched to Bluejay Logistics, the supplier');
+  await expect(page.getByTestId('inv-side-sent')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('inv-supplier-name')).toHaveValue('Bluejay Logistics');
   await expect(page.getByTestId('inv-payee')).toHaveValue(BLUEJAY);
   await expect(page.getByTestId('inv-supplier-account')).toHaveValue(BLUEJAY);
@@ -34,6 +36,15 @@ test('/invoices/: "Fill with sample data" as Acme switches the supplier to Bluej
   expect(subtotal).toBeGreaterThanOrEqual(0.5);
   expect(subtotal).toBeLessThanOrEqual(1.5);
   expect(await usdt(page, 'paper-tax')).toBeCloseTo(subtotal * 0.18, 5);
+  // GST (display-only): both parties in Maharashtra → CGST 9% + SGST 9%, SAC per line, place of supply; ₹ is indicative
+  const preview = page.getByTestId('inv-preview');
+  await expect(preview.getByTestId('paper-gstin-supplier')).toHaveText('GSTIN 27AABCB1234C1Z5');
+  await expect(preview.getByTestId('paper-pos')).toHaveText('27 · Maharashtra');
+  await expect(preview.getByTestId('paper-hsn-0')).toHaveText(/^\d{6}$/);
+  await expect(preview.getByTestId('paper-cgst')).toContainText('of which CGST 9%');
+  await expect(preview.getByTestId('paper-sgst')).toContainText('of which SGST 9%');
+  await expect(preview.getByTestId('paper-inr')).toContainText(/^≈ ₹[\d,]+\.\d{2} · indicative at ₹88\.00 per USDT$/);
+  await expect(page.getByTestId('inv-total-inr')).toHaveText(/^≈ ₹[\d,]+\.\d{2}$/);
 
   await page.getByTestId('inv-create').click();
   await expect(page.getByTestId('toast').filter({ hasText: /Payment link for INV-\d{8}-[0-9A-F]{4} created/ })).toBeVisible();
@@ -41,6 +52,10 @@ test('/invoices/: "Fill with sample data" as Acme switches the supplier to Bluej
   await page.goto(link.replace('http://localhost:4173', ''));
   await expect(page.locator('h1')).toContainText('Invoice INV-');
   await expect(page.getByTestId('pay-steps')).toBeVisible();
+  // the GST details came through the encrypted link (outside the signed invoice)
+  await expect(page.getByTestId('paper-cgst')).toBeVisible();
+  await expect(page.getByTestId('paper-gstin-supplier')).toHaveText('GSTIN 27AABCB1234C1Z5');
+  await expect(page.getByTestId('amount-inr')).toHaveText(/^≈ ₹/);
   await expect(page.getByTestId('pay-step-1')).toContainText('Check supplier');
   await expect(page.getByTestId('pay-step-2')).toContainText('Approve with passkey');
   await expect(page.getByTestId('pay-step-4')).toHaveAttribute('data-state', 'todo');

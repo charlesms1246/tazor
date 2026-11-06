@@ -196,6 +196,9 @@ test('sampleInvoice: Bluejay → Acme, 2–3 lines, 0.5–1.5 USDT before GST 18
     const r = buildInvoice(withTax(s.form, s.taxRate, s.taxLabel), 'INV-S');
     assert.ok('invoice' in r, 'error' in r ? r.error : '');
     assert.equal(r.invoice.lines.at(-1)!.description, 'GST 18%');
+    assert.equal(s.gst.hsn!.length, s.form.lines.length);
+    assert.ok(s.gst.hsn!.every((h) => /^\d{6}$/.test(h)));
+    assert.deepEqual([s.gst.supplierGstin, s.gst.buyerGstin, s.gst.placeOfSupply], ['27AABCB1234C1Z5', '27AACCA5678D1Z2', '27']);
   }
 });
 
@@ -213,4 +216,15 @@ test('runCandidates: unpaid invoices of the buyer with the most of them, capped'
   assert.deepEqual(runCandidates(list, paid as never), { buyer: list[1].invoice.buyerAccount, links: ['http://x/pay/#v1.B1', 'http://x/pay/#v1.B3', 'http://x/pay/#v1.B4'] });
   assert.deepEqual(runCandidates(list, [], 2)!.links, ['http://x/pay/#v1.B1', 'http://x/pay/#v1.B2']);
   assert.equal(runCandidates([], []), null);
+});
+
+test('stored invoices keep their display-only GST details (and old entries without them still load)', async () => {
+  const { saveInvoice, loadInvoices } = await import('../lib/invoices-store.ts');
+  const r = buildInvoice(form, 'INV-G');
+  assert.ok('invoice' in r);
+  saveInvoice({ invoice: r.invoice, link: 'http://x/pay/#v1.g', createdAt: 1, gst: { supplierGstin: '27aabcb1234c1z5', placeOfSupply: '27' } });
+  saveInvoice({ invoice: r.invoice, link: 'http://x/pay/#v1.h', createdAt: 2 });
+  const [plain, withGst] = loadInvoices();
+  assert.equal(plain.gst, null);
+  assert.deepEqual(withGst.gst, { supplierGstin: '27AABCB1234C1Z5', placeOfSupply: '27' });
 });

@@ -2,6 +2,7 @@ import { formatUnits, getAddress, isAddress, parseUnits, type Address } from 'vi
 import { WHITECHAIN_SEPOLIA_USDT } from './invoice-auth.ts';
 import { canonicalInvoiceJson, invoiceHash, parseInvoice, type Invoice, type InvoiceLine } from './invoice.ts';
 import type { PaymentRecord } from './export.ts';
+import { cleanGst, readGst, type GstMeta } from './gst.ts';
 
 export type LineForm = { description: string; quantity: string; unitPrice: string };
 export type InvoiceForm = {
@@ -114,14 +115,15 @@ export function splitTax(lines: InvoiceLine[]): { lines: InvoiceLine[]; tax: Tax
 // ---- invoices created on this device
 
 const KEY = 'tazor.invoices.v1';
-export type StoredInvoice = { invoice: Invoice; link: string; createdAt: number };
-type Raw = { invoice: string; link: string; createdAt: number };
+/** `gst` is display-only metadata (see lib/gst.ts); it is not part of the signed invoice. */
+export type StoredInvoice = { invoice: Invoice; link: string; createdAt: number; gst?: GstMeta | null };
+type Raw = { invoice: string; link: string; createdAt: number; gst?: unknown };
 
 export function loadInvoices(): StoredInvoice[] {
   try {
     const list = JSON.parse(globalThis.localStorage?.getItem(KEY) ?? '[]') as Raw[];
     return list.flatMap((r) => {
-      try { return [{ invoice: parseInvoice(JSON.parse(r.invoice)), link: r.link, createdAt: r.createdAt }]; } catch { return []; }
+      try { return [{ invoice: parseInvoice(JSON.parse(r.invoice)), link: r.link, createdAt: r.createdAt, gst: readGst(r.gst) }]; } catch { return []; }
     });
   } catch {
     return [];
@@ -131,7 +133,8 @@ export function loadInvoices(): StoredInvoice[] {
 export function saveInvoice(s: StoredInvoice): boolean {
   try {
     const list = (JSON.parse(globalThis.localStorage.getItem(KEY) ?? '[]') as Raw[]).filter((r) => r.link !== s.link);
-    list.unshift({ invoice: canonicalInvoiceJson(s.invoice), link: s.link, createdAt: s.createdAt });
+    const gst = cleanGst(s.gst);
+    list.unshift({ invoice: canonicalInvoiceJson(s.invoice), link: s.link, createdAt: s.createdAt, ...(gst ? { gst } : {}) });
     globalThis.localStorage.setItem(KEY, JSON.stringify(list));
     return true;
   } catch {
@@ -191,25 +194,29 @@ export function supplierAccountWarning(f: InvoiceForm, company: Party): string |
 
 // ---- "Fill with sample data": a realistic Bluejay → Acme invoice, small enough for the demo account to pay often
 
-const SAMPLE_LINES: [string, number][] = [
-  ['Road freight Mumbai → Pune, 20 ft container', 0.42],
-  ['Port handling, JNPT', 0.18],
-  ['Customs documentation', 0.12],
-  ['Cargo insurance (0.3 % of value)', 0.07],
-  ['Last-mile delivery, Pune MIDC', 0.21],
-  ['Warehouse storage, 3 days', 0.15],
+const SAMPLE_LINES: [string, number, string][] = [
+  ['Road freight Mumbai → Pune, 20 ft container', 0.42, '996511'],
+  ['Port handling, JNPT', 0.18, '996719'],
+  ['Customs documentation', 0.12, '998599'],
+  ['Cargo insurance (0.3 % of value)', 0.07, '997136'],
+  ['Last-mile delivery, Pune MIDC', 0.21, '996511'],
+  ['Warehouse storage, 3 days', 0.15, '996729'],
 ];
+/** Sample GSTINs (format-valid, fictitious): both in Maharashtra, so the sample shows CGST + SGST. */
+export const SAMPLE_GSTIN = { bluejay: '27AABCB1234C1Z5', acme: '27AACCA5678D1Z2' };
 
 /** A sample invoice from `supplier` to `buyer`: 2–3 freight lines totalling 0.5–1.5 USDT, GST 18 %, due in 14 days. */
 export function sampleInvoice(
   supplier: { name: string; account: string }, buyer: { account: string }, now = new Date(), rand: () => number = Math.random,
-): { form: InvoiceForm; taxRate: string; taxLabel: string } {
+): { form: InvoiceForm; taxRate: string; taxLabel: string; gst: GstMeta } {
   const pool = [...SAMPLE_LINES];
   const n = 2 + Math.floor(rand() * 2);
   const lines: LineForm[] = [];
+  const hsn: string[] = [];
   for (let i = 0; i < n; i++) {
-    const [description, price] = pool.splice(Math.floor(rand() * pool.length), 1)[0];
+    const [description, price, sac] = pool.splice(Math.floor(rand() * pool.length), 1)[0];
     lines.push({ description, quantity: i === 0 ? String(1 + Math.floor(rand() * 2)) : '1', unitPrice: price.toFixed(2) });
+    hsn.push(sac);
   }
   // keep the subtotal inside 0.5–1.5 USDT
   while (formTotal({ lines } as InvoiceForm) < 500_000n) lines[0] = { ...lines[0], quantity: String(Number(lines[0].quantity) + 1) };
@@ -219,6 +226,7 @@ export function sampleInvoice(
   return {
     form: { customer: buyer.account, payee: supplier.account, supplierName: supplier.name, supplierAccount: supplier.account, lines, dueDate: due, memo: po },
     taxRate: '18', taxLabel: 'GST',
+    gst: { supplierGstin: SAMPLE_GSTIN.bluejay, buyerGstin: SAMPLE_GSTIN.acme, placeOfSupply: '27', hsn },
   };
 }
 

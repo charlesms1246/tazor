@@ -6,7 +6,7 @@ import { TIMINGS } from '../../lib/timings.ts';
 
 const SHOP = 'https://bluejay-shop.vercel.app';
 /** A relayer address that never answers: the page sees exactly what it sees when our servers are down. */
-export const OFFLINE_RELAYER = 'https://relayer-offline.invalid';
+export { OFFLINE_RELAYER } from '../../lib/relayer-off.ts';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
 
 /** The Ethereum fallback recorded live with our servers off (lib/timings.ts), offered when a visitor has no Sepolia wallet. */
@@ -37,6 +37,7 @@ export const LABELS: Record<string, string> = {
   'm-digest': 'the contract check', 'm-approve': 'the "Approve with passkey" button', 'm-submit': 'the "Create mandate" button', 'm-tx': 'the mandate confirmation',
   'company-ens': 'the company ENS name', 'company-ens-links': 'the ENS links', 'registry-contract-link': 'the registry link', 'person-sync-state': 'the sync status',
   'relayer-url': 'the relayer address field', 'relayer-save': 'the "Save" button', 'relayer-clear': 'the "Clear" button', 'health-refresh': 'the "Refresh" button',
+  'relayer-simulate-off': 'the "Simulate relayer down" button', 'relayer-simulate-on': 'the "Turn back on" button', 'relayer-off-banner': 'the "Relayer off" banner',
   'prepare-l1': 'the "Prepare Ethereum transaction" button', 'send-l1': 'the "Send with your wallet" button', 'l1-guide': 'the Blockscout guide', 'l1-blockscout-open': 'the "Open on Blockscout" link', activity: 'the activity list', tally: 'the "Tally CSV" button',
   create: 'the "Create passkey" button', 'approver-account': 'your approver account',
 };
@@ -106,7 +107,7 @@ export const STORY: Step[] = [
     ],
   },
   {
-    id: 'invoice', title: 'Supplier creates an invoice', why: 'Bluejay invoices the buyer: the invoice travels encrypted inside a link.',
+    id: 'invoice', title: 'Supplier creates an invoice', why: 'The supplier invoices the buyer: the invoice travels encrypted inside a link.',
     actions: createInvoice('link', 'Payment link created; only someone holding it can read the invoice.'),
   },
   {
@@ -160,13 +161,13 @@ export const STORY: Step[] = [
       { do: 'waitFor', wait: { testid: 'm-tx' }, timeout: 120_000, say: 'Creating the mandate on Whitechain…' },
       { do: 'capture', testid: 'm-tx', attr: 'href', inner: 'a', as: 'mandateCreated', tx: 'whitechain', say: (_v, c) => `✓ Mandate approved: ${c.supplierName || 'the supplier'} may collect up to 0.30 USDT a period` },
       { do: 'receiptLog', key: 'mandateCreatedTx', chain: 'whitechain', topic0: MANDATE_CREATED, topic: 1, addresses: MANDATE_MODULES, as: 'mandateId', say: 'Read the new mandate’s id from its transaction.', optional: true },
-      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: mandateForCollect(c) }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
+      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: mandateForCollect(c) }) }, say: 'Simulated counterparty: the supplier collects under the mandate…', sim: true },
     ],
   },
   {
     id: 'credit', title: 'Credit note', why: 'The supplier refunds part of an invoice; it lands as money in.',
     actions: [
-      { do: 'api', call: { name: 'counterparty', args: () => ({ action: 'credit-note' }) }, say: 'Simulated counterparty: Bluejay sends a credit note…', sim: true },
+      { do: 'api', call: { name: 'counterparty', args: () => ({ action: 'credit-note' }) }, say: 'Simulated counterparty: the supplier sends a credit note…', sim: true },
       asBuyer,
       { do: 'goto', path: '/' },
       { do: 'highlight', testid: 'activity', say: 'Home shows the refund as money in.', ms: 2400 },
@@ -192,8 +193,8 @@ export const STORY: Step[] = [
     id: 'offline', title: 'Servers off', why: 'With our relayer unreachable, the same signed payment still goes through Ethereum.',
     actions: [
       { do: 'goto', path: '/security/' },
-      { do: 'fill', testid: 'relayer-url', value: OFFLINE_RELAYER },
-      { do: 'click', testid: 'relayer-save' },
+      { do: 'click', testid: 'relayer-simulate-off', optional: true, timeout: 3000 },
+      { do: 'waitFor', wait: { testid: 'relayer-off-banner' }, timeout: 5000, say: 'Switching the relayer off…' },
       { do: 'log', text: 'Simulated outage: this device now uses a relayer address that never answers.', kind: 'warn' },
       { do: 'click', testid: 'health-refresh' },
       { do: 'waitFor', wait: { textIn: ['health-relayer', 'Unreachable'] }, timeout: 20_000, say: 'System health: the relayer is unreachable.' },
@@ -218,7 +219,7 @@ export const STORY: Step[] = [
     id: 'restore', title: 'Restore the relayer', why: 'Back to normal: the default relayer for this build.',
     actions: [
       { do: 'goto', path: '/security/' },
-      { do: 'click', testid: 'relayer-clear' },
+      { do: 'click', testid: 'relayer-simulate-on', optional: true, timeout: 5000 },
       { do: 'click', testid: 'health-refresh' },
       { do: 'waitFor', wait: { textIn: ['health-relayer', 'Up'] }, timeout: 20_000, say: 'System health: the relayer is up again.' },
     ],

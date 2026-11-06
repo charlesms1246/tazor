@@ -21,6 +21,11 @@ import { INVOICE_STEPS, partyName, subjectOf } from '@/lib/story.ts';
 import '../_invoice/touch.css';
 import { toast, Toasts } from '../_invoice/toast.tsx';
 import { usdtNumber } from '@/lib/money.ts';
+import { cleanGst, gstProblem, STATES, type GstMeta } from '@/lib/gst.ts';
+import { chainPaidMap, companyLedger, type LedgerRow, type Side } from '@/lib/ledger.ts';
+import { INBOX_CHANGED, loadInbox, type InboxItem } from '@/lib/inbox.ts';
+import { isCompanyAccount, setCompany } from '@/lib/company.ts';
+import { Inr } from '../_invoice/inr.tsx';
 
 const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
@@ -32,6 +37,8 @@ const LIST_TABS: { id: ListTab; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'sent', label: 'Sent' }, { id: 'paid', label: 'Paid' }, { id: 'overdue', label: 'Overdue' },
 ];
 const STATUS_PILL = { paid: { tone: 'positive', text: 'Paid' }, sent: { tone: 'info', text: 'Sent' }, overdue: { tone: 'negative', text: 'Overdue' } } as const;
+const BILL_PILL = { ...STATUS_PILL, sent: { tone: 'info', text: 'To pay' } } as const;
+const SIDES: { id: Side; label: string }[] = [{ id: 'sent', label: 'Invoices sent' }, { id: 'bills', label: 'Bills to pay' }];
 
 export default function InvoicesPage() {
   const [form, setForm] = useState<InvoiceForm>({
@@ -48,27 +55,53 @@ export default function InvoicesPage() {
   const [logoError, setLogoError] = useState('');
   const [viewing, setViewing] = useState<StoredInvoice | null>(null);
   const [listTab, setListTab] = useState<ListTab>('all');
+  const [side, setSide] = useState<Side>('sent');
+  const [gst, setGst] = useState<GstMeta>({});
+  const setGstField = (patch: Partial<GstMeta>) => { setGst({ ...gst, ...patch }); setError(''); setDirty(true); };
+  const setHsn = (n: number, v: string) => { const h = [...(gst.hsn ?? [])]; h[n] = v; setGstField({ hsn: h }); };
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [query, setQuery] = useState('');
   const company = useCompany();
   const touched = useRef(new Set<keyof InvoiceForm>());
   const [sampleNote, setSampleNote] = useState('');
 
-  // the demo always goes Bluejay (supplier) → Acme (buyer): acting as Acme switches the supplier to Bluejay
+  // the sample goes supplier → buyer, by each company's ENS `tazor.role` (else this company and another)
   const onFillSample = () => {
-    const supplier = COMPANIES.find((c) => c.id === 'bluejay')!;
-    const buyer = COMPANIES.find((c) => c.id === 'acme')!;
+    const supplier = COMPANIES.find((c) => c.role === 'Supplier') ?? company;
+    const buyer = COMPANIES.find((c) => c.role === 'Buyer' && c.id !== supplier.id) ?? COMPANIES.find((c) => c.id !== supplier.id);
+    if (!buyer || supplier.status !== 'ready') { setSampleNote('Waiting for the companies from ENS…'); return; }
     const s = sampleInvoice(supplier, buyer);
     for (const k of Object.keys(s.form) as (keyof InvoiceForm)[]) touched.current.add(k);
     setForm(s.form);
     setTaxRate(s.taxRate);
     setTaxLabel(s.taxLabel);
+    setGst(s.gst);
     setError(''); setDirty(true);
-    setSampleNote(company.id === 'bluejay'
+    // never let the selected company bill itself: as the buyer, switch to the supplier (visibly)
+    if (company.id !== supplier.id) setCompany(supplier.id);
+    setSide('sent');
+    setSampleNote(company.id === supplier.id
       ? `Sample invoice from ${supplier.name} to ${buyer.name}. Create the payment link, then open it to pay as ${buyer.name}.`
-      : `You're acting as ${company.name}, so the sample bills ${buyer.name} from ${supplier.name} (the supplier was switched). Create the payment link, then open it to approve as ${buyer.name}.`);
+      : `Switched to ${supplier.name}, the supplier, to send this invoice to ${buyer.name}. Create the payment link, then switch back to ${buyer.name} (top left) and pay it under Bills to pay.`);
   };
   const drawerHistory = useSubjectHistory(viewing ? subjectOf(viewing.invoice) : null, viewing?.invoice.buyerAccount);
   const chain = useHistory(company.account);
+  // default side from the company's role once ENS has it (a placeholder company has no role yet); a tab the user picked
+  // for this company is kept until they switch company
+  const pickedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (company.status && company.status !== 'ready') return;
+    if (pickedFor.current === company.id) return;
+    pickedFor.current = null;
+    setSide(/supplier/i.test(company.role.trim()) ? 'sent' : 'bills');
+    setListTab('all');
+  }, [company.id, company.role, company.status]);
+  useEffect(() => {
+    const sync = () => setInbox(loadInbox());
+    sync();
+    addEventListener(INBOX_CHANGED, sync);
+    return () => removeEventListener(INBOX_CHANGED, sync);
+  }, []);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [preview, setPreview] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -127,46 +160,50 @@ export default function InvoicesPage() {
       quantity: /^[1-9]\d*$/.test(l.quantity.trim()) ? BigInt(l.quantity.trim()) : null,
       unitPrice: parseUsdt(l.unitPrice),
     })),
-    memo: form.memo, tax,
+    memo: form.memo, tax, gst: cleanGst(gst),
   };
   const shown = dirty ? null : created;
-  const paper = shown ? paperFromInvoice(shown.invoice, shown.createdAt) : draft;
-  // paid if this device recorded the payment, or the chain shows an InvoicePaid for this invoice hash
-  const chainPaid = new Map(chain.events.filter((e) => e.kind === 'paid' && e.tx).map((e) => [e.subject.toLowerCase(), e.tx!]));
-  const txOf = (s: StoredInvoice | null): string | null => {
-    if (!s) return null;
-    if (invoiceStatus(s.invoice, payments) === 'paid') {
-      return payments.find((p) => { try { return invoiceHash(p.invoice) === invoiceHash(s.invoice); } catch { return false; } })?.txHash ?? null;
-    }
-    return chainPaid.get(subjectOf(s.invoice)) ?? null;
-  };
-  const isPaid = (s: StoredInvoice) => invoiceStatus(s.invoice, payments) === 'paid' || chainPaid.has(subjectOf(s.invoice));
+  const paper = shown ? paperFromInvoice(shown.invoice, shown.createdAt, shown.gst) : draft;
+  // one source for statuses and totals (lib/ledger.ts): device invoices + payments + inbox + chain, per company
+  const ledger = companyLedger({ company, invoices: list, payments, inbox, chainPaid: chainPaidMap(chain.events) });
+  const byKey = new Map([...ledger.sent, ...ledger.bills].map((r) => [r.key, r]));
+  const rowOf = (s: StoredInvoice | null) => (s ? byKey.get(subjectOf(s.invoice)) ?? null : null);
+  const fallbackPaid = (s: StoredInvoice) => invoiceStatus(s.invoice, payments) === 'paid' || chainPaidMap(chain.events).has(subjectOf(s.invoice));
+  const isPaid = (s: StoredInvoice) => (rowOf(s)?.status ?? (fallbackPaid(s) ? 'paid' : 'sent')) === 'paid';
+  const txOf = (s: StoredInvoice | null): string | null => (s ? rowOf(s)?.paidTx ?? null : null);
   const shownStatus = shown ? (isPaid(shown) ? 'paid' : 'sent') : 'draft';
   const paidTx = txOf(shown);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const rowStatus = (s: StoredInvoice): 'paid' | 'sent' | 'overdue' =>
-    isPaid(s) ? 'paid' : s.invoice.dueDate < nowSec ? 'overdue' : 'sent';
-  const inTab = (s: StoredInvoice, t: ListTab) => t === 'all' || rowStatus(s) === t;
+    rowOf(s)?.status ?? (isPaid(s) ? 'paid' : s.invoice.dueDate < nowSec ? 'overdue' : 'sent');
+  const sideRows = ledger[side];
+  const inTab = (r: LedgerRow, t: ListTab) => t === 'all' || r.status === t;
   const q = query.trim().toLowerCase();
-  const matches = (s: StoredInvoice) => !q || [
-    s.invoice.id, s.invoice.buyerAccount, partyName(s.invoice.buyerAccount), formatUnits(s.invoice.amount, 6), usdtNumber(s.invoice.amount), s.invoice.memo,
+  const who = (r: LedgerRow) => r.counterpartyName ?? (r.counterparty ? partyName(r.counterparty) : '');
+  const matches = (r: LedgerRow) => !q || [
+    r.id, r.counterparty ?? '', who(r), formatUnits(r.amount, 6), usdtNumber(r.amount), r.stored?.invoice.memo ?? '',
   ].some((v) => v.toLowerCase().includes(q));
-  const rows = list.filter((s) => inTab(s, listTab) && matches(s));
+  const rows = sideRows.filter((r) => inTab(r, listTab) && matches(r));
   const tabStats = (t: ListTab) => {
-    const xs = list.filter((s) => inTab(s, t));
-    return { count: xs.length, total: xs.reduce((a, s) => a + s.invoice.amount, 0n) };
+    const xs = sideRows.filter((r) => inTab(r, t));
+    return { count: xs.length, total: xs.reduce((a, r) => a + r.amount, 0n) };
   };
   const openDrawer = (s: StoredInvoice) => setViewing(s);
+  const pill = (r: LedgerRow) => (r.side === 'bills' ? BILL_PILL : STATUS_PILL)[r.status];
+  const otherCompany = COMPANIES.find((c) => c.id !== company.id);
 
   const onCreate = async () => {
     setBusy(true); setError(''); setCreated(null);
     try {
       if (taxRateError) return setError('Tax % must be a number from 0 to 100 with up to 2 decimals.');
+      const gstErr = gstProblem(gst);
+      if (gstErr) return setError(gstErr);
+      const meta = cleanGst({ ...gst, hsn: gst.hsn?.slice(0, form.lines.length) });
       const r = buildInvoice(withTax(form, taxRate, taxLabel), newInvoiceId());
       if ('error' in r) return setError(r.error);
-      const link = await encodeInvoiceLink(r.invoice, location.origin);
-      const stored = { invoice: r.invoice, link, createdAt: Math.floor(Date.now() / 1000) };
+      const link = await encodeInvoiceLink(r.invoice, location.origin, meta);
+      const stored = { invoice: r.invoice, link, createdAt: Math.floor(Date.now() / 1000), gst: meta };
       if (!saveInvoice(stored)) setError('Created, but this browser would not save it to the list; copy the link now.');
       const subject = subjectOf(r.invoice);
       const to = partyName(r.invoice.buyerAccount);
@@ -174,6 +211,8 @@ export default function InvoicesPage() {
       recordEvent({ subject, kind: 'sent', at: Date.now(), title: `${r.invoice.id} sent to ${to}`, detail: 'payment link generated' });
       setCreated(stored);
       toast(`Payment link for ${r.invoice.id} created`);
+      if (isCompanyAccount(company, r.invoice.buyerAccount) && !isCompanyAccount(company, r.invoice.payee) && !isCompanyAccount(company, r.invoice.supplierAccount)) setSide('bills');
+      else setSide('sent');
       setViewing(null);
       setDirty(false);
       setList(loadInvoices());
@@ -239,9 +278,12 @@ export default function InvoicesPage() {
                         </span>
                       </Field>
                     </div>
+                    <Field label="HSN/SAC (optional)">
+                      <input data-testid={`inv-line-hsn-${n}`} className="input mono" inputMode="numeric" value={gst.hsn?.[n] ?? ''} onChange={(e) => setHsn(n, e.target.value.trim())} placeholder="e.g. 996511" />
+                    </Field>
                     <div className="spread">
                       {form.lines.length > 1
-                        ? <button type="button" data-testid={`inv-remove-line-${n}`} className="btn btn-sm btn-ghost" onClick={() => set({ lines: form.lines.filter((_, i) => i !== n) })}>Remove line</button>
+                        ? <button type="button" data-testid={`inv-remove-line-${n}`} className="btn btn-sm btn-ghost" onClick={() => { set({ lines: form.lines.filter((_, i) => i !== n) }); if (gst.hsn) setGst({ ...gst, hsn: gst.hsn.filter((_, i) => i !== n) }); }}>Remove line</button>
                         : <span />}
                       <span className="num" data-testid={`inv-line-total-${n}`}>{t === null ? <span className="faint">—</span> : amt(t)}</span>
                     </div>
@@ -250,7 +292,7 @@ export default function InvoicesPage() {
               })}
               <div className="spread">
                 <button type="button" data-testid="inv-add-line" className="btn btn-sm" onClick={() => set({ lines: [...form.lines, blankLine()] })}>Add line</button>
-                <span className="num" style={{ fontWeight: 500 }}>Total <span data-testid="inv-total">{amt(total)}</span></span>
+                <span className="num" style={{ fontWeight: 500 }}>Total <span data-testid="inv-total">{amt(total)}</span><Inr v={total} testId="inv-total-inr" /></span>
               </div>
             </div>
 
@@ -275,6 +317,27 @@ export default function InvoicesPage() {
               </Field>
             </div>
             {taxRateError && <Notice tone="negative" testId="inv-tax-error">Tax % must be a number from 0 to 100 with up to 2 decimals.</Notice>}
+
+            <details className="tech-details" data-testid="inv-gst" open={!!cleanGst(gst) || undefined}>
+              <summary>GST details (optional)</summary>
+              <div className="stack" style={{ gap: 12 }}>
+                <div className="fields-2">
+                  <Field label="Supplier GSTIN">
+                    <input data-testid="inv-gstin-supplier" className="input mono" value={gst.supplierGstin ?? ''} onChange={(e) => setGstField({ supplierGstin: e.target.value.toUpperCase() })} placeholder="27AABCB1234C1Z5" maxLength={15} />
+                  </Field>
+                  <Field label="Buyer GSTIN">
+                    <input data-testid="inv-gstin-buyer" className="input mono" value={gst.buyerGstin ?? ''} onChange={(e) => setGstField({ buyerGstin: e.target.value.toUpperCase() })} placeholder="27AACCA5678D1Z2" maxLength={15} />
+                  </Field>
+                </div>
+                <Field label="Place of supply" hint="Same state as the supplier: CGST + SGST; another state: IGST. Shown on the invoice; the tax total is unchanged.">
+                  <select data-testid="inv-pos" className="select" value={gst.placeOfSupply ?? ''} onChange={(e) => setGstField({ placeOfSupply: e.target.value || undefined })}>
+                    <option value="">Not set</option>
+                    {STATES.map(([code, name]) => <option key={code} value={code}>{code} · {name}</option>)}
+                  </select>
+                </Field>
+                <p className="small muted" style={{ margin: 0 }}>GST details travel encrypted with the link and print on the invoice. They are not part of what approvers sign.</p>
+              </div>
+            </details>
 
             <Field label="Logo" hint="PNG, JPG or SVG, up to 200 KB. Your logo shows on your copy and PDF; the customer's link shows your name.">
               <span className="row" style={{ gap: 8 }}>
@@ -317,10 +380,32 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <Card title="Invoices on this device" flush testId="inv-list">
-        {list.length === 0 ? (
-          <div style={{ padding: '0 24px 24px' }}>
-            <Empty><span data-testid="inv-empty">No invoices created on this device yet. Create one above to get a payment link.</span></Empty>
+      <Card title={company.name} subtitle="Invoices on this device and on Whitechain, from this company's side." flush testId="inv-list">
+        <div className="tabs side-tabs" role="tablist" aria-label="Perspective">
+          {SIDES.map((t) => (
+            <button key={t.id} role="tab" className="tab" aria-selected={side === t.id} data-testid={`inv-side-${t.id}`} onClick={() => { pickedFor.current = company.id; setSide(t.id); setListTab('all'); }}>
+              {t.label}<span className="tab-count">{ledger[t.id].length}</span>
+            </button>
+          ))}
+        </div>
+        {sideRows.length === 0 ? (
+          <div style={{ padding: '16px 24px 24px' }}>
+            {side === 'sent' ? (
+              <Empty>
+                <span data-testid="inv-empty">
+                  {/supplier/i.test(company.role) || list.length === 0
+                    ? `No invoices sent by ${company.name} yet. Create one above to get a payment link.`
+                    : `${company.name} is the buyer in this demo, so it has no invoices to send.`}
+                </span>
+                {!/supplier/i.test(company.role) && otherCompany && (
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <button type="button" className="btn btn-sm" data-testid="inv-switch-supplier" onClick={() => setCompany(otherCompany.id)}>Switch to {otherCompany.name} to send an invoice</button>
+                  </div>
+                )}
+              </Empty>
+            ) : (
+              <Empty><span data-testid="inv-bills-empty">No bills for {company.name} yet. When a supplier sends a payment link and it is opened here, it appears in this list.</span></Empty>
+            )}
           </div>
         ) : (
           <>
@@ -330,34 +415,39 @@ export default function InvoicesPage() {
                   const st = tabStats(t.id);
                   return (
                     <button key={t.id} role="tab" className="tab" aria-selected={listTab === t.id} data-testid={`inv-tab-${t.id}`} onClick={() => setListTab(t.id)}>
-                      {t.label}<span className="tab-count" data-testid={`inv-tab-count-${t.id}`}>{st.count}</span>
+                      {side === 'bills' && t.id === 'sent' ? 'To pay' : t.label}<span className="tab-count" data-testid={`inv-tab-count-${t.id}`}>{st.count}</span>
                       <span className="tab-sum" data-testid={`inv-tab-total-${t.id}`}>{usdtNumber(st.total)} USDT</span>
                     </button>
                   );
                 })}
               </div>
-              <input data-testid="inv-search" className="input list-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customer, number or amount" aria-label="Search invoices" />
+              <input data-testid="inv-search" className="input list-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={side === 'sent' ? 'Search customer, number or amount' : 'Search supplier, number or amount'} aria-label="Search invoices" />
             </div>
             {rows.length === 0 ? (
               <div style={{ padding: '16px 24px 24px' }}><Empty><span data-testid="inv-filter-empty">No invoices match{q ? ` "${query.trim()}"` : ''} in this tab.</span></Empty></div>
             ) : (
               <div className="table-wrap"><table className="table table-stack">
-                <thead><tr><th>Invoice</th><th>Customer</th><th className="num">Amount</th><th>Due</th><th>Status</th><th>Link</th></tr></thead>
+                <thead><tr><th>Invoice</th><th>{side === 'sent' ? 'Customer' : 'Supplier'}</th><th className="num">Amount</th><th>Due</th><th>Status</th><th>{side === 'sent' ? 'Link' : ''}</th></tr></thead>
                 <tbody>
-                  {rows.map((s) => {
-                    const st = STATUS_PILL[rowStatus(s)];
+                  {rows.map((r) => {
+                    const st = pill(r);
+                    const s = r.stored;
                     return (
-                      <tr key={s.link} data-testid="inv-row" className="inv-row" data-selected={viewing?.link === s.link ? 'true' : undefined} onClick={() => openDrawer(s)}>
-                        <td>{s.invoice.id}<span className="cell-sub">{s.invoice.memo || s.invoice.lines[0]?.description}</span></td>
-                        <td>{partyName(s.invoice.buyerAccount)}<span className="cell-sub mono">{s.invoice.buyerAccount.slice(0, 6)}…{s.invoice.buyerAccount.slice(-4)}</span></td>
-                        <td className="num">{amt(s.invoice.amount)}</td>
-                        <td className="num">{day(s.invoice.dueDate)}</td>
+                      <tr key={r.key} data-testid="inv-row" data-side={r.side} className="inv-row" data-selected={viewing && s && viewing.link === s.link ? 'true' : undefined}
+                        onClick={() => (s ? openDrawer(s) : r.link && location.assign(r.link))}>
+                        <td>{r.id}<span className="cell-sub">{s?.invoice.memo || s?.invoice.lines[0]?.description || (r.side === 'bills' ? 'Opened from a payment link' : '')}</span></td>
+                        <td>{who(r) || <span className="faint">—</span>}{r.counterparty && <span className="cell-sub mono">{r.counterparty.slice(0, 6)}…{r.counterparty.slice(-4)}</span>}</td>
+                        <td className="num">{amt(r.amount)}<span className="cell-sub"><Inr v={r.amount} /></span></td>
+                        <td className="num">{r.dueDate ? day(r.dueDate) : <span className="faint">—</span>}</td>
                         <td><Pill tone={st.tone} testId="inv-status">{st.text}</Pill></td>
                         <td>
                           <span className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => openDrawer(s)}>View</button>
-                            <span onClickCapture={() => toast('Link copied')}><CopyButton value={s.link} label="Copy link" /></span>
-                            <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
+                            {r.side === 'bills' && r.status !== 'paid' && r.link && <a className="btn btn-sm" data-testid="inv-pay" href={r.link}>Pay</a>}
+                            {s && <button type="button" className="btn btn-sm" data-testid="inv-view" onClick={() => openDrawer(s)}>View</button>}
+                            {r.side === 'sent' && s && <>
+                              <span onClickCapture={() => toast('Link copied')}><CopyButton value={s.link} label="Copy link" /></span>
+                              <a className="btn btn-sm" href={s.link} target="_blank" rel="noreferrer">Open</a>
+                            </>}
                           </span>
                         </td>
                       </tr>
@@ -388,7 +478,7 @@ export default function InvoicesPage() {
                 <button type="button" className="btn btn-sm" data-testid="inv-view-pdf" onClick={printInvoice}>Download PDF</button>
               </div>
               <div className="paper-mini">
-                <InvoicePaper invoice={paperFromInvoice(viewing.invoice, viewing.createdAt)} status={isPaid(viewing) ? 'paid' : 'sent'} link={viewing.link} txHash={txOf(viewing)} logo={logo} />
+                <InvoicePaper invoice={paperFromInvoice(viewing.invoice, viewing.createdAt, viewing.gst)} status={isPaid(viewing) ? 'paid' : 'sent'} link={viewing.link} txHash={txOf(viewing)} logo={logo} />
               </div>
               <div>
                 <h3 className="drawer-h">Activity</h3>

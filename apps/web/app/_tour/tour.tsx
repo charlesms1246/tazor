@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { currentCompany, setCompany } from '../../lib/company.ts';
+import { COMPANIES, currentCompany, setCompany } from '../../lib/company.ts';
 import { INITIAL, STEPS, TOUR_EVENT, TOUR_KEY, endTour, nextStep, normalizePath, parseState, placeCard, prevStep, stepHere, type Rect, type TourState } from './steps.ts';
 import './tour.css';
 
@@ -63,7 +63,7 @@ export function Tour() {
 
   // The demo story switches company where a step says so.
   useEffect(() => {
-    if (step?.company && currentCompany().id !== step.company) setCompany(step.company);
+    if (step?.company && COMPANIES.some((c) => c.id === step.company) && currentCompany().id !== step.company) setCompany(step.company);
   }, [step]);
 
   // Pages render their data on the client, so give the anchor a moment to appear before centering.

@@ -5,6 +5,7 @@ import type { Address } from 'viem';
 import { toCamt054, toQuickBooksCsv, toTallyCsv, toXeroCsv, usdt2dp, type PaymentRecord } from '@/lib/export.ts';
 import { loadPayments } from '@/lib/storage.ts';
 import { config } from '@/lib/config.ts';
+import { useCompany } from '@/lib/company.ts';
 import { configV2 } from '@/lib/config-v2.ts';
 import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 import { counterpartyOf, directionOf, toStatementCsv } from '@/lib/statement.ts';
@@ -23,12 +24,17 @@ const STATEMENT_ROWS = 10;
 type StatementState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ok'; transfers: Transfer[] };
 
 function Statement({ accounts }: { accounts: string[] }) {
-  const options = [...new Map([configV2.demoAccount, ...accounts].map((a) => [a.toLowerCase(), a])).values()];
-  const [acct, setAcct] = useState<string>(configV2.demoAccount);
+  // the selected company's account comes from ENS; nothing is hard-coded
+  const company = useCompany();
+  const own = company.status === 'ready' ? [company.account] : [];
+  const options = [...new Map([...own, ...accounts].map((a) => [a.toLowerCase(), a])).values()];
+  const [picked, setAcct] = useState<string>('');
+  const acct = picked || options[0] || '';
   const [state, setState] = useState<StatementState>({ status: 'loading' });
 
   const load = useCallback(() => {
     setState({ status: 'loading' });
+    if (!acct) return;
     fetchTransfers(config.explorer, acct as Address, configV2.usdt)
       .then((t) => setState({ status: 'ok', transfers: [...t].sort((a, b) => b.time.localeCompare(a.time)) }))
       .catch((e) => setState({ status: 'error', message: e instanceof Error ? e.message : String(e) }));

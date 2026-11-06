@@ -8,6 +8,7 @@ const store = new Map<string, string>();
 const { recordEvent, eventsFor, elapsed, recentEvents } = await import('../lib/events.ts');
 const { upsertInbox, loadInbox, pendingInbox } = await import('../lib/inbox.ts');
 const { currentCompany, setCompany, companyByAccount, COMPANIES } = await import('../lib/company.ts');
+const { seedDirectory } = await import('./directory-fixture.ts');
 
 beforeEach(() => store.clear());
 
@@ -40,9 +41,14 @@ test('inbox: upsert merges and paid never reverts', () => {
   assert.equal(pendingInbox().length, 0);
 });
 
-test('company: defaults to Acme, switches, looks up by account', () => {
+test('company: nothing before ENS (a blank placeholder), then the first ENS company; switches; looks up by account and alias', () => {
+  const blank = currentCompany();
+  assert.deepEqual([blank.id, blank.name, blank.status], ['', '', 'loading']);
+  assert.equal(COMPANIES.length, 0);
+  seedDirectory();
   assert.equal(currentCompany().id, 'acme');
   setCompany('bluejay');
   assert.equal(currentCompany().id, 'bluejay');
   assert.equal(companyByAccount(COMPANIES[1].account.toUpperCase().replace('0X', '0x'))?.id, 'bluejay');
+  assert.equal(companyByAccount('0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6')?.id, 'acme', 'earlier account from tazor.aliases');
 });

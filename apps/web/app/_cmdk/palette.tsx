@@ -33,13 +33,15 @@ const PAGES: { href: string; title: string; keywords: string[] }[] = [
 const fmt = (amount: bigint) => (Number(amount) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-function buildCommands(companyId: 'acme' | 'bluejay'): Command[] {
+function buildCommands(companyId: string): Command[] {
   const pages: Command[] = PAGES.map((p) => ({ id: `page:${p.href}`, group: 'Pages', title: p.title, keywords: p.keywords, href: p.href }));
-  const other = COMPANIES.find((c) => c.id !== companyId) ?? COMPANIES[0];
   const actions: Command[] = [
     { id: 'act:create-invoice', group: 'Actions', title: 'Create invoice', keywords: ['new invoice', 'bill'], href: '/invoices/' },
     { id: 'act:open-link', group: 'Actions', title: 'Open a payment link', keywords: ['pay', 'paste', 'scan', 'qr'], href: '/approvals/' },
-    { id: `act:switch:${other.id}`, group: 'Actions', title: `Switch to ${other.name.split(' ')[0]} (${other.role.toLowerCase()})`, subtitle: other.ens, keywords: ['company', 'switch', other.ens], action: `switch:${other.id}` },
+    // one "Switch to …" per other company in the ENS directory (none while it is still loading)
+    ...COMPANIES.filter((c) => c.id && c.id !== companyId).map((o): Command => ({
+      id: `act:switch:${o.id}`, group: 'Actions', title: `Switch to ${o.name || o.ens}${o.role ? ` (${o.role.toLowerCase()})` : ''}`, subtitle: o.ens, keywords: ['company', 'switch', o.ens, o.id], action: `switch:${o.id}`,
+    })),
     { id: 'act:tour', group: 'Actions', title: 'Take the product tour', keywords: ['tour', 'walkthrough', 'help', 'guide'], action: 'tour' },
   ];
   const invoices: Command[] = loadInvoices().map(({ invoice }) => {
@@ -129,7 +131,7 @@ export function CommandPalette() {
     const c = hit.cmd;
     setOpen(false);
     if (c.action === 'tour') { startTour(); return; }
-    if (c.action?.startsWith('switch:')) { setCompany(c.action.slice(7) as 'acme' | 'bluejay'); return; }
+    if (c.action?.startsWith('switch:')) { setCompany(c.action.slice(7)); return; }
     if (c.href) window.location.assign(c.href);
   };
 

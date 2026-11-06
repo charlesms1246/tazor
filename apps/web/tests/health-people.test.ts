@@ -2,7 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Address } from 'viem';
 import { checkHealth } from '../lib/health.ts';
-import { SYNC_GRACE_SECONDS, agoText, approverFlags, cacheAgeSeconds, labelOf, roleList, roleNames, rolesFor, uniqueAddresses, whitechainStatus, type ApproverView } from '../lib/people.ts';
+const store = new Map<string, string>();
+(globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+import { seedDirectory } from './directory-fixture.ts';
+const { SYNC_GRACE_SECONDS, agoText, approverFlags, cacheAgeSeconds, labelOf, roleList, roleNames, rolesFor, uniqueAddresses, whitechainStatus } = await import('../lib/people.ts');
+type ApproverView = import('../lib/people.ts').ApproverView;
 import { ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR_ADMIN } from '../lib/policies.ts';
 
 type Reply = (method: string, params: unknown[], url: string) => unknown;
@@ -61,7 +65,9 @@ test('roles, labels and statuses', () => {
   assert.deepEqual(roleList(ROLE_APPROVER | ROLE_AGENT), ['Approver', 'Agent']);
   assert.equal(roleNames(0n), 'none');
   assert.equal(roleNames(ROLE_APPROVER | ROLE_TAZOR_ADMIN), 'approver, admin');
-  assert.equal(labelOf(A), 'Priya (Finance)');
+  assert.equal(labelOf(A), '0x00aB…5450', 'no ENS directory: the short address');
+  seedDirectory();
+  assert.equal(labelOf(A), 'Priya (Finance)', 'the ENS member label');
   assert.equal(labelOf('0x000000000000000000000000000000000000dEaD'), '0x0000…dEaD');
   assert.equal(whitechainStatus(view({ revoked: true, cached: ROLE_APPROVER, ens: ROLE_APPROVER })), 'revoked');
   assert.equal(whitechainStatus(view({ cached: ROLE_APPROVER, ens: ROLE_APPROVER })), 'in-sync');

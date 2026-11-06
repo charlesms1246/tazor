@@ -5,6 +5,8 @@ const CUSTOMER = '0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6';
 const PAYEE = '0xc1dce946D192e344251972470237F1471C93876c';
 
 test('/invoices/: create an invoice, and its link opens /pay/ with that invoice loaded', async ({ page }) => {
+  // Bluejay (the supplier) sends the invoice; as Acme the list would open on Bills to pay
+  await page.addInitScript(() => localStorage.setItem('tazor.company.v1', 'bluejay'));
   await mockExplorer(page);
   // the Pay page reads the chain for its guards; nothing here needs real answers
   for (const url of ['https://rpc.testnet.whitechain.io/', 'https://ethereum-sepolia-rpc.publicnode.com/']) {

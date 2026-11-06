@@ -57,3 +57,7 @@ test('placeCard: below, above, right, left, centered and clamped', () => {
   assert.deepEqual(big, { top: 588, left: 430, side: 'bottom' }, 'full-screen target: card over the bottom edge');
   assert.equal(placeCard({ top: 100, left: 0, width: 20, height: 20 }, card, vp).left, 12, 'clamped to the margin');
 });
+
+test('tour copy names no specific company (companies come from ENS)', () => {
+  for (const s of STEPS) assert.ok(!/acme|bluejay|taz0r\.eth/i.test(`${s.title} ${s.body}`), s.title);
+});

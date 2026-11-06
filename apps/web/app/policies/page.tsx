@@ -17,6 +17,7 @@ import { decodeFunctionResult, encodeFunctionData, parseAbi } from 'viem';
 import { ApproversPanel } from './approvers.tsx';
 import { Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { NameChip, TechDetails, nameFor } from '../_readable/index.tsx';
+import { useCompany } from '@/lib/company.ts';
 import { shortAddress, usdtText } from '@/lib/readable.ts';
 
 const registryAbi = parseAbi(['function registryOf(address account) view returns (address)']);
@@ -94,7 +95,10 @@ function useAction() {
 
 export default function PoliciesPage() {
   const pm = configV2.paymentModule;
-  const [input, setInput] = useState<string>(configV2.demoAccount);
+  const company = useCompany();
+  // the selected company's account, from ENS (nothing hard-coded); anyone can type another
+  const [input, setInput] = useState<string>('');
+  const [autoFrom, setAutoFrom] = useState<string | null>(null);
   const [account, setAccount] = useState<Address | null>(null);
   const [cfg, setCfg] = useState<ConfigV2 | null>(null);
   const [win, setWin] = useState<readonly [bigint, bigint] | null>(null);
@@ -129,8 +133,12 @@ export default function PoliciesPage() {
     }
   }, [pm, input]);
 
+  useEffect(() => {
+    if (company.status === 'ready' && !input) { setInput(company.account); setAutoFrom(company.account); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company.status, company.account]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { if (autoFrom) void load(); }, [autoFrom]);
   useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
 
   const addPayee = useAction();

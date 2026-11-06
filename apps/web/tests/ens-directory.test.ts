@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeAbiParameters, encodeEventTopics, type Address, type Hex } from 'viem';
 import {
-  TAZ0R_REGISTRY, WHITECHAIN_MAINNET_COIN_TYPE, WHITECHAIN_SEPOLIA_COIN_TYPE, coinTypeForChain, ensLabelOf, loadDirectory, mergeCompany,
+  TAZ0R_REGISTRY, WHITECHAIN_MAINNET_COIN_TYPE, WHITECHAIN_SEPOLIA_COIN_TYPE, coinTypeForChain, ensLabelOf, loadDirectory, parseAliases, parseRoleBits, mergeCompany,
   registryEventsAbi, rootRoleAccountsFromLogs, rootRoleHoldersFromLogs, subnamesFromLogs, type RawLog,
 } from '../lib/ens-directory.ts';
 import { labelInfo } from '../lib/people.ts';
@@ -41,14 +41,17 @@ test('subnames and role accounts from registry logs (newest-first input, unknown
   assert.deepEqual(rootRoleHoldersFromLogs(logs), []);
 });
 
-test('company records override the fallback; missing records are marked as fallback', () => {
-  const s = subnamesFromLogs([registered('acme', CE43, 1888629000, 1)])[0];
-  const ens = mergeCompany(s, ACME_REG, { name: 'Acme Corp', role: 'buyer', account: '0x0000000000000000000000000000000000000Ac1' });
-  assert.deepEqual([ens.name, ens.role, ens.account, ens.fallback], ['Acme Corp', 'Buyer', '0x0000000000000000000000000000000000000Ac1', []]);
-  const fb = mergeCompany(s, ACME_REG, {});
-  assert.deepEqual([fb.name, fb.role, fb.account, fb.fallback], ['Acme Industries', 'Buyer', '0xb99A12652BEe98429ae31EA0529A0b63f1073721', ['name', 'role', 'account']]);
-  const unknown = mergeCompany({ ...s, label: 'meridian' }, null, {});
-  assert.deepEqual([unknown.name, unknown.role, unknown.account, unknown.fallback], ['meridian', null, null, []]);
+test('company records come from ENS only: missing records stay missing (no static fallback); aliases and role bits parse', () => {
+  const s = { label: 'acme', owner: '0xce4389ACb79463062c362fACB8CB04513fA3D8D8' as Address, expiry: 0, tokenId: 1n, block: 1 };
+  const ens = mergeCompany(s, ACME_REG, { name: 'Acme Corp', role: 'buyer', account: '0x0000000000000000000000000000000000000Ac1', aliases: ['0x0000000000000000000000000000000000000Ac0'], roleBits: { APPROVER: 64 } });
+  assert.deepEqual([ens.name, ens.role, ens.account, ens.aliases, ens.roleBits, ens.fallback], ['Acme Corp', 'Buyer', '0x0000000000000000000000000000000000000Ac1', ['0x0000000000000000000000000000000000000Ac0'], { APPROVER: 64 }, []]);
+  const bare = mergeCompany(s, ACME_REG, {});
+  assert.deepEqual([bare.name, bare.role, bare.account, bare.aliases, bare.roleBits], ['acme', null, null, [], null], 'no "Acme Industries" without an ENS record');
+  assert.deepEqual(parseRoleBits('{"APPROVER":64,"TAZOR_ADMIN":68,"AGENT":72}'), { APPROVER: 64, TAZOR_ADMIN: 68, AGENT: 72 });
+  assert.equal(parseRoleBits('nope'), null);
+  assert.equal(parseRoleBits('{"approver":64}'), null);
+  assert.deepEqual(parseAliases('0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6, junk 0x18d15b034c645dbbfcb9c68238a14d059f632513'),
+    ['0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6', '0x18d15B034C645dbbFCb9c68238A14D059f632513']);
 });
 
 test('loadDirectory: companies from the taz0r.eth registry, members from subnames, owners and role history', async () => {
@@ -81,7 +84,7 @@ test('loadDirectory: companies from the taz0r.eth registry, members from subname
   assert.equal(ensLabelOf('0xb99A12652BEe98429ae31EA0529A0b63f1073721', d), 'acme.taz0r.eth');
   assert.equal(ensLabelOf(RAVI, d), null);
   assert.deepEqual(labelInfo(PRIYA, null, d), { label: 'Priya Sharma, Finance', source: 'ens' });
-  assert.deepEqual(labelInfo(RAVI, null, d), { label: 'Ravi (Operations)', source: 'fallback' });
+  assert.deepEqual(labelInfo(RAVI, null, d), { label: '0xeD73…c3Cb', source: 'address' }, 'no ENS name: the short address, never a made-up label');
   assert.deepEqual(labelInfo('0x000000000000000000000000000000000000dEaD', null, d), { label: '0x0000…dEaD', source: 'address' });
 });
 

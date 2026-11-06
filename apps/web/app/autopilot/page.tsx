@@ -40,7 +40,7 @@ export default function AutopilotPage() {
           {running ? 'Autopilot is running' : s?.status === 'done' ? 'Run it again' : 'Start Autopilot'}
         </button>
         {mode === 'presenter' && hasKey === false && <Notice tone="warning">No passkey on this device yet. Choose Try it yourself to create one.</Notice>}
-        <p className="small muted">Both modes run on a sandbox company: your passkey is added as its approver, so the demo never touches a real company. Other parties (the second approver, Ravi, the financier, Bluejay collecting) are simulated counterparties and are labelled as such. The Ethereum fallback is signed by your browser wallet on Sepolia. Testnet only.</p>
+        <p className="small muted">Both modes run on a sandbox company: your passkey is added as its approver, so the demo never touches a real company. Other parties (the second approver, Ravi, the financier, the supplier collecting) are simulated counterparties and are labelled as such. The Ethereum fallback is signed by your browser wallet on Sepolia. Testnet only.</p>
       </Card>
 
       <Card title="The story" flush>

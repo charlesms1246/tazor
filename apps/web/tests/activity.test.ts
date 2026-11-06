@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTransfers, nameOf } from '../lib/activity.ts';
+const store = new Map<string, string>();
+(globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+import { seedDirectory } from './directory-fixture.ts';
+const { parseTransfers, nameOf } = await import('../lib/activity.ts');
 
 const ACC = '0xb99A12652BEe98429ae31EA0529A0b63f1073721';
 const USDT = '0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7';
@@ -23,8 +26,11 @@ test('skips other tokens and rejects a malformed body', () => {
   assert.throws(() => parseTransfers({}, ACC, USDT));
 });
 
-test('names known demo accounts on the full address only', () => {
+test('names accounts from the ENS directory only, on the full address', () => {
+  assert.equal(nameOf('0xc1dce946D192e344251972470237F1471C93876c'), null, 'no ENS directory: no name (nothing hard-coded)');
+  seedDirectory();
   assert.equal(nameOf('0xc1dce946D192e344251972470237F1471C93876c'), 'bluejay.taz0r.eth');
+  assert.equal(nameOf('0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6'), 'acme.taz0r.eth (earlier account)', 'tazor.aliases');
   assert.equal(nameOf('0xc1dce946D9a2BBF1e0c2A0B5a5E0D2e44c3d876c'), null);
   assert.equal(nameOf('0x0000000000000000000000000000000000000001'), null);
 });

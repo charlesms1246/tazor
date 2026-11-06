@@ -1,18 +1,18 @@
 /** Pure tour state: steps, persistence parsing, navigation and card placement (no DOM, no React). */
 
-export type TourStep = { path: string; selector: string; title: string; body: string; company?: 'acme' | 'bluejay' };
+export type TourStep = { path: string; selector: string; title: string; body: string; company?: string };
 export type TourState = { step: number; active: boolean };
 
 export const TOUR_KEY = 'tazor.tour.v1';
 export const TOUR_EVENT = 'tazor:tour';
 
 export const STEPS: TourStep[] = [
-  { path: '/', selector: '[data-tour="balance"]', title: 'Your company account', body: 'This is Acme’s USDT balance on Whitechain. It belongs to the company, not to any one person.' },
+  { path: '/', selector: '[data-tour="balance"]', title: 'Your company account', body: 'This is your company’s USDT balance on Whitechain. It belongs to the company, not to any one person.' },
   { path: '/', selector: '[data-tour="lanes"]', title: 'Everything that needs you', body: 'Invoices to pay, approvals to sign and money coming in, sorted by what is due first.' },
-  { path: '/invoices/', selector: '[data-tour="invoice-form"]', title: 'Create an invoice as Bluejay', body: 'We have switched you to Bluejay, the supplier. Fill in the lines and send Acme an encrypted payment link.', company: 'bluejay' },
+  { path: '/invoices/', selector: '[data-tour="invoice-form"]', title: 'Create an invoice as the supplier', body: 'Now you act as the supplier. Fill in the lines and send your customer an encrypted payment link.', company: 'bluejay' },
   { path: '/invoices/', selector: '[data-tour="invoice-paper"]', title: 'Your customer sees this', body: 'The invoice updates as you type. Only someone holding the link can read it.', company: 'bluejay' },
-  { path: '/approvals/', selector: '[data-tour="approvals"]', title: 'Approve with your passkey', body: 'Back as Acme, a verified approver signs with Face ID, fingerprint or device PIN. No seed phrase, no browser wallet.', company: 'acme' },
-  { path: '/company/', selector: '[data-tour="people"]', title: 'Roles live on ENS', body: 'Who may approve for acme.taz0r.eth is written on ENS. Remove someone and they lose access within seconds.', company: 'acme' },
+  { path: '/approvals/', selector: '[data-tour="approvals"]', title: 'Approve with your passkey', body: 'Back as the buyer, a verified approver signs with Face ID, fingerprint or device PIN. No seed phrase, no browser wallet.', company: 'acme' },
+  { path: '/company/', selector: '[data-tour="people"]', title: 'Roles live on ENS', body: 'Who may approve for your company is written on its ENS name. Remove someone and they lose access within seconds.', company: 'acme' },
   { path: '/security/', selector: '[data-tour="fallback"]', title: 'If our servers are down, pay via Ethereum', body: 'A signed payment never depends on Tazor. You can send it through Ethereum and it still settles on Whitechain.' },
   { path: '/security/', selector: '[data-tour="health"]', title: 'Live system health', body: 'Each check here reads the chain directly, so you can see that every piece is working.' },
   { path: '/export/', selector: '[data-tour="reports"]', title: 'Close the books', body: 'Download every payment with its transaction proof as CSV, ready for your accountant.' },

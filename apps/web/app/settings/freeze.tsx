@@ -26,7 +26,7 @@ export function FreezeDevice() {
   const company = useCompany();
   const [account, setAccount] = useState('');
   // start with the company this device is acting for; it can still be changed
-  useEffect(() => { setAccount((a) => a || company.account); }, [company.account]);
+  useEffect(() => { if (company.status !== 'loading' && company.status !== 'error' && company.id) setAccount((a) => a || company.account); }, [company.account, company.id, company.status]);
   const [prep, setPrep] = useState<Prepared | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

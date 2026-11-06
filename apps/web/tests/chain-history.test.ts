@@ -6,6 +6,9 @@ const store = new Map<string, string>();
 (globalThis as { localStorage?: unknown }).localStorage = {
   getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); },
 };
+// names come from the ENS directory (seeded here, as the app caches it)
+const { seedDirectory } = await import('./directory-fixture.ts');
+seedDirectory();
 const { fetchLogs, historySources, loadChainHistory, mapLogs, mergeEvents } = await import('../lib/chain-history.ts');
 
 // recorded from https://explorer.testnet.whitechain.io/api/v2 and https://eth-sepolia.blockscout.com/api/v2 on 2026-11-06
