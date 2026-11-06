@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { encodeFunctionData, erc20Abi, type Address } from 'viem';
+import { encodeFunctionData, erc20Abi } from 'viem';
 import { ethCall } from '@/lib/rpc.ts';
 import { config } from '@/lib/config.ts';
 import { configV2 } from '@/lib/config-v2.ts';
@@ -12,9 +12,13 @@ import { fetchTransfers, nameOf, type Transfer } from '@/lib/activity.ts';
 import { dailyFlows, niceMax, sumFlows, type DayFlow } from '@/lib/dashboard.ts';
 import { TIMINGS } from '@/lib/timings.ts';
 import { Card, CopyButton, Notice, PageHeader, short } from './_ui/index.tsx';
+import { Timeline } from './_ui/timeline.tsx';
+import { useCompany } from '@/lib/company.ts';
+import { pendingInbox, loadInbox, INBOX_CHANGED, type InboxItem } from '@/lib/inbox.ts';
+import { recentEvents, EVENTS_CHANGED, type TimelineEvent } from '@/lib/events.ts';
+import { checkHealth, type Health } from '@/lib/health.ts';
+import { loadPeople, type Person } from '@/lib/people.ts';
 
-const ACCOUNT: Address = configV2.demoAccount;
-const COMPANY = process.env.NEXT_PUBLIC_COMPANY_ENS || 'acme.taz0r.eth';
 const PAY_TIME = TIMINGS.find((t) => t.action.startsWith('Pay an approved'))?.tazor ?? '';
 
 const when = (iso: string) => {
@@ -62,6 +66,13 @@ function FlowChart({ rows }: { rows: DayFlow[] }) {
 }
 
 export default function Home() {
+  const company = useCompany();
+  const ACCOUNT = company.account;
+  const COMPANY = company.ens;
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [health, setHealth] = useState<Health | null>(null);
+  const [people, setPeople] = useState<Person[] | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
   const [balanceError, setBalanceError] = useState(false);
   const [stamp, setStamp] = useState('');
@@ -85,23 +96,44 @@ export default function Home() {
   };
 
   useEffect(() => {
+    setBalance(null); setActivity(null);
     refresh();
     loadActivity();
+    setPeople(null);
+    loadPeople(ACCOUNT).then(setPeople).catch(() => setPeople([]));
+  }, [ACCOUNT]);
+
+  useEffect(() => {
+    checkHealth().then(setHealth);
+    const syncInbox = () => setInbox(loadInbox());
+    const syncEvents = () => setEvents(recentEvents(6));
+    syncInbox(); syncEvents();
+    globalThis.addEventListener(INBOX_CHANGED, syncInbox);
+    globalThis.addEventListener(EVENTS_CHANGED, syncEvents);
     setPayments(loadPayments());
     setInvoices(loadInvoices());
     setMandates(loadMandates().length);
     setHasPasskey(loadPasskey() !== null);
     setReady(true);
+    return () => { globalThis.removeEventListener(INBOX_CHANGED, syncInbox); globalThis.removeEventListener(EVENTS_CHANGED, syncEvents); };
   }, []);
 
   const flows = useMemo(() => (activity ? dailyFlows(activity, 7) : null), [activity]);
   const totals = flows ? sumFlows(flows) : null;
 
   const now = Date.now() / 1000;
-  const open = invoices.filter((s) => invoiceStatus(s.invoice, payments) !== 'paid');
+  const mine = (a: string) => a.toLowerCase() === ACCOUNT.toLowerCase();
+  const open = invoices.filter((s) => (mine(s.invoice.supplierAccount) || mine(s.invoice.payee)) && invoiceStatus(s.invoice, payments) !== 'paid');
   const overdue = open.filter((s) => s.invoice.dueDate < now);
   const awaiting = open.filter((s) => s.invoice.dueDate >= now);
   const openTotal = open.reduce((s, i) => s + i.invoice.amount, 0n);
+
+  const pending = pendingInbox(inbox);
+  const pendingTotal = pending.reduce((s, i) => s + (i.amount ? BigInt(i.amount) : 0n), 0n);
+  const approvers = people?.filter((p) => p.roles.some((r) => /approver/i.test(r)) && p.whitechain !== 'revoked') ?? [];
+  const syncing = people?.filter((p) => p.whitechain === 'syncing').length ?? 0;
+  const revoked = people?.filter((p) => p.whitechain === 'revoked').length ?? 0;
+  const healthy = health ? [health.relayer.ok || !health.relayer.configured, health.whitechain.ok, health.fallback.ready].filter(Boolean).length : 0;
 
   const steps = [
     { done: hasPasskey, title: 'Create your approver passkey', href: '/onboard/' },
@@ -116,7 +148,7 @@ export default function Home() {
       <PageHeader title="Home" subtitle={<>{COMPANY} · Whitechain Sepolia</>} />
 
       <div className="home-top">
-        <section className="hero-card" aria-label="Balance">
+        <section className="hero-card" aria-label="Balance" data-tour="balance">
           <div className="hero-label">Available balance</div>
           <div className="hero-value num">
             <span data-testid="balance">
@@ -156,6 +188,32 @@ export default function Home() {
         </Card>
       </div>
 
+      <section className="lanes" aria-label="Overview" data-tour="lanes">
+        <a className="lane" href="/invoices/" data-testid="lane-receivables">
+          <span className="lane-label">Receivables</span>
+          <span className="lane-value num">{usdt2dp(openTotal)}<span className="kpi-unit">USDT</span></span>
+          <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''}`}</span>
+          {overdue.length > 0 && <span className="pill pill-negative lane-pill">Overdue</span>}
+        </a>
+        <a className="lane" href="/approvals/" data-testid="lane-payables">
+          <span className="lane-label">Waiting for approval</span>
+          <span className="lane-value num">{pending.length}</span>
+          <span className="lane-sub">{pending.length === 0 ? 'Nothing to approve' : `${usdt2dp(pendingTotal)} USDT to approve`}</span>
+          {pending.length > 0 && <span className="pill pill-info lane-pill">Review</span>}
+        </a>
+        <a className="lane" href="/company/" data-testid="lane-controls">
+          <span className="lane-label">Approvers</span>
+          <span className="lane-value num">{people === null ? '…' : approvers.length}</span>
+          <span className="lane-sub">{people === null ? 'Reading roles from ENS…' : syncing ? `${syncing} syncing to Whitechain` : revoked ? `All in sync · ${revoked} removed` : 'All in sync with ENS'}</span>
+        </a>
+        <a className="lane" href="/security/" data-testid="lane-health">
+          <span className="lane-label">System health</span>
+          <span className="lane-value num">{health === null ? '…' : healthy === 3 ? 'All good' : `${healthy} of 3 ok`}</span>
+          <span className="lane-sub">{health === null ? 'Checking…' : health.fallback.ready ? 'Ethereum fallback ready' : health.fallback.reason}</span>
+          {health && <span className={`pill lane-pill ${healthy === 3 ? 'pill-positive' : 'pill-warning'}`}><span className="dot" />{health.whitechain.ok ? `Block ${health.whitechain.block?.toLocaleString('en-US')}` : 'Whitechain down'}</span>}
+        </a>
+      </section>
+
       <div className="home-bottom">
         <Card title="Recent activity" flush testId="activity" actions={<a href="/export/" className="small">Statement</a>}>
           {activity === null && !activityError && (
@@ -188,21 +246,6 @@ export default function Home() {
         </Card>
 
         <div className="stack">
-          <Card title="Needs your attention" testId="attention">
-            {!ready ? <span className="skeleton" style={{ width: '100%' }} /> : overdue.length + awaiting.length === 0 ? (
-              <p className="muted">Nothing is waiting on you. Invoices you send stay here until they&apos;re paid.</p>
-            ) : (
-              <ul className="attention">
-                {overdue.length > 0 && (
-                  <li><a href="/invoices/"><span><b>{overdue.length} overdue {overdue.length === 1 ? 'invoice' : 'invoices'}</b><span className="cell-sub">Past their due date and unpaid</span></span><span className="pill pill-negative">Overdue</span></a></li>
-                )}
-                {awaiting.length > 0 && (
-                  <li><a href="/invoices/"><span><b>{awaiting.length} awaiting payment</b><span className="cell-sub">{usdt2dp(openTotal)} USDT outstanding</span></span><span className="pill pill-info">Sent</span></a></li>
-                )}
-              </ul>
-            )}
-          </Card>
-
           {ready && doneCount < steps.length && (
             <Card title="Get set up" subtitle={`${doneCount} of ${steps.length} done`} testId="setup">
               <div className="progress" aria-hidden="true"><span style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
@@ -216,6 +259,11 @@ export default function Home() {
               </ul>
             </Card>
           )}
+          <Card title="Latest events" subtitle="What happened on this device, step by step" testId="events">
+            {events.length === 0
+              ? <p className="muted">Invoices you create, approvals and payments show up here as a timeline.</p>
+              : <Timeline events={events} testId="home-events" />}
+          </Card>
         </div>
       </div>
     </div>
