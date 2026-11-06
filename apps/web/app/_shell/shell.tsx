@@ -15,6 +15,7 @@ const ICONS: Record<string, ReactNode> = {
   policy: <><path d="M8 2 3 4v4c0 3 2.2 5.2 5 6 2.8-.8 5-3 5-6V4z" /><path d="m6 8 1.5 1.5L10.5 6.5" /></>,
   onboard: <><circle cx="8" cy="8" r="5.5" /><path d="M8 5.5v5M5.5 8h5" /></>,
   settings: <><circle cx="8" cy="8" r="2" /><path d="M8 1.8v1.7M8 12.5v1.7M14.2 8h-1.7M3.5 8H1.8M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2M12.4 12.4l-1.2-1.2M4.8 4.8 3.6 3.6" /></>,
+  docs: <><path d="M3 2.5h7.5L13 5v8.5H3z" /><path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" /></>,
   developers: <><path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5 14 8l-3.5 3.5" /></>,
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
   close: <path d="m4 4 8 8M12 4l-8 8" />,
@@ -60,7 +61,7 @@ const GROUPS: { label?: string; items: Item[] }[] = [
 ];
 const FOOT: Item[] = [
   { href: '/settings/', label: 'Settings', icon: 'settings' },
-  { href: '/developers/', label: 'Developers', icon: 'developers' },
+  { href: '/docs/', label: 'Docs', icon: 'docs' },
 ];
 const BOTTOM: Item[] = [
   { href: '/', label: 'Home', icon: 'home' },
