@@ -23,7 +23,8 @@ test('skips other tokens and rejects a malformed body', () => {
   assert.throws(() => parseTransfers({}, ACC, USDT));
 });
 
-test('names known demo accounts', () => {
-  assert.equal(nameOf('0xc1dce946D9a2BBF1e0c2A0B5a5E0D2e44c3d876c'), 'bluejay.taz0r.eth');
+test('names known demo accounts on the full address only', () => {
+  assert.equal(nameOf('0xc1dce946D192e344251972470237F1471C93876c'), 'bluejay.taz0r.eth');
+  assert.equal(nameOf('0xc1dce946D9a2BBF1e0c2A0B5a5E0D2e44c3d876c'), null);
   assert.equal(nameOf('0x0000000000000000000000000000000000000001'), null);
 });

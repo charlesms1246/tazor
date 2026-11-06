@@ -35,16 +35,12 @@ export async function fetchTransfers(explorer: string, account: Address, token: 
   return parseTransfers(await res.json(), account, token);
 }
 
-/** Names for the demo's known accounts on Whitechain Sepolia. */
+/** Names for the demo's known accounts on Whitechain Sepolia, matched on the full address only. */
 export const KNOWN: Record<string, string> = {
-  '0xc1dce946': 'bluejay.taz0r.eth',
-  '0xea5a4be3': 'acme.taz0r.eth (v1)',
-  '0x18d1': 'acme-v2.taz0r.eth',
-  '0xb99a1265': 'acme.taz0r.eth',
-  '0xce4389ac': 'Tazor test treasury',
+  '0xc1dce946d192e344251972470237f1471c93876c': 'bluejay.taz0r.eth',
+  '0xea5a4be313e05eb254900b6adbb7d655c55242f6': 'acme.taz0r.eth (v1)',
+  '0x18d15b034c645dbbfcb9c68238a14d059f632513': 'acme-v2.taz0r.eth',
+  '0xb99a12652bee98429ae31ea0529a0b63f1073721': 'acme.taz0r.eth',
+  '0xce4389acb79463062c362facb8cb04513fa3d8d8': 'Tazor test treasury',
 };
-export const nameOf = (a: Address): string | null => {
-  const l = a.toLowerCase();
-  for (const [k, v] of Object.entries(KNOWN)) if (l.startsWith(k)) return v;
-  return null;
-};
+export const nameOf = (a: string): string | null => KNOWN[a.toLowerCase()] ?? null;
