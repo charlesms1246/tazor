@@ -150,7 +150,7 @@ export default function ReceiptPage() {
               <span className="fin-n" aria-hidden="true">{stage > n ? '✓' : n + 1}</span>
               <span className="fin-text">
                 <span className="fin-title">{title}</span>
-                <span className="fin-sub">{stage > n ? (at ? `${n === 0 ? '' : 'by '}${when(at)}` : 'done') : stage === n ? (n === 2 ? 'waiting… usually about 30 min after posting to Ethereum' : 'waiting…') : sub}</span>
+                <span className="fin-sub">{stage > n ? (at ? `${n === 0 ? '' : 'by '}${when(at)}` : 'done') : stage === n ? (n === 2 ? 'waiting… usually about 30 min after posting to Ethereum' : n === 1 ? 'waiting… usually about 10 min after paying' : 'waiting…') : sub}</span>
               </span>
             </li>
           ))}

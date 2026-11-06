@@ -32,7 +32,7 @@ export function commerceApi(d: CommerceDeps) {
     const data: Ctx = {};
     for (const k of ['orderId', 'customer', 'merchant', 'orderParam', 'depositAddress', 'agent', 'amount', 'payTo']) if (b[k] !== undefined) data[k === 'amount' ? `${action}Amount` : k] = str(b[k]);
     const quote = b.quote as { from?: string; to?: string; priceINR?: number; distanceKm?: number; transitDays?: number } | undefined;
-    if (quote) data.quote = `${quote.from} → ${quote.to}: ${quote.distanceKm} km, ₹${quote.priceINR}, ${quote.transitDays} day(s)`;
+    if (quote) data.quote = `${quote.from} → ${quote.to}: ${quote.distanceKm} km, ₹${quote.priceINR}, ${quote.transitDays} day${quote.transitDays === 1 ? '' : 's'}`;
     return { ok: true, status: str(b.status), tx: str(b.txHash ?? b.tx) || undefined, chain: 'whitechain', detail: str(b.detail) || undefined, data };
   }
 

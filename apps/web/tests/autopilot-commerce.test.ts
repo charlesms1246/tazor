@@ -42,7 +42,7 @@ test('Checkout chapter: no wallet → the sandbox merchant receives and signs th
   assert.equal(r.ok, true);
   assert.deepEqual(calls[1], { action: 'checkout-merchant-refund', params: { orderId: ORDER, amount: '0.02' } });
   const agent = await api.agentPays();
-  assert.equal(agent.data!.quote, 'Mumbai → Pune: 148 km, ₹7716, 1 day(s)');
+  assert.equal(agent.data!.quote, 'Mumbai → Pune: 148 km, ₹7716, 1 day');
   assert.equal(agent.data!.payTo, '0x03');
 });
 

@@ -41,13 +41,13 @@ export const LABELS: Record<string, string> = {
   'prepare-l1': 'the "Prepare Ethereum transaction" button', 'send-l1': 'the "Send with your wallet" button', 'l1-guide': 'the Blockscout guide', 'l1-blockscout-open': 'the "Open on Blockscout" link', activity: 'the activity list', tally: 'the "Tally CSV" button',
   create: 'the "Create passkey" button', 'approver-account': 'your approver account',
   'co-watch': 'the merchant address field', 'co-watch-add': 'the "Show its payments too" button', 'co-orders': 'the orders list', 'co-order-row': 'the new order',
-  'co-tab-webhooks': 'the Webhooks tab', 'co-tab-agents': 'the Agents tab', 'co-tab-orders': 'the Orders tab', 'co-hooks': 'the webhook deliveries', 'co-agents': 'the agent payments',
+  'co-order-focus': 'the new order', 'co-tab-webhooks': 'the Webhooks tab', 'co-tab-agents': 'the Agents tab', 'co-tab-orders': 'the Orders tab', 'co-hooks': 'the webhook deliveries', 'co-agents': 'the agent payments',
   'receipt-amount': 'the receipt', 'receipt-finality': 'the finality stages', 'receipt-refund-row': 'the refund on the receipt',
 };
 
 /** /checkout/ for one merchant (watched like any other address), opened on a tab. */
-export const checkoutPage = (merchant: string | undefined, tab: 'orders' | 'webhooks' | 'agents') =>
-  `/checkout/?merchant=${encodeURIComponent(merchant ?? '')}&tab=${tab}`;
+export const checkoutPage = (merchant: string | undefined, tab: 'orders' | 'webhooks' | 'agents', order?: string) =>
+  `/checkout/?merchant=${encodeURIComponent(merchant ?? '')}&tab=${tab}${order ? `&order=${encodeURIComponent(order)}` : ''}`;
 /** Statuses of a settled deposit order. */
 export const DEPOSIT_PAID = ['paid', 'partially-refunded', 'refunded'];
 
@@ -247,14 +247,11 @@ export const STORY: Step[] = [
       { do: 'goto', path: '/checkout/' },
       { do: 'api', call: { name: 'wallet-address' }, say: 'Choosing the merchant: your browser wallet, or the sandbox merchant if there is none…' },
       { do: 'api', call: { name: 'customer-pays' }, say: 'Simulated customer: a wallet with USDT and no WBT pays 0.12 USDT with one signature…', sim: true, saveAs: 'checkoutTx' },
-      { do: 'goto', path: (c) => checkoutPage(c.merchant, 'orders') },
-      { do: 'fill', testid: 'co-watch', value: (c) => c.merchant },
-      { do: 'click', testid: 'co-watch-add', optional: true, timeout: 3000 },
-      { do: 'waitFor', wait: { testid: 'co-order-row' }, timeout: 60_000, say: 'The order appears for the merchant, read straight from Whitechain…' },
+      { do: 'goto', path: (c) => checkoutPage(c.merchant, 'orders', c.orderId) },
+      { do: 'waitFor', wait: { testid: 'co-order-focus' }, timeout: 60_000, say: 'The order appears for the merchant, read straight from Whitechain…' },
       { do: 'goto', path: (c) => `/receipt/?order=${c.orderId}` },
       { do: 'waitFor', wait: { testid: 'receipt-amount' }, timeout: 60_000, say: 'The customer’s receipt, checkable by anyone on-chain…' },
-      { do: 'highlight', testid: 'receipt-finality', say: 'Three finality stages: confirmed by the sequencer, posted to Ethereum, finalized.', ms: 2500 },
-      { do: 'waitFor', wait: { test: (d) => Number(d.attr('receipt-finality', 'data-stage')) >= 2 }, timeout: 150_000, say: 'Waiting for Whitechain to post this block to Ethereum…', optional: true },
+      { do: 'highlight', testid: 'receipt-finality', say: 'Three stages: confirmed by Whitechain in about a second, posted to Ethereum in about 10 minutes, final about 30 minutes later. The page updates by itself.', ms: 3500 },
       { do: 'api', call: { name: 'merchant-refund' }, say: 'The merchant refunds 0.02 USDT: it can only go back to the customer…', saveAs: 'refundTx' },
       { do: 'goto', path: (c) => `/receipt/?order=${c.orderId}&r=1` },
       { do: 'waitFor', wait: { testid: 'receipt-refund-row' }, timeout: 60_000, say: 'The receipt shows the refund…' },
@@ -265,19 +262,17 @@ export const STORY: Step[] = [
       },
       { do: 'api', call: { name: 'agent-pays' }, say: 'Simulated AI agent: it pays 0.01 USDT over x402 for one freight quote…', sim: true },
       { do: 'log', text: (c) => `The agent bought: ${c.quote ?? 'a freight quote'}`, kind: 'info' },
-      { do: 'goto', path: (c) => checkoutPage(c.merchant, 'orders') },
-      { do: 'fill', testid: 'co-watch', value: (c) => c.merchant },
-      { do: 'click', testid: 'co-watch-add', optional: true, timeout: 3000 },
-      { do: 'waitFor', wait: { testid: 'co-orders' }, timeout: 60_000, say: 'All orders: paid by signature and by transfer, with the refund…' },
+      { do: 'goto', path: (c) => checkoutPage(c.merchant, 'orders', c.orderId) },
+      { do: 'waitFor', wait: { testid: 'co-order-focus' }, timeout: 60_000, say: 'All orders: paid by signature and by transfer, with the refund…' },
       { do: 'highlight', testid: 'co-orders', say: 'Orders paid by signature and by plain transfer, with refunds; read from Whitechain.', ms: 2500 },
       { do: 'goto', path: (c) => checkoutPage(c.merchant, 'webhooks') },
       { do: 'click', testid: 'co-tab-webhooks', optional: true, timeout: 3000 },
       { do: 'waitFor', wait: { testid: 'co-hooks' }, timeout: 30_000, say: 'Signed webhooks for every event…', optional: true },
-      { do: 'highlight', testid: 'co-hooks', say: 'Every order event as an HMAC-signed webhook; each is verified on this page.', ms: 2500 },
+      { do: 'highlight', testid: 'co-hooks', say: 'Every order event goes to the shop as a signed webhook, so the shop can trust it came from Tazor.', ms: 2500 },
       { do: 'goto', path: (c) => checkoutPage(c.payTo || c.merchant, 'agents') },
       { do: 'click', testid: 'co-tab-agents', optional: true, timeout: 3000 },
       { do: 'waitFor', wait: { testid: 'co-agents' }, timeout: 30_000, say: 'Payments from AI agents over x402…', optional: true },
-      { do: 'highlight', testid: 'co-agents', say: 'AI agents pay per request over x402; we run the facilitator.', ms: 2500 },
+      { do: 'highlight', testid: 'co-agents', say: 'AI agents pay per request over x402; Tazor settles each payment on Whitechain.', ms: 2500 },
     ],
   },
   {
