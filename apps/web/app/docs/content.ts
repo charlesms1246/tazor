@@ -46,6 +46,7 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     title: 'Developers',
     pages: [
+      { slug: 'sdk', title: 'Pay button SDK', summary: 'Take a Tazor payment on any website with one script tag, one element and one event.' },
       { slug: 'relayer-api', title: 'Relayer API', summary: 'The optional, stateless relayer: every endpoint, request and response.' },
       { slug: 'contracts', title: 'Contracts', summary: 'Every contract address this build uses, with explorer links.' },
       { slug: 'passkey-check', title: 'Passkey check', summary: "Sign a test challenge with this device's passkey and verify it on Whitechain's P-256 precompile." },
