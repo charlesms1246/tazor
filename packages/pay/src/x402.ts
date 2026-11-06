@@ -3,7 +3,8 @@
 import { getAddress, toHex, type Address, type Hex } from 'viem';
 import { CHAIN_ID, TRANSFER_TYPES, USDT, type Signer, type TypedData } from './checkout.ts';
 
-export const NETWORKS = ['whitechain-sepolia', `eip155:${CHAIN_ID}`];
+/** CAIP-2 eip155:1874 first (the network id facilitators use); 'whitechain-sepolia' is accepted as an alias. */
+export const NETWORKS = [`eip155:${CHAIN_ID}`, 'whitechain-sepolia'];
 
 export type PaymentRequirements = {
   scheme: string; network: string; maxAmountRequired: string; resource?: string; description?: string; mimeType?: string;
@@ -22,7 +23,7 @@ export const encodePaymentHeader = (p: PaymentPayload): string => b64(JSON.strin
 export const decodePaymentHeader = (h: string): PaymentPayload => JSON.parse(unb64(h)) as PaymentPayload;
 export const decodePaymentResponse = (h: string | null): SettleResponse | null => { if (!h) return null; try { return JSON.parse(unb64(h)) as SettleResponse; } catch { return null; } };
 
-/** The requirement we can pay: exact scheme, Whitechain Sepolia, the official USDT. */
+/** The requirement we can pay: exact scheme, Whitechain Sepolia (eip155:1874 or 'whitechain-sepolia'), the official USDT. */
 export function pickRequirement(accepts: PaymentRequirements[], usdt: Address = USDT): PaymentRequirements | null {
   return accepts.find((r) => r.scheme === 'exact' && NETWORKS.includes(r.network) && r.asset.toLowerCase() === usdt.toLowerCase()) ?? null;
 }

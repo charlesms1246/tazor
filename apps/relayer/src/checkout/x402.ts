@@ -4,7 +4,8 @@ import type { Webhooks } from '../webhooks.ts';
 import { CHAIN_ID, USDT, USDT_DOMAIN, authorizationTypes, usdtAbi } from './abi.ts';
 import type { CheckoutChain } from './service.ts';
 
-export const X402_NETWORKS = ['whitechain-sepolia', `eip155:${CHAIN_ID}`] as const;
+/** CAIP-2 `eip155:1874` is the primary network id; 'whitechain-sepolia' is accepted as an alias. */
+export const X402_NETWORKS = [`eip155:${CHAIN_ID}`, 'whitechain-sepolia'] as const;
 export const MAX_AUTH_WINDOW_SEC = 3600n;
 
 export type PaymentRequirements = {

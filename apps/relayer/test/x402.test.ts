@@ -49,9 +49,9 @@ async function payload(over: Partial<{ to: Address; value: string; validAfter: s
 }
 const req = (paymentPayload: unknown, r = requirements) => ({ x402Version: 1, paymentPayload, paymentRequirements: r });
 
-test('x402 supported: exact on whitechain-sepolia and eip155:1874', () => {
+test('x402 supported: exact on eip155:1874 (primary) and the alias whitechain-sepolia', () => {
   const x = createX402({ chain: fake().chain });
-  assert.deepEqual(x.supported(), { kinds: [{ x402Version: 1, scheme: 'exact', network: 'whitechain-sepolia' }, { x402Version: 1, scheme: 'exact', network: 'eip155:1874' }] });
+  assert.deepEqual(x.supported(), { kinds: [{ x402Version: 1, scheme: 'exact', network: 'eip155:1874' }, { x402Version: 1, scheme: 'exact', network: 'whitechain-sepolia' }] });
 });
 
 test('x402 verify: a real EIP-712 TransferWithAuthorization on the USDT domain is valid; every drain or misuse is rejected with the x402 reason', async () => {
@@ -59,6 +59,7 @@ test('x402 verify: a real EIP-712 TransferWithAuthorization on the USDT domain i
   const x = createX402({ chain, now: () => NOW * 1000 });
   assert.deepEqual(await x.verify(req(await payload())), { isValid: true, payer: agent.address });
   assert.equal((await x.verify(req({ ...(await payload()), network: 'eip155:1874' }))).isValid, true);
+  assert.equal((await x.verify(req(await payload(), { ...requirements, network: 'whitechain-sepolia' }))).isValid, true, 'the alias is still accepted');
   const reason = async (p: unknown, r = requirements) => (await x.verify(req(p, r))).invalidReason;
   assert.equal(await reason(await payload({ value: '20000' })), 'invalid_exact_evm_payload_authorization_value', 'overpaying is refused (exact)');
   assert.equal(await reason(await payload({ value: '9999' })), 'invalid_exact_evm_payload_authorization_value');
@@ -92,7 +93,7 @@ test('x402 settle: verify + guard + transferWithAuthorization(bytes sig) to USDT
   const guarded: Address[] = [];
   const p = await payload();
   const r = await x.settle(req(p), async (payer) => { guarded.push(payer); });
-  assert.deepEqual(r, { success: true, transaction: `0x${'1'.padStart(64, '0')}`, network: 'whitechain-sepolia', payer: agent.address });
+  assert.deepEqual(r, { success: true, transaction: `0x${'1'.padStart(64, '0')}`, network: 'eip155:1874', payer: agent.address });
   assert.deepEqual(guarded, [agent.address]);
   assert.equal(s.sent[0].to, USDT);
   assert.equal(s.sent[0].fn, 'transferWithAuthorization');
@@ -117,7 +118,7 @@ test('HTTP: facilitator routes, and the demo paid resource (402 → pay with X-P
   const body = await first.json();
   assert.equal(body.x402Version, 1);
   const accepts = body.accepts[0];
-  assert.deepEqual([accepts.scheme, accepts.network, accepts.maxAmountRequired, accepts.payTo, accepts.asset, accepts.extra], ['exact', 'whitechain-sepolia', '10000', PAY_TO, USDT, { name: 'Tether USD', version: '1' }]);
+  assert.deepEqual([accepts.scheme, accepts.network, accepts.maxAmountRequired, accepts.payTo, accepts.asset, accepts.extra], ['exact', 'eip155:1874', '10000', PAY_TO, USDT, { name: 'Tether USD', version: '1' }]);
 
   const now = Math.floor(Date.now() / 1000);
   const authorization = { from: agent.address, to: PAY_TO, value: '10000', validAfter: String(now - 60), validBefore: String(now + 300), nonce: `0x${'09'.repeat(32)}` as Hex };
