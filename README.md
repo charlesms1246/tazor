@@ -40,6 +40,11 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 - a hosted payment link and QR if it has no site;
 - its dashboard and accountant export.
 
+**For the customers (the "C"):**
+- **My payments** ([`/me/`](https://app.tazor.charlesms.dev/me/)): every payment across all businesses, with refunds received and subscriptions they can cancel. It's read straight from Whitechain, so there's no account and no merchant login.
+- **A verified-business badge** on payment links and receipts, shown when the business owner is WhiteBIT-verified (WB Soul, simulated on testnet).
+- **"Request a refund"** on every receipt: it opens WhatsApp or email to the merchant, with a link that opens the refund already filled in.
+
 **Beachhead: cross-border SMEs.** Small exporters and importers lose 1–3 business days, a 1–3% FX spread and wire fees on every SWIFT payment. With Tazor they settle in USDT in seconds, with refunds and books built in.
 
 **First merchant: Healthsoft, India.** I work with Healthsoft and have a strong connection to bring Tazor into its payment flow. That is where the pilot starts. Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
