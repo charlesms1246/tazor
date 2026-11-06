@@ -7,7 +7,12 @@ const SHOP = 'https://bluejay-shop.vercel.app';
 export const OFFLINE_RELAYER = 'https://relayer-offline.invalid';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
 
-/** The supplier invoices the sandbox company; the link is kept as ctx[as]. Every account comes from the sandbox admit. */
+/** Total in USDT shown on the invoice form, or NaN. */
+export const totalOf = (t: string | null) => Number((t ?? '').replace(/[^0-9.]/g, '')) || NaN;
+/** Above this, the sandbox needs two approvers; every Autopilot payment (a run of two included) stays at or under it. */
+export const MAX_PAYMENT = 0.5;
+
+/** The sandbox supplier invoices the sandbox company; the link is kept as ctx[as]. Every account comes from the sandbox admit. */
 const createInvoice = (as: string, say: string): Action[] => [
   { do: 'company', id: 'bluejay' },
   { do: 'goto', path: '/invoices/' },
@@ -15,6 +20,14 @@ const createInvoice = (as: string, say: string): Action[] => [
   { do: 'fill', testid: 'inv-customer', value: (c) => c.buyerAccount },
   { do: 'fill', testid: 'inv-payee', value: (c) => c.supplierAccount },
   { do: 'fill', testid: 'inv-supplier-account', value: (c) => c.supplierAccount },
+  { do: 'fill', testid: 'inv-supplier-name', value: (c) => c.supplierName || 'Sandbox Supplier' },
+  // small lines: 0.12 + 0.05 = 0.17, plus 18 % GST ≈ 0.20 USDT, so a run of two is still ≤ 0.5
+  { do: 'click', testid: 'inv-remove-line-2', optional: true, timeout: 600 },
+  { do: 'fill', testid: 'inv-line-qty-0', value: '1' },
+  { do: 'fill', testid: 'inv-line-price-0', value: '0.12' },
+  { do: 'fill', testid: 'inv-line-qty-1', value: '1' },
+  { do: 'fill', testid: 'inv-line-price-1', value: '0.05' },
+  { do: 'waitFor', wait: { test: (d) => totalOf(d.text('inv-total')) <= MAX_PAYMENT / 2 }, timeout: 4000, say: 'Keeping the invoice small (about 0.20 USDT) so one approver is enough.' },
   { do: 'highlight', testid: 'inv-preview', say: 'The invoice paper updates as the form is filled.', ms: 1200 },
   { do: 'capture', testid: 'inv-total', as: `${as}Total` },
   { do: 'click', testid: 'inv-create' },
@@ -42,7 +55,10 @@ export const STORY: Step[] = [
       { do: 'goto', mode: 'guest', path: '/onboard/' },
       { do: 'userTap', mode: 'guest', testid: 'create', prompt: 'Your turn: tap "Create passkey". It stays in this device’s keychain.', until: { testid: 'approver-account' } },
       { do: 'capture', mode: 'guest', testid: 'approver-account', as: 'approver' },
-      { do: 'api', call: { name: 'sandbox-admit', args: (c) => ({ approver: c.approver }) }, say: 'Adding this passkey as an approver of the sandbox company…', sim: true },
+      {
+        do: 'api', call: { name: 'sandbox-admit', args: (c) => ({ approver: c.approver }) }, say: 'Adding this passkey as an approver of the sandbox company…', sim: true,
+        retry: { while: (r) => r.status === 'pending-sync', everyMs: 10_000, maxMs: 180_000, say: 'Waiting for Whitechain to see your new role (~1 min)…' },
+      },
     ],
   },
   {
@@ -100,21 +116,21 @@ export const STORY: Step[] = [
       { do: 'goto', path: '/mandates/' },
       { do: 'fill', testid: 'm-account', value: (c) => c.mandateAccount },
       { do: 'fill', testid: 'm-payee', value: (c) => c.supplierAccount },
-      { do: 'fill', testid: 'm-cap', value: '0.50' },
+      { do: 'fill', testid: 'm-cap', value: '0.30' },
       { do: 'fill', testid: 'm-expiry', value: in90days },
       { do: 'click', testid: 'm-prepare' },
       { do: 'capture', testid: 'm-digest', as: 'mandate', say: () => 'The page rebuilt the mandate and the contract agrees on its digest.' },
-      { do: 'userTap', testid: 'm-approve', prompt: 'Your turn: tap "Approve with passkey" to sign the mandate (up to 0.50 USDT a period).', until: { enabled: 'm-submit' } },
+      { do: 'userTap', testid: 'm-approve', prompt: 'Your turn: tap "Approve with passkey" to sign the mandate (up to 0.30 USDT a period).', until: { enabled: 'm-submit' } },
       { do: 'click', testid: 'm-submit' },
       { do: 'waitFor', wait: { testid: 'm-tx' }, timeout: 120_000, say: 'Creating the mandate on Whitechain…' },
       { do: 'capture', testid: 'm-tx', as: 'mandateCreated', tx: 'whitechain', say: () => 'Mandate created' },
-      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: (c.mandate.match(/0x[0-9a-fA-F]{64}/) ?? [''])[0], account: c.mandateAccount }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
+      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: (c.mandate.match(/0x[0-9a-fA-F]{64}/) ?? [''])[0] }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
     ],
   },
   {
     id: 'credit', title: 'Credit note', why: 'The supplier refunds part of an invoice; it lands as money in.',
     actions: [
-      { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'credit-note', account: c.buyerAccount }) }, say: 'Simulated counterparty: Bluejay sends a credit note…', sim: true },
+      { do: 'api', call: { name: 'counterparty', args: () => ({ action: 'credit-note' }) }, say: 'Simulated counterparty: Bluejay sends a credit note…', sim: true },
       asBuyer,
       { do: 'goto', path: '/' },
       { do: 'highlight', testid: 'activity', say: 'Home shows the refund as money in.', ms: 2400 },

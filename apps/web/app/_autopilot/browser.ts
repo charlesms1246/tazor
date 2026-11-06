@@ -1,12 +1,13 @@
 'use client';
 
 /** Browser bindings for the Autopilot engine: the real DOM, navigation, storage, RPC receipts and the sandbox. */
-import { COMPANIES, setCompany } from '../../lib/company.ts';
+import { setCompany } from '../../lib/company.ts';
+import { createSandboxClient, isSandboxError } from '../../lib/sandbox.ts';
 import { config } from '../../lib/config.ts';
 import { getRelayerUrl } from '../../lib/relayer-url.ts';
 import { loadPasskey } from '../../lib/storage.ts';
-import { createRunner, KEY, parseState, type ApiResult, type Chain, type Deps, type Dom, type RunState, type Runner } from './engine.ts';
-import { fetchSandbox, getSandbox, type CounterpartyAction } from './sandbox-port.ts';
+import { createRunner, KEY, parseState, type ApiResult, type Chain, type Ctx, type Deps, type Dom, type RunState, type Runner } from './engine.ts';
+import { fromClient, getSandbox, type CounterpartyAction } from './sandbox-port.ts';
 import { STORY } from './story.ts';
 
 export const AUTOPILOT_EVENT = 'tazor:autopilot';
@@ -53,7 +54,14 @@ async function receipt(chain: Chain, hash: string): Promise<'ok' | 'reverted' | 
   }
 }
 
-const sandbox = () => getSandbox(() => fetchSandbox(() => process.env.NEXT_PUBLIC_SANDBOX_URL || getRelayerUrl()));
+const client = createSandboxClient(() => process.env.NEXT_PUBLIC_SANDBOX_URL || getRelayerUrl());
+const sandbox = () => getSandbox(() => fromClient(client));
+
+/** The sandbox supplier's display name, from GET /sandbox/status. */
+async function supplierName(): Promise<string> {
+  const r = await client.status();
+  return !isSandboxError(r.body) && r.body.company?.supplierName ? r.body.company.supplierName : 'Sandbox Supplier';
+}
 
 async function api(name: string, args: Record<string, string>): Promise<ApiResult> {
   if (name === 'preflight') {
@@ -63,14 +71,13 @@ async function api(name: string, args: Record<string, string>): Promise<ApiResul
   }
   if (name === 'sandbox-admit') {
     const r = await sandbox().admit(args.approver);
-    if (!r.ok) return r;
-    // the sandbox supplier defaults to Bluejay's account if the admit response does not name one
-    const bluejay = COMPANIES.find((c) => c.id === 'bluejay')!;
-    const data = { supplierAccount: bluejay.account, buyerCompany: 'sandbox', ...r.data };
+    if (!r.ok || r.status === 'pending-sync') return r;   // the engine repeats admit while it is pending-sync
+    const data: Ctx = { buyerCompany: 'sandbox', ...r.data };
     if (!data.mandateAccount && data.buyerAccount) data.mandateAccount = data.buyerAccount;
-    const missing = (['buyerAccount', 'registry'] as const).filter((k) => !ADDR.test(data[k] ?? ''));
-    if (missing.length) return { ok: false, error: `The sandbox did not return the company ${missing.join(' and ')}` };
-    return { ...r, detail: r.detail ?? `Approver of the sandbox company ${data.buyerAccount.slice(0, 6)}…${data.buyerAccount.slice(-4)}`, data };
+    const missing = (['buyerAccount', 'registry', 'supplierAccount'] as const).filter((k) => !ADDR.test(data[k] ?? ''));
+    if (missing.length) return { ok: false, error: `The sandbox did not return the ${missing.join(', ')}` };
+    data.supplierName = await supplierName();
+    return { ...r, detail: `You approve for the sandbox company ${data.buyerAccount.slice(0, 6)}…${data.buyerAccount.slice(-4)}; its supplier is ${data.supplierName}`, data };
   }
   if (name === 'counterparty') {
     const { action, ...rest } = args;

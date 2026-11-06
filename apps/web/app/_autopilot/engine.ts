@@ -26,7 +26,7 @@ export interface Dom {
 export type Wait = { testid?: string; enabled?: string; text?: string; textIn?: [testid: string, text: string]; test?: (d: Dom, c: Ctx) => boolean };
 export type Val = string | ((c: Ctx) => string);
 
-export type ApiResult = { ok: boolean; tx?: string; txs?: string[]; chain?: Chain; detail?: string; error?: string; data?: Ctx };
+export type ApiResult = { ok: boolean; status?: string; tx?: string; txs?: string[]; chain?: Chain; detail?: string; error?: string; data?: Ctx };
 export type ApiCall = { name: string; args?: (c: Ctx) => Record<string, string> };
 
 export type Action = { mode?: Mode } & (
@@ -39,7 +39,7 @@ export type Action = { mode?: Mode } & (
   | { do: 'userTap'; testid: string; prompt: string; until: Wait; timeout?: number }
   | { do: 'openTab'; url: string; prompt: string }
   | { do: 'capture'; testid: string; as: string; attr?: string; inner?: string; say?: (v: string, c: Ctx) => string; tx?: Chain }
-  | { do: 'api'; call: ApiCall; say: string; sim?: boolean; expectRefusal?: boolean; saveAs?: string }
+  | { do: 'api'; call: ApiCall; say: string; sim?: boolean; expectRefusal?: boolean; saveAs?: string; retry?: { while: (r: ApiResult) => boolean; everyMs: number; maxMs: number; say: string } }
   | { do: 'assertChain'; key: string; chain: Chain }
   | { do: 'log'; text: Val; kind?: LogKind }
 );
@@ -212,8 +212,20 @@ export function createRunner(steps: Step[], deps: Deps) {
       }
       case 'api': {
         log(a.sim ? 'sim' : 'info', a.say);
-        const r = await deps.api(a.call.name, a.call.args ? a.call.args(s.ctx) : {}, s.ctx);
+        let r = await deps.api(a.call.name, a.call.args ? a.call.args(s.ctx) : {}, s.ctx);
         if (g !== gen) throw new Aborted();
+        // repeat an idempotent call while the service says "not yet" (e.g. Whitechain hasn't seen an ENS change)
+        if (a.retry && r.ok && a.retry.while(r)) {
+          log('info', a.retry.say);
+          let waited = 0;
+          while (r.ok && a.retry.while(r)) {
+            if (waited >= a.retry.maxMs) throw new Error(`Still not ready after ${Math.round(a.retry.maxMs / 1000)} s: ${a.retry.say}`);
+            await until({ test: () => false }, a.retry.everyMs, g);
+            waited += a.retry.everyMs;
+            r = await deps.api(a.call.name, a.call.args ? a.call.args(cur().ctx) : {}, cur().ctx);
+            if (g !== gen) throw new Aborted();
+          }
+        }
         if (r.data) s.ctx = { ...cur().ctx, ...r.data };
         const txs = [...(r.txs ?? []), ...(r.tx ? [r.tx] : [])].filter((t, i, xs) => TX.test(t) && xs.indexOf(t) === i);
         if (a.saveAs && txs.length) s.ctx = { ...cur().ctx, [a.saveAs]: txs[txs.length - 1] };

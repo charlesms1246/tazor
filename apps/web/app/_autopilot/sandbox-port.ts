@@ -29,6 +29,11 @@ const pickData = (r: Raw): Ctx => {
   return out;
 };
 
+const tooMany = (sec: unknown) => {
+  const min = typeof sec === 'number' && sec > 0 ? Math.max(1, Math.ceil(sec / 60)) : null;
+  return `Too many new guests right now; try again in ${min ?? 'a few'} min`;
+};
+
 /** Normalises any of the likely response shapes into an ApiResult. */
 export function toResult(status: number, r: Raw | null): ApiResult {
   const body = r ?? {};
@@ -37,11 +42,12 @@ export function toResult(status: number, r: Raw | null): ApiResult {
   const ok = status >= 200 && status < 300 && body.ok !== false && !body.error && !refused;
   return {
     ok,
+    ...(typeof body.status === 'string' ? { status: body.status } : {}),
     ...(typeof tx === 'string' ? { tx } : {}),
     ...(Array.isArray(body.txs) ? { txs: body.txs.filter((t): t is string => typeof t === 'string') } : {}),
     ...(body.chain === 'sepolia' || body.chain === 'whitechain' ? { chain: body.chain as Chain } : {}),
     ...(typeof (body.detail ?? body.message) === 'string' ? { detail: String(body.detail ?? body.message) } : {}),
-    ...(!ok ? { error: String(body.reason ?? body.error ?? body.detail ?? `HTTP ${status}`) } : {}),
+    ...(!ok ? { error: status === 429 ? tooMany(body.retryAfterSec) : String(body.reason ?? body.error ?? body.detail ?? `HTTP ${status}`) } : {}),
     data: pickData(body),
   };
 }
@@ -61,6 +67,17 @@ export function fetchSandbox(base: () => string, f: typeof fetch = (...a) => glo
   return {
     admit: (approver) => post('/sandbox/admit', { approver, account: approver }),
     counterparty: (action, args) => post('/sandbox/counterparty', { ...args, action }),
+  };
+}
+
+/** Adapts helper2's lib/sandbox.ts client ({httpStatus, body}) to the port. */
+export function fromClient(c: {
+  admit(approver: string): Promise<{ httpStatus: number; body: unknown }>;
+  counterparty(action: CounterpartyAction, params: Record<string, string>): Promise<{ httpStatus: number; body: unknown }>;
+}): SandboxPort {
+  return {
+    admit: async (approver) => { const r = await c.admit(approver); return toResult(r.httpStatus, r.body as Raw); },
+    counterparty: async (action, args) => { const r = await c.counterparty(action, args); return toResult(r.httpStatus, r.body as Raw); },
   };
 }
 

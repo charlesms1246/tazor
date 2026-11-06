@@ -230,3 +230,74 @@ test('the story: unique ids, a why for every step, every userTap waits on a page
     for (const a of s.actions) if (a.do === 'userTap') assert.ok(Object.keys(a.until).length > 0, s.id);
   }
 });
+
+test('the Autopilot never targets acme: no acme accounts or registry in its sources, and both modes admit to the sandbox', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const dir = join(import.meta.dirname, '..', 'app', '_autopilot');
+  for (const f of ['story.ts', 'browser.ts', 'engine.ts', 'sandbox-port.ts', 'panel.tsx']) {
+    const src = readFileSync(join(dir, f), 'utf8').toLowerCase();
+    for (const a of ['0xb99a12652bee98429ae31ea0529a0b63f1073721', '0x18d15b034c645dbbfcb9c68238a14d059f632513', '0x331bdb575a72fb3dd8a6c85b6c043a753340fbf1', '0xea5a4be313e05eb254900b6adbb7d655c55242f6']) {
+      assert.ok(!src.includes(a), `${f} mentions ${a}`);
+    }
+  }
+  const ready = STORY.find((s) => s.id === 'ready')!;
+  const admit = ready.actions.find((a) => a.do === 'api' && a.call.name === 'sandbox-admit')!;
+  assert.equal(admit.mode, undefined, 'admit runs in both modes');
+  const companies = STORY.flatMap((s) => s.actions).filter((a) => a.do === 'company').map((a) => (a.do === 'company' ? a.id : ''));
+  assert.ok(!companies.includes('acme'));
+});
+
+test('api retry repeats an idempotent call while pending-sync, then continues; gives up after maxMs', async () => {
+  const w = world();
+  let n = 0;
+  w.setApi(() => (++n < 4 ? { ok: true, status: 'pending-sync' } : { ok: true, status: 'admitted', data: { buyerAccount: '0x1' } }));
+  const steps: Step[] = [{ id: 'adm', title: 'Admit', why: '', actions: [
+    { do: 'api', call: { name: 'sandbox-admit' }, say: 'admitting', retry: { while: (r) => r.status === 'pending-sync', everyMs: 10_000, maxMs: 180_000, say: 'Waiting for Whitechain to see your new role (~1 min)…' } },
+  ] }];
+  const r = createRunner(steps, w.deps());
+  r.start('guest');
+  await settle(r, w, (s) => s?.status === 'done');
+  assert.equal(n, 4);
+  assert.equal(r.state()!.ctx.buyerAccount, '0x1');
+  assert.equal(r.state()!.log.filter((l) => l.text.startsWith('Waiting for Whitechain')).length, 1, 'the waiting line is shown once');
+  assert.ok(w.clock() >= 30_000);
+
+  w.setApi(() => ({ ok: true, status: 'pending-sync' }));
+  r.start('guest');
+  await settle(r, w, (s) => s?.status === 'failed', 20_000);
+  assert.match(r.state()!.error!, /Still not ready after 180 s/);
+});
+
+test('sandbox port: 429 gives a plain wait message; the lib/sandbox client adapts', async () => {
+  const { fromClient } = await import('../app/_autopilot/sandbox-port.ts');
+  assert.equal(toResult(429, { ok: false, error: 'rate limited', retryAfterSec: 600 } as never).error, 'Too many new guests right now; try again in 10 min');
+  assert.equal(toResult(429, null).error, 'Too many new guests right now; try again in a few min');
+  const port = fromClient({
+    admit: async () => ({ httpStatus: 200, body: { ok: true, status: 'pending-sync', companyId: 'sandbox', account: '0x1', registry: '0x2', supplier: '0x3', mandateAccount: '0x1', txs: [TX] } }),
+    counterparty: async () => ({ httpStatus: 200, body: { ok: false, status: 'refused', reason: 'approver revoked', tx: null } }),
+  });
+  const a = await port.admit('0xa');
+  assert.equal(a.ok, true);
+  assert.equal(a.status, 'pending-sync');
+  assert.deepEqual(a.txs, [TX]);
+  assert.deepEqual(a.data, { buyerCompany: 'sandbox', buyerAccount: '0x1', mandateAccount: '0x1', registry: '0x2', supplierAccount: '0x3' });
+  const c = await port.counterparty('ravi-pays', {});
+  assert.deepEqual([c.ok, c.error], [false, 'approver revoked']);
+});
+
+test('story: every invoice is small, the mandate cap is under the two-approver threshold', async () => {
+  const { totalOf, MAX_PAYMENT } = await import('../app/_autopilot/story.ts');
+  assert.equal(totalOf('0.20 USDT'), 0.2);
+  assert.ok(Number.isNaN(totalOf(null)));
+  const fills = STORY.flatMap((s) => s.actions).filter((a) => a.do === 'fill');
+  const prices = fills.filter((a) => a.do === 'fill' && a.testid.startsWith('inv-line-price-')).map((a) => (a.do === 'fill' && typeof a.value === 'string' ? Number(a.value) : NaN));
+  assert.ok(prices.length > 0 && prices.every((p) => p > 0));
+  // two lines per invoice, plus 18 % GST, twice for a run
+  assert.ok(2 * (0.12 + 0.05) * 1.18 <= MAX_PAYMENT);
+  const cap = fills.find((a) => a.do === 'fill' && a.testid === 'm-cap');
+  assert.ok(cap && cap.do === 'fill' && Number(cap.value) <= MAX_PAYMENT);
+  const payees = fills.filter((a) => a.do === 'fill' && ['inv-payee', 'inv-supplier-account', 'm-payee'].includes(a.testid));
+  assert.equal(payees.length >= 3, true);
+  for (const p of payees) assert.ok(p.do === 'fill' && typeof p.value === 'function' && p.value({ supplierAccount: '0xS' }) === '0xS', 'payee is the sandbox supplier');
+});
