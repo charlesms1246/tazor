@@ -1,0 +1,98 @@
+{
+  "id": "SDK-LIVE-20261106-MW4ZNAQ0",
+  "at": "2026-11-06T13:06:25.560Z",
+  "link": "https://tazor-app.vercel.app/pay/#v1.6XglAGomWTlzuQEmKwo758vyrrAleTO1P4SrmeiLBOoGP7Hvc8zYDIahhh5snYRIsjA76k7NxBtfOgT6xWUPHf2uvHthDKmJ3Q8G1i38RIJur1H_PeUT0e4j5oMMAXdAW78JyLrujq0Nit_ABwHRgOg0_Mrb0j3NKExfDWVddfjUT9VRMeEZ47U-9nHXLnW4Bo_nObzoCJxl9zUHx5-K4QCUys36p2C9PkiWa4Yp-W-yLTmop8PqOvZgB9KlkknP1y__2L6HlADPOlO4AtQy0plByt-CFy5VQ0s6g_HXawTyXztJvV-3NjmYKsJ01rvbg7RebKLlUAwlhxQm7723KC6bx51gVV71x1erkTWyc_cD6ygaV4ty12pfG8C_GkJEykqp1GBavF1OzvwuBVhvfV87XKAJnCbxbPPniQzg0h-jI53fI9PXHZDfqzt8HbSolB1HYNIr1tjlza7EVfP2PB31J_HBZFaDLapozMl4eHJ5VR6o65RZ43dWhLdG_ECfBOJatOsI9miuro6KncWeElxOldc4JzwlgGPTRuF7eskEOpXpVXQhqAh46DL7ffqaWxBNTPOi7g3T78ByqnDXV4h8SKDwrWrJW7Su1LQp4mGQonsYLUz6l7Lt2s0trd0ev3DqFDxJja2kRM2oDJI.Sqw__DAdQ69xVH4JdCjK8oJI_MZ-fBKb5cxwCiHkH8M",
+  "invoiceHash": "0xc56bb0347131d9a5c098d4f6e70e393fecdadb5a0a72d36a8b76d5053f0fd4ac",
+  "amount": "0.05",
+  "relayer": "https://tazor-relayer.vercel.app",
+  "relayed": {
+    "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+    "paymentModule": "0x906620D82e2959351c81D731C67EA46DF71E36f3",
+    "deployTxs": []
+  },
+  "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+  "block": "12374020",
+  "gasUsed": "178984",
+  "explorer": "https://explorer.testnet.whitechain.io/tx/0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+  "onPaid": {
+    "txHash": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c",
+    "amount": "0.05",
+    "amountBaseUnits": "50000",
+    "at": 1793970388000,
+    "payer": "0xb99A12652BEe98429ae31EA0529A0b63f1073721",
+    "payee": "0xc1dce946D192e344251972470237F1471C93876c",
+    "viaL1": false,
+    "invoiceHash": "0xc56bb0347131d9a5c098d4f6e70e393fecdadb5a0a72d36a8b76d5053f0fd4ac",
+    "explorerUrl": "https://explorer.testnet.whitechain.io/tx/0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+  },
+  "timings": {
+    "submitToReceiptMs": 3038,
+    "submitToBlockTimeMs": 2440,
+    "receiptToOnPaidMs": -174,
+    "submitToOnPaidMs": 2864
+  },
+  "checks": [
+    {
+      "name": "auth nonce equals the invoice hash",
+      "ok": true
+    },
+    {
+      "name": "buyer is a PaymentModuleV2 company",
+      "ok": true,
+      "detail": "registry 0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1"
+    },
+    {
+      "name": "on-chain runDigest matches the local digest",
+      "ok": true,
+      "detail": "0xfe42bc41cb24607d4bd2ac37c2ad56c49446a3a336868ccefb0326ec53dcabca"
+    },
+    {
+      "name": "buyer holds enough USDT",
+      "ok": true,
+      "detail": "10.4 USDT"
+    },
+    {
+      "name": "relayer /health ok",
+      "ok": true,
+      "detail": "sender 0x63C40720830EbcEc32Bcf782c91FC3A300D8672b"
+    },
+    {
+      "name": "relayer accepted the payment",
+      "ok": true,
+      "detail": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+    },
+    {
+      "name": "relayer chose PaymentModuleV2",
+      "ok": true,
+      "detail": "0x906620D82e2959351c81D731C67EA46DF71E36f3"
+    },
+    {
+      "name": "transaction succeeded",
+      "ok": true,
+      "detail": "block 12374020"
+    },
+    {
+      "name": "receipt has InvoicePaid(nonce = invoiceHash) for the amount",
+      "ok": true
+    },
+    {
+      "name": "watchPayment onPaid fired",
+      "ok": true
+    },
+    {
+      "name": "onPaid tx hash equals the submitted tx",
+      "ok": true,
+      "detail": "0xd5b6b97f2f82c556752b3da961635650566be183f79c3e403bc0e111552b171c"
+    },
+    {
+      "name": "onPaid amount equals the invoice amount",
+      "ok": true,
+      "detail": "0.05 USDT"
+    },
+    {
+      "name": "isPaid(invoiceHash) is true",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

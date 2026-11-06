@@ -1,0 +1,59 @@
+{
+  "id": "SDK-LIVE-20261106-MW4ZL9AT",
+  "at": "2026-11-06T13:04:49.139Z",
+  "link": "https://tazor-app.vercel.app/pay/#v1.rEB2pAfVbMMo4-wjug7j2k_OkZBrmHcxl8x2Xzfm7C75ASlUXduFWJIR42oYZ1xfcGoYMKmelgO8dFqBdX-cUyPW2_IqpqVQvzMWRv35g9A2fsqU2aN5z6E9h4L9oTdqltXaVxbcgAMLLszVQp2r2Vz1evMAuHSv1kl8NIXAkhuBD81EMCsjhvFhOLz9FKQKJ6s0M3xuydpbILTgb3p1jDcTbVPeVo5wbiK0QTHk8yxrrikXX2WWNipui_-lMiI5cBGKeG5Qi4zENlG26nz-RP0NrFd6qLfube-NzlLhswVHz1cRS5QIkBFzVruPk9JEknRpzGOO31x8vuqeaoMn1q1wV8zSalkYEmiLIfb8EPyFi34pp4m7glpsNTSOXJzYTEi-sk1sGuIX071CQxG5RM670fWzurfWBM8cagvNgcpsNM3oXJH39xDcv18_QsyiGENS5idytx-8gFtY2h1RLSSXBK3u4TKbr77SZersBUAfXCV-27k9pd9SCNUnGkZLoiXhbiXZx6BWZbOfjotvd5I_sLO7Fjux-0G0__rFRGXvBAab7H9ksak2tBaUruGyGh0A76H4CQ2ZRd4tAkU7HUiXqSfYM5jG28le8sycnA3hAx-2WlHD_48l0obwYmO_ixsF18CGpriUec2GdMw.sLci4CLBhqGFUs4s14GhprQuq39LcURJbN3l1xr_dHw",
+  "invoiceHash": "0x73a17efacf48994a563cc53ebf624384e304f21c1eb1d9697ed90ee65d8413d1",
+  "amount": "0.05",
+  "digest": "0xd5749ac4a55e46f2cf40c88529d7a0fbdd6e2cb865ea96e9a7172c34330460de",
+  "preflight": {
+    "digest": "0xd5749ac4a55e46f2cf40c88529d7a0fbdd6e2cb865ea96e9a7172c34330460de",
+    "buyerUsdt": "400000",
+    "relayer": "0x63C40720830EbcEc32Bcf782c91FC3A300D8672b"
+  },
+  "checks": [
+    {
+      "name": "auth nonce equals the invoice hash",
+      "ok": true
+    },
+    {
+      "name": "buyer is a PaymentModuleV2 company",
+      "ok": true,
+      "detail": "registry 0x331bDB575A72Fb3dd8a6C85b6C043A753340Fbf1"
+    },
+    {
+      "name": "on-chain runDigest matches the local digest",
+      "ok": true,
+      "detail": "0xd5749ac4a55e46f2cf40c88529d7a0fbdd6e2cb865ea96e9a7172c34330460de"
+    },
+    {
+      "name": "buyer holds enough USDT",
+      "ok": true,
+      "detail": "0.4 USDT"
+    },
+    {
+      "name": "relayer /health ok",
+      "ok": true,
+      "detail": "sender 0x63C40720830EbcEc32Bcf782c91FC3A300D8672b"
+    }
+  ],
+  "relayerBody": {
+    "account": "0xb99A12652BEe98429ae31EA0529A0b63f1073721",
+    "auths": [
+      {
+        "invoiceHash": "0x73a17efacf48994a563cc53ebf624384e304f21c1eb1d9697ed90ee65d8413d1",
+        "account": "0xb99A12652BEe98429ae31EA0529A0b63f1073721",
+        "payee": "0xc1dce946D192e344251972470237F1471C93876c",
+        "amount": "50000",
+        "expiry": "1797120000",
+        "nonce": "52301316346360826724256308685503899397909266128849278552871366305741499798481"
+      }
+    ],
+    "approvers": [
+      "0x00aBed5bDddf794c415eE746d3E4De5332cC5450"
+    ],
+    "signatures": [
+      "0x<signature by PRIYA_KEY>"
+    ]
+  },
+  "signed": false
+}
