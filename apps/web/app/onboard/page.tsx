@@ -6,6 +6,7 @@ import { predictApproverAccount } from '@/lib/approver.ts';
 import { config } from '@/lib/config.ts';
 import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { loadPasskey, savePasskey, type StoredPasskey } from '@/lib/storage.ts';
+import { Addr, Card, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
 export default function OnboardPage() {
   const [stored, setStored] = useState<StoredPasskey | null>(null);
@@ -45,34 +46,68 @@ export default function OnboardPage() {
     }
   };
 
+  const created = !!stored;
+  const deployed = !!deploy;
   return (
-    <main>
-      <h1>Become an approver</h1>
-      <p data-testid="wb-label">Verified by WhiteBIT (simulated on testnet)</p>
-      <p>
-        Your passkey stays in your device keychain. Your approver account address is derived from its public key
-        and the relayer deploys it for you.
-      </p>
-      <button data-testid="create" onClick={onCreate} disabled={busy}>Create passkey</button>
-      {error && <p data-testid="error" style={{ color: 'crimson' }}>{error}</p>}
-      {note && <p>{note}</p>}
-      {stored && (
-        <table>
-          <tbody>
-            <tr><td>Approver account (predicted)</td><td data-testid="approver-account">{stored.approverAccount}</td></tr>
-            {signer && <tr><td>Signer id</td><td data-testid="signer" style={{ wordBreak: 'break-all' }}>{signer}</td></tr>}
-            {deploy && (
-              <tr><td>Deployment</td><td data-testid="deploy">
-                {deploy.txHash
-                  ? <a href={`${config.explorer}/tx/${deploy.txHash}`} target="_blank" rel="noreferrer">{deploy.txHash}</a>
-                  : 'already deployed'}
-              </td></tr>
-            )}
-            <tr><td>Passkey x</td><td style={{ wordBreak: 'break-all' }}>{stored.x}</td></tr>
-            <tr><td>Passkey y</td><td style={{ wordBreak: 'break-all' }}>{stored.y}</td></tr>
-          </tbody>
-        </table>
-      )}
-    </main>
+    <div className="page">
+      <PageHeader
+        title="Approver onboarding"
+        subtitle="Create a passkey on this device; your approver account is derived from it and deployed for you."
+      />
+
+      <Card>
+        <div className="steps">
+          <div className="step" data-done={created}>
+            <span className="step-n">1</span>
+            <div className="stack">
+              <div className="spread">
+                <span style={{ fontWeight: 500 }}>Create a passkey</span>
+                <Pill tone="info" testId="wb-label">Verified by WhiteBIT (simulated on testnet)</Pill>
+              </div>
+              <p className="muted">Your passkey stays in your device keychain. Face ID or your device PIN unlocks it whenever you approve.</p>
+              <div className="row">
+                <button data-testid="create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create passkey</button>
+              </div>
+              {error && <Notice tone="negative" testId="error">{error}</Notice>}
+              {note && <Notice>{note}</Notice>}
+            </div>
+          </div>
+
+          <div className="step" data-done={created}>
+            <span className="step-n">2</span>
+            <div className="stack">
+              <span style={{ fontWeight: 500 }}>Your approver account</span>
+              {!stored ? (
+                <p className="muted">Appears here after you create the passkey: its address is computed from the passkey&apos;s public key.</p>
+              ) : (
+                <dl className="kv">
+                  <dt>Approver account (predicted)</dt>
+                  <dd><Addr value={stored.approverAccount} href={`${config.explorer}/address/${stored.approverAccount}`} full testId="approver-account" /></dd>
+                  {signer && <><dt>Signer id</dt><dd><span className="mono break" data-testid="signer">{signer}</span></dd></>}
+                  <dt>Passkey x</dt><dd><span className="mono break">{stored.x}</span></dd>
+                  <dt>Passkey y</dt><dd><span className="mono break">{stored.y}</span></dd>
+                </dl>
+              )}
+            </div>
+          </div>
+
+          <div className="step" data-done={deployed}>
+            <span className="step-n">3</span>
+            <div className="stack">
+              <span style={{ fontWeight: 500 }}>Deployed by the relayer</span>
+              {deploy ? (
+                <p data-testid="deploy">
+                  {deploy.txHash
+                    ? <a href={`${config.explorer}/tx/${deploy.txHash}`} target="_blank" rel="noreferrer" className="mono break">{deploy.txHash}</a>
+                    : 'already deployed'}
+                </p>
+              ) : (
+                <p className="muted">The relayer deploys your account on Whitechain. Without one, anyone can deploy it later with createAccount([signer id]).</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 }
