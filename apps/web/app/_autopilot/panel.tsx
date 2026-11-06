@@ -89,6 +89,12 @@ export function AutopilotPanel() {
                 {s.link
                   ? <a className="btn btn-primary" href={s.link} target="_blank" rel="noreferrer" onClick={() => r.ack()} data-testid="autopilot-open-tab">Open {new URL(s.link).host}</a>
                   : <span className="ap-callout-sub">The Autopilot continues as soon as the page reaches the next state.</span>}
+                {s.skipNote && (
+                  <span className="ap-callout-sub" data-testid="autopilot-skip-note">
+                    {s.skipNote.text}{s.skipNote.href && <> <a href={s.skipNote.href} target="_blank" rel="noreferrer" style={{ color: 'var(--wc-lime)' }}>View the recorded payment</a></>}
+                    {' '}<button type="button" className="btn btn-sm" onClick={() => r.skip()} data-testid="autopilot-skip-recorded">Skip</button>
+                  </span>
+                )}
               </div>
             )}
             {s.status === 'failed' && s.error && (() => {

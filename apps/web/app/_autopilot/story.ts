@@ -1,5 +1,6 @@
 import { toEventSelector } from 'viem';
-import type { Action, Ctx, Step } from './engine.ts';
+import type { Action, Ctx, SkipNote, Step } from './engine.ts';
+import { TIMINGS } from '../../lib/timings.ts';
 
 /** The pitch, end to end, on the real pages. Values the run learns (links, accounts, txs) live in ctx. */
 
@@ -7,6 +8,13 @@ const SHOP = 'https://bluejay-shop.vercel.app';
 /** A relayer address that never answers: the page sees exactly what it sees when our servers are down. */
 export const OFFLINE_RELAYER = 'https://relayer-offline.invalid';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+
+/** The Ethereum fallback recorded live with our servers off (lib/timings.ts), offered when a visitor has no Sepolia wallet. */
+const fallbackTiming = TIMINGS.find((t) => /servers down/i.test(t.action));
+export const RECORDED_FALLBACK: SkipNote = {
+  text: `No Sepolia wallet? Skip; this was recorded live: ${fallbackTiming?.tazor ?? 'about a minute via Ethereum'} with our servers off.`,
+  href: fallbackTiming?.proof?.find((p) => /whitechain/i.test(p.label))?.url ?? fallbackTiming?.proof?.[0]?.url,
+};
 
 /** MandateCreated(bytes32 indexed mandateId, address indexed account, address indexed payee, uint256, uint64, uint64), same in v1 and v2. */
 export const MANDATE_CREATED = toEventSelector('MandateCreated(bytes32,address,address,uint256,uint64,uint64)');
@@ -29,7 +37,7 @@ export const LABELS: Record<string, string> = {
   'm-digest': 'the contract check', 'm-approve': 'the "Approve with passkey" button', 'm-submit': 'the "Create mandate" button', 'm-tx': 'the mandate confirmation',
   'company-ens': 'the company ENS name', 'company-ens-links': 'the ENS links', 'registry-contract-link': 'the registry link', 'person-sync-state': 'the sync status',
   'relayer-url': 'the relayer address field', 'relayer-save': 'the "Save" button', 'relayer-clear': 'the "Clear" button', 'health-refresh': 'the "Refresh" button',
-  'prepare-l1': 'the "Prepare Ethereum transaction" button', 'send-l1': 'the "Send with your wallet" button', activity: 'the activity list', tally: 'the "Tally CSV" button',
+  'prepare-l1': 'the "Prepare Ethereum transaction" button', 'send-l1': 'the "Send with your wallet" button', 'l1-guide': 'the Blockscout guide', 'l1-blockscout-open': 'the "Open on Blockscout" link', activity: 'the activity list', tally: 'the "Tally CSV" button',
   create: 'the "Create passkey" button', 'approver-account': 'your approver account',
 };
 
@@ -194,7 +202,15 @@ export const STORY: Step[] = [
       { do: 'click', testid: 'pay' },
       { do: 'waitFor', wait: { testid: 'error' }, timeout: 30_000, say: 'Paying through our relayer fails, as expected…', optional: true },
       { do: 'click', testid: 'prepare-l1' },
-      { do: 'userTap', testid: 'send-l1', prompt: 'Your turn: tap "Send with your wallet" and confirm on Ethereum Sepolia.', until: { testid: 'pay-success' }, timeout: 15 * 60_000 },
+      { do: 'highlight', testid: 'l1-guide', say: 'With our servers off, the same signed payment goes through Ethereum. Blockscout is the safest place to send it from.', ms: 2400 },
+      { do: 'capture', testid: 'l1-blockscout-open', attr: 'href', as: 'blockscoutUrl' },
+      {
+        do: 'openTab', url: (c) => c.blockscoutUrl, timeout: 15 * 60_000,
+        prompt: 'Your turn: on Blockscout, connect your wallet, open forward, paste the 5 fields from Tazor and press Write.',
+        // the relayer is offline in this step, so a payment can only have arrived through Ethereum
+        until: { testid: 'pay-success' },
+        skipNote: RECORDED_FALLBACK,
+      },
       { do: 'capture', testid: 'pay-success-tx', attr: 'href', as: 'fallback', tx: 'whitechain', say: () => 'Paid via Ethereum with our relayer offline; settled on Whitechain' },
     ],
   },

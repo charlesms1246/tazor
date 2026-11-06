@@ -37,7 +37,8 @@ export type Action = { mode?: Mode } & (
   | { do: 'click'; testid: string; optional?: boolean; timeout?: number }
   | { do: 'waitFor'; wait: Wait; timeout: number; say: string; optional?: boolean }
   | { do: 'userTap'; testid: string; prompt: string; until: Wait; timeout?: number }
-  | { do: 'openTab'; url: string; prompt: string }
+  /** Shows a link to tap in the panel; done when tapped, or (with `until`) when the page reaches that state. */
+  | { do: 'openTab'; url: Val; prompt: string; until?: Wait; timeout?: number; skipNote?: SkipNote }
   | { do: 'capture'; testid: string; as: string; attr?: string; inner?: string; say?: (v: string, c: Ctx) => string; tx?: Chain }
   | { do: 'api'; call: ApiCall; say: string; sim?: boolean; expectRefusal?: boolean; saveAs?: string; retry?: { while: (r: ApiResult) => boolean; everyMs: number; maxMs: number; say: string } }
   | { do: 'assertChain'; key: string; chain: Chain }
@@ -46,11 +47,13 @@ export type Action = { mode?: Mode } & (
   | { do: 'log'; text: Val; kind?: LogKind }
 );
 
+export type SkipNote = { text: string; href?: string };
+
 export type Step = { id: string; title: string; why: string; modes?: Mode[]; actions: Action[] };
 
 export type RunState = {
   v: 1; mode: Mode; status: Status; step: number; action: number; ctx: Ctx; log: LogLine[]; done: string[];
-  prompt?: string; highlight?: string; link?: string; acked?: boolean; error?: string; startedAt: number;
+  prompt?: string; highlight?: string; link?: string; acked?: boolean; skipNote?: SkipNote; error?: string; startedAt: number;
 };
 
 export type Deps = {
@@ -204,14 +207,15 @@ export function createRunner(steps: Step[], deps: Deps) {
         return 'next';
       }
       case 'openTab': {
-        s.status = 'waiting-user'; s.prompt = a.prompt; s.link = a.url; s.acked = false; emit();
+        s.status = 'waiting-user'; s.prompt = a.prompt; s.link = val(a.url, s.ctx); s.acked = false; s.skipNote = a.skipNote; emit();
         log('user', a.prompt);
-        const ok = await until({ test: () => cur().acked === true }, USER_TIMEOUT, g);
+        const done: Wait = a.until ?? { test: () => cur().acked === true };
+        const ok = await until(done, a.timeout ?? USER_TIMEOUT, g);
         const now = cur();
-        now.prompt = undefined; now.link = undefined; now.acked = undefined;
+        now.prompt = undefined; now.link = undefined; now.acked = undefined; now.skipNote = undefined;
         if (now.status === 'waiting-user') now.status = 'running';
         emit();
-        if (!ok) throw new Error('Timed out waiting for you to open the tab.');
+        if (!ok) throw new Error(a.until ? 'Timed out waiting for the payment to arrive.' : 'Timed out waiting for you to open the tab.');
         return 'next';
       }
       case 'capture': {
@@ -354,8 +358,14 @@ export function createRunner(steps: Step[], deps: Deps) {
     resume() { st = deps.load() ?? st; if (st && (st.status === 'running' || st.status === 'waiting-user')) void loop(); },
     pause() { if (st && (st.status === 'running' || st.status === 'waiting-user')) { st.status = 'paused'; emit(); } },
     play() { if (st?.status === 'paused') { st.status = st.prompt ? 'waiting-user' : 'running'; emit(); void loop(); } },
-    skip() { control((s) => { s.step++; s.action = 0; s.status = 'running'; s.prompt = undefined; s.highlight = undefined; s.link = undefined; s.error = undefined; log('warn', 'Skipped'); }); },
-    retry() { control((s) => { s.action = 0; s.status = 'running'; s.prompt = undefined; s.highlight = undefined; s.link = undefined; s.error = undefined; log('warn', 'Retrying this step'); }); },
+    skip() {
+      control((s) => {
+        const note = s.skipNote;
+        log('warn', note ? `Skipped. ${note.text}` : 'Skipped', note?.href ? { href: note.href } : {});
+        s.step++; s.action = 0; s.status = 'running'; s.prompt = undefined; s.highlight = undefined; s.link = undefined; s.skipNote = undefined; s.error = undefined;
+      });
+    },
+    retry() { control((s) => { s.action = 0; s.status = 'running'; s.prompt = undefined; s.highlight = undefined; s.link = undefined; s.skipNote = undefined; s.error = undefined; log('warn', 'Retrying this step'); }); },
     stop() { gen++; st = null; emit(); },
     ack() { if (st) { st.acked = true; emit(); } },
     /** For tests: resolves when the loop is idle. */

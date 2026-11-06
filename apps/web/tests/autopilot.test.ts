@@ -382,3 +382,53 @@ test('a step (re)start clears its own captured values, so Retry never reuses a p
   assert.equal(r.state()!.ctx.lastLink, 'L1', 'shared key kept');
   assert.equal(r.state()!.ctx.aValue, 'X', "another step's value kept");
 });
+
+test('openTab with until: link from ctx, continues on the page state (no tap on our link needed); Skip logs the note', async () => {
+  const w = world();
+  const note = { text: 'No Sepolia wallet? Skip; this was recorded live: 69 s via Ethereum with our servers off.', href: 'https://explorer/tx/recorded' };
+  const steps: Step[] = [
+    { id: 'off', title: 'Servers off', why: '', actions: [
+      { do: 'capture', testid: 'bs', attr: 'href', as: 'blockscoutUrl' },
+      { do: 'openTab', url: (c) => c.blockscoutUrl, prompt: 'Your turn: Blockscout', until: { testid: 'pay-success' }, timeout: 60_000, skipNote: note },
+      { do: 'log', text: 'paid via Ethereum' },
+    ] },
+    { id: 'next', title: 'Next', why: '', actions: [{ do: 'log', text: 'next ran' }] },
+  ];
+  w.el.set('bs', { attrs: { href: 'https://eth-sepolia.blockscout.com/address/0xgate?tab=write_contract' } });
+  const r = createRunner(steps, w.deps());
+  r.start('presenter');
+  await settle(r, w, (s) => s?.status === 'waiting-user');
+  assert.equal(r.state()!.link, 'https://eth-sepolia.blockscout.com/address/0xgate?tab=write_contract');
+  assert.deepEqual(r.state()!.skipNote, note);
+  r.ack();
+  await w.deps().sleep(1000);
+  assert.equal(r.state()!.status, 'waiting-user', 'opening the tab is not enough: it waits for the payment');
+  w.el.set('pay-success', {});
+  await settle(r, w, (s) => s?.status === 'done');
+  assert.ok(r.state()!.log.some((l) => l.text === 'paid via Ethereum'));
+  assert.equal(r.state()!.skipNote, undefined);
+
+  // no wallet: Skip records the note with the recorded payment
+  w.el.delete('pay-success');
+  r.start('presenter');
+  await settle(r, w, (s) => s?.status === 'waiting-user');
+  r.skip();
+  await settle(r, w, (s) => s?.status === 'done');
+  const skipped = r.state()!.log.find((l) => l.text.startsWith('Skipped.'))!;
+  assert.equal(skipped.text, `Skipped. ${note.text}`);
+  assert.equal(skipped.href, note.href);
+  assert.ok(r.state()!.log.some((l) => l.text === 'next ran'));
+  assert.ok(!r.state()!.log.some((l) => l.text === 'paid via Ethereum'));
+});
+
+test('servers-off step: Blockscout guide, no wallet prompt from this site, recorded run to fall back on', async () => {
+  const { RECORDED_FALLBACK } = await import('../app/_autopilot/story.ts');
+  const off = STORY.find((s) => s.id === 'offline')!;
+  assert.ok(!off.actions.some((a) => a.do === 'userTap' && a.testid === 'send-l1'), 'never asks this site to send the wallet transaction');
+  assert.ok(off.actions.some((a) => a.do === 'highlight' && a.testid === 'l1-guide'));
+  assert.ok(off.actions.some((a) => a.do === 'capture' && a.testid === 'l1-blockscout-open' && a.attr === 'href'));
+  const open = off.actions.find((a) => a.do === 'openTab')!;
+  assert.ok(open.do === 'openTab' && open.until?.testid === 'pay-success' && open.timeout === 15 * 60_000 && open.skipNote === RECORDED_FALLBACK);
+  assert.match(RECORDED_FALLBACK.text, /^No Sepolia wallet\? Skip; this was recorded live: 69 s via Ethereum with our servers off\.$/);
+  assert.equal(RECORDED_FALLBACK.href, 'https://explorer.testnet.whitechain.io/tx/0xa00dbd6923b79335f4ee60733adaa0f68652a47915141ddba0e6719b48eea30e');
+});

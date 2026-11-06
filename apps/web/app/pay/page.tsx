@@ -32,6 +32,7 @@ import '../_invoice/touch.css';
 import { ApprovalNames, MyApproval } from '../_invoice/approvals-ui.tsx';
 import { parseApprovalInput } from '@/lib/approval-code.ts';
 import { hasHex } from '@/lib/hex-text.ts';
+import { blockscoutWriteUrl, forwardFields, forwardNote } from '@/lib/blockscout-forward.ts';
 import { plain } from '@/lib/human.ts';
 import { printInvoice } from '../_invoice/paper.tsx';
 import { toast, Toasts } from '../_invoice/toast.tsx';
@@ -42,7 +43,7 @@ import { usdtNumber } from '@/lib/money.ts';
 import { AddrChip } from '../_human/chip.tsx';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
-type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
+type L1 = { via?: 'blockscout' | 'wallet'; data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
 type Guard = { status: 'checking' } | { status: 'ok'; digest: Hex } | { status: 'refused'; reason: string };
 
 const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
@@ -270,12 +271,12 @@ export default function PayPage() {
     if (!gate) throw new Error('EnsGate address is not configured.');
     if (!label.trim()) throw new Error('Enter the company name label.');
     const data = encodeForward(label.trim(), auth, inner);
-    setL1({ data });
+    setL1({ via: 'wallet', data });
     try {
       const { gas, fee } = await estimateForwardFee(gate, data);
-      setL1({ data, gas, fee });
+      setL1({ via: 'wallet', data, gas, fee });
     } catch (e) {
-      setL1({ data, feeError: msg(e) });
+      setL1({ via: 'wallet', data, feeError: msg(e) });
     }
   });
 
@@ -287,6 +288,18 @@ export default function PayPage() {
     setL1({ ...l1, hash, started, fromBlock });
     story('fallback-sent', `${i.id} sent via Ethereum (${label.trim()}.taz0r.eth)`, { detail: 'EnsGate → OptimismPortal', tx: hash, chain: 'sepolia' });
   });
+
+  // the Blockscout path: the five values come straight from the approvals; opening Blockscout starts the delivery watch
+  const bsFields = approvals?.length && label.trim() ? forwardFields(label.trim(), auth, inner, i.id) : null;
+  const copy = (text: string, what: string) =>
+    navigator.clipboard?.writeText(text).then(() => toast(`${what} copied`), () => toast('Could not copy; select the text instead', 'error'));
+  const onOpenBlockscout = () => {
+    if (!approvals?.length || l1?.started) return;
+    const data = encodeForward(label.trim(), auth, inner);
+    rpc<Hex>('eth_blockNumber', [])
+      .then((b) => setL1((prev) => ({ ...(prev ?? { data }), via: prev?.via ?? 'blockscout', data, started: Date.now(), fromBlock: BigInt(b) - 10n })))
+      .catch(() => undefined);
+  };
 
   const onWatchL1 = run(async () => {
     if (!l1) return;
@@ -347,7 +360,7 @@ export default function PayPage() {
           <div className="pay-success-body">
             <h2 data-testid="pay-success-amount">Paid {amountText} USDT to {i.supplierName}</h2>
             <p className="muted" data-testid="pay-success-time">
-              {settledIn !== null ? `Settled on Whitechain in ${settledIn.toFixed(1)} s` : 'Settled on Whitechain'}
+              {l1?.l2Tx && l1.seconds !== undefined ? `Delivered via Ethereum in ${l1.seconds.toFixed(0)} s` : settledIn !== null ? `Settled on Whitechain in ${settledIn.toFixed(1)} s` : 'Settled on Whitechain'}
               {' · '}<a href={`${config.explorer}/tx/${paidTx}`} target="_blank" rel="noreferrer" data-testid="pay-success-tx">View transaction</a>
             </p>
             <div className="row">
@@ -464,9 +477,10 @@ export default function PayPage() {
           <div data-tour="pay-fallback">
           <Card title="Send via Ethereum" subtitle="Works with Tazor's relayer and Whitechain's sequencer down.">
             <div className="stack">
-              <p className="muted">
-                The payment goes to EnsGate on Ethereum, which checks the approvers&apos; ENS roles and delivers it to Whitechain
-                through the OptimismPortal (about a minute).
+              <p className="muted" style={{ margin: 0 }}>
+                Your wallet will deliver this payment through Ethereum from Blockscout, a public block explorer, so it works even if
+                Tazor is offline. Ethereum checks your approvers against your company&apos;s ENS name and hands the payment to
+                Whitechain in about a minute.
               </p>
               <Field label="Company name">
                 <span className="input-affix">
@@ -474,20 +488,77 @@ export default function PayPage() {
                   <span>.taz0r.eth</span>
                 </span>
               </Field>
+              {!approvals?.length ? (
+                <p className="small muted" data-testid="l1-guide">Approve first: the five values to paste on Blockscout appear here.</p>
+              ) : !bsFields || !gate ? (
+                <p className="small muted" data-testid="l1-guide">Enter your company name above to see the steps.</p>
+              ) : (
+                <ol className="bs-guide" data-testid="l1-guide">
+                  <li>
+                    <b>Open EnsGate on Blockscout</b> (a new tab; the contract is verified there).
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <a className="btn" data-testid="l1-blockscout-open" href={blockscoutWriteUrl(gate)} target="_blank" rel="noreferrer" onClick={onOpenBlockscout}>Open EnsGate on Blockscout ↗</a>
+                    </div>
+                  </li>
+                  <li><b>Connect your wallet</b> on Blockscout and choose the Ethereum Sepolia network.</li>
+                  <li><b>Find &ldquo;forward&rdquo;</b> in the list of write methods and open it.</li>
+                  <li>
+                    <b>Paste, in this order:</b> label · account · the 6 parts of auth · each approver · each approval.
+                    <div className="bs-fields">
+                      {bsFields.map((f) => (
+                        <div className="bs-field" key={f.name} data-testid={`l1-field-${f.name}`} data-value={f.value}>
+                          <div className="bs-field-head">
+                            <span><b>{f.name}</b> <span className="faint small">({f.type})</span> · {f.title}</span>
+                            {!f.parts && <button type="button" className="btn btn-sm" data-testid={`l1-copy-${f.name}`} onClick={() => copy(f.value, f.title)}>Copy</button>}
+                          </div>
+                          <span className="small muted">{f.parts ? f.hint : f.what}</span>
+                          {!f.parts && <span className="small mono bs-preview">{f.preview}</span>}
+                          {f.parts && (
+                            <>
+                              {f.parts.map((p, n) => (
+                                <div className="bs-part" key={p.name}>
+                                  <span className="bs-part-text">
+                                    <span>{n + 1}. {p.label} <span className="faint small">({p.name})</span></span>
+                                    <span className="small mono bs-preview">{p.value.length > 22 ? `${p.value.slice(0, 10)}…${p.value.slice(-6)}` : p.value}</span>
+                                  </span>
+                                  <button type="button" className="btn btn-sm" data-testid={`l1-copy-${f.name}-${n + 1}`} onClick={() => copy(p.value, p.label)}>Copy</button>
+                                </div>
+                              ))}
+                              <div className="row">
+                                <button type="button" className="btn btn-sm btn-ghost" data-testid={`l1-copy-${f.name}`} onClick={() => copy(f.value, `${f.title} as one value`)}>Copy as one value</button>
+                                <span className="small faint">for wallets or explorers that take a whole {f.type === 'tuple' ? 'tuple' : 'list'} in one box</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <button type="button" className="btn btn-sm" data-testid="l1-copy-all" onClick={() => copy(forwardNote(gate, bsFields), 'All five values')}>Copy all as a note</button>
+                    </div>
+                  </li>
+                  <li><b>Press Simulate first</b>: it should say success. <b>Then press Write</b> and confirm in your wallet. This page shows the payment as paid when it reaches Whitechain.</li>
+                </ol>
+              )}
+              {pendingDeploys.length > 0 && <Notice tone="warning">Your approver account isn&apos;t on Whitechain yet. Pay through Tazor once first, or send its creation transaction (under For developers).</Notice>}
+              {l1?.started && !l1.hash && !l1.l2Tx && <p className="small muted">Watching Whitechain for the delivery…</p>}
+              <h4 className="bs-secondary">Or send with this site&apos;s wallet connection</h4>
               <div className="row">
-                <button data-testid="prepare-l1" className="btn" onClick={onPrepareL1} disabled={busy || !approvals?.length}>Prepare Ethereum transaction</button>
+                <button data-testid="prepare-l1" className="btn btn-sm" onClick={onPrepareL1} disabled={busy || !approvals?.length}>Prepare Ethereum transaction</button>
               </div>
               {l1 && (
                 <div data-testid="l1" className="stack">
+                  {l1.via !== 'blockscout' && <>
                   <p className="muted">To Tazor&apos;s EnsGate {gate && <AddrChip value={gate} href={`${config.sepolia.explorer}/address/${gate}`} />} on Ethereum Sepolia. {l1.fee !== undefined
                     ? <span data-testid="l1-fee">Estimated fee: {formatEther(l1.fee)} ETH ({l1.gas?.toString()} gas)</span>
                     : l1.feeError ? <span data-testid="l1-fee-error">Fee estimate failed: {l1.feeError}</span> : 'Estimating fee…'}</p>
                   <div className="row">
-                    <button data-testid="send-l1" className="btn" onClick={onSendL1} disabled={busy || !!l1.hash}>Send with your wallet</button>
+                    <button data-testid="send-l1" className="btn btn-sm" onClick={onSendL1} disabled={busy || !!l1.hash}>Send with this site&apos;s wallet connection</button>
                     <button data-testid="copy-l1" className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>
                     <button data-testid="watch-l1" className="btn" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
                   </div>
                   <p className="small muted">The raw calldata is under For developers below.</p>
+                  </>}
                   {l1.hash && <p data-tx={l1.hash}>Sent on Ethereum · <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer">View on Etherscan</a></p>}
                   {l1.started && (
                     <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status"><span>{l1.l2Tx

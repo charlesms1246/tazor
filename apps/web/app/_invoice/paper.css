@@ -235,3 +235,15 @@
 .ip-pay-text { align-items: center; }
 .ip-actions { justify-content: center; }
 @container paper (max-width: 600px) { .ip-pay { align-items: center; } }
+
+/* /pay: the Blockscout guide for the Ethereum fallback */
+.bs-guide { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; }
+.bs-guide > li::marker { font-weight: 700; color: var(--wc-blue); }
+.bs-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bs-field { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); min-width: 0; }
+.bs-field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bs-preview { color: var(--text); overflow-wrap: anywhere; }
+.bs-parts > summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
+.bs-part { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.bs-part-text { display: flex; flex-direction: column; min-width: 0; }
+.bs-secondary { margin: 8px 0 0; font-size: 14px; font-weight: 600; color: var(--muted); }
