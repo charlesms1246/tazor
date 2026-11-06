@@ -14,6 +14,7 @@ import { companyRegistry } from '@/lib/people.ts';
 import { useCompany } from '@/lib/company.ts';
 import '../_invoice/touch.css';
 import './onboard.css';
+import { BackupKey } from './backup-key.tsx';
 
 export default function OnboardPage() {
   const [stored, setStored] = useState<StoredPasskey | null>(null);
@@ -192,6 +193,11 @@ export default function OnboardPage() {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="step" data-done={false} data-testid="backup-step">
+            <span className="step-n">5</span>
+            <BackupKey ready={!!admission && admitted(admission)} />
           </div>
         </div>
       </Card>
