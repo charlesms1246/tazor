@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  Bluejay Logistics: a separate merchant site that takes payment through Tazor.
+  Tazor integration: 16 lines (between "tazor:begin" and "tazor:end" below):
+  one <script>, one <tazor-pay-button>, one 'tazor-paid' listener. No build step, no framework.
+  The merchant dashboard on the right is optional and uses the same SDK (window.TazorPay).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bluejay Logistics · Checkout</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">BJ</span> Bluejay Logistics</div>
+    <span class="testnet">Testnet demo · Whitechain Sepolia · test USDT</span>
+  </header>
+
+  <main class="grid">
+    <section class="card" aria-labelledby="customer-h">
+      <p class="eyebrow">Customer view</p>
+      <h1 id="customer-h">Your order <span id="order-no" class="mono">BJ-1042</span></h1>
+      <table class="items">
+        <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          <tr><td>Freight Mumbai → Pune, 20 ft container</td><td class="num">1</td><td class="num">1.20</td></tr>
+          <tr><td>Customs handling</td><td class="num">2</td><td class="num">0.30</td></tr>
+          <tr><td>Cargo insurance</td><td class="num">1</td><td class="num">0.05</td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="2">Total</td><td class="num">1.55 <span class="unit">USDT</span></td></tr></tfoot>
+      </table>
+      <p class="status">Status: <b id="order-status">Awaiting payment</b> <a id="order-tx" target="_blank" rel="noreferrer" hidden>View transaction</a></p>
+
+      <!-- tazor:begin -->
+      <script src="./tazor-pay.js"></script>
+      <tazor-pay-button
+        supplier-name="Bluejay Logistics"
+        payee="0xc1dce946D192e344251972470237F1471C93876c"
+        buyer="0xb99A12652BEe98429ae31EA0529A0b63f1073721"
+        lines='[{"description":"Freight Mumbai → Pune, 20 ft container","unitPrice":"1.20"},{"description":"Customs handling","quantity":2,"unitPrice":"0.15"},{"description":"Cargo insurance","unitPrice":"0.05"}]'
+        memo="Order BJ-1042"
+        label="Pay 1.55 USDT with Tazor"></tazor-pay-button>
+      <script>
+        document.querySelector('tazor-pay-button').addEventListener('tazor-paid', (e) => {
+          document.querySelector('#order-status').textContent = 'Paid';
+          const tx = document.querySelector('#order-tx');
+          tx.href = e.detail.explorerUrl;
+          tx.hidden = false;
+        });
+      </script>
+      <!-- tazor:end -->
+
+      <p class="hint">Your company approves in the Tazor app with a passkey; USDT settles on Whitechain in seconds.</p>
+    </section>
+
+    <section class="card" aria-labelledby="merchant-h">
+      <p class="eyebrow">Merchant view</p>
+      <h2 id="merchant-h">Orders</h2>
+      <p class="muted">Every checkout creates a Tazor invoice. This list watches Whitechain for its payment, on any device.</p>
+      <table class="items" id="orders">
+        <thead><tr><th>Invoice</th><th class="num">Amount</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="muted small" id="orders-empty">No orders yet: the checkout on the left creates one.</p>
+    </section>
+  </main>
+
+  <script src="./merchant.js"></script>
+</body>
+</html>

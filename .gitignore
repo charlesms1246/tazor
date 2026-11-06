@@ -29,3 +29,4 @@ vendor/
 # os
 .DS_Store
 .taste-skill/
+examples/.deploy/
