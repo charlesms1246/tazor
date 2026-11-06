@@ -29,6 +29,12 @@ PRIYA_EOA=$(cast wallet address --private-key $PRIYA_KEY)
 CFO_EOA=$(cast wallet address --private-key $CFO_KEY)
 MEERA=$(cast wallet address --private-key $MEERA_KEY)
 
+# The harness swaps contracts/broadcast/CreateCompany.s.sol/1874 (same chain id as the fork); never run it
+# while a live demo is writing there.
+if pgrep -f "scripts/demo-v2.sh" >/dev/null; then
+  print -u2 "a demo-v2.sh run is in progress; run the dry run after it finishes"; exit 2
+fi
+
 BACKUP=$(mktemp -d)
 BROADCAST=$ROOT/contracts/broadcast/CreateCompany.s.sol/1874
 [[ -d $BROADCAST ]] && cp -R $BROADCAST $BACKUP/1874
