@@ -1,0 +1,29 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# markdown stays local; only README.md is committed (in the final commits)
+*.md
+!README.md
+
+# local evidence and agent notes
+proofs/
+claude-docs/
+
+# node / next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# foundry
+cache/
+broadcast/*/dry-run/
+
+# vendored checkouts
+vendor/
+
+# os
+.DS_Store
