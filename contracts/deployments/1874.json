@@ -12,5 +12,6 @@
   "TazorAccountFactory": "0xe6efb87a9f3C2d7275aDB9526094Fc7aa4d5b4A2",
   "PaymentModule": "0xe19ddf1fd417B146137A5dE6eb56c4589431540A",
   "RevocationList": "0x407a8605Fc6fe002Eb025b2dcf9f9C630d5D311e",
-  "EnsGateAlias": "0x50f0aEFE793F05bB22Fa58AB44ee294e51b27d3b"
+  "EnsGateAlias": "0x50f0aEFE793F05bB22Fa58AB44ee294e51b27d3b",
+  "MandateModule": "0xB6f4F1B437AC30223D3661bD7bdd12aAec73aC32"
 }
