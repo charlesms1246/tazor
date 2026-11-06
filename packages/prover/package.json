@@ -1,0 +1,13 @@
+{
+  "name": "@tazor/prover",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "patch:vendor": "sh scripts/apply-patch.sh",
+    "check:headers": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-headers.ts"
+  },
+  "dependencies": {
+    "viem": "2.57.16"
+  }
+}

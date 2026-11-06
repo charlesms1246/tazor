@@ -1,0 +1,23 @@
+diff -ru a/src/eth/types.ts b/src/eth/types.ts
+--- a/src/eth/types.ts	2026-11-06 09:53:20
++++ b/src/eth/types.ts	2026-11-06 09:53:20
+@@ -55,6 +55,8 @@
+   excessBlobGas?: HexString;
+   parentBeaconBlockRoot?: HexString32;
+   requestsHash?: HexString32;
++  blockAccessListHash?: HexString32;
++  slotNumber?: HexString;
+ };
+ 
+ export const EMPTY_STORAGE_HASH =
+diff -ru a/src/rlp.ts b/src/rlp.ts
+--- a/src/rlp.ts	2026-11-06 09:53:20
++++ b/src/rlp.ts	2026-11-06 09:53:20
+@@ -52,5 +52,7 @@
+     encodeRlpUint(block.excessBlobGas),
+     block.parentBeaconBlockRoot,
+     block.requestsHash,
++    block.blockAccessListHash,
++    encodeRlpUint(block.slotNumber),
+   ]);
+ }
