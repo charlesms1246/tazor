@@ -6,6 +6,8 @@
 # tazor/.env.local) if present: PRIVATE_KEY (deployer/relayer/financier), PRIYA_KEY, CFO_KEY, MEERA_KEY.
 # Overrides: DEPLOYER_KEY, WC_RPC, SEPOLIA_RPC, COMPANY_SALT, FINANCING_MODULE, ENSGATE_V2, PROVER_CMD,
 # PRIYA_ACCOUNT, CFO_ACCOUNT, MEERA, BLUEJAY, EXIT_ACCOUNT.
+# Every tx is recorded in $RUN_JSON (default scripts/demo-v2/last-run.json; not written in DRY_RUN) for
+# scripts/verify-live.sh section 7.
 # DRY_RUN=1 (anvil forks only): time is advanced with evm_increaseTime, the L1->L2 deposit is relayed by
 # impersonating the gate alias, and the role sync is emulated with anvil_setStorageAt.
 # Needs: cast, forge, jq, bc. Note: cast takes keys via --private-key, so they appear briefly in the local
@@ -59,13 +61,32 @@ PRIYA_EOA=$(cast wallet address --private-key $PRIYA_KEY)
 CFO_EOA=$(cast wallet address --private-key $CFO_KEY)
 MEERA_EOA=$(cast wallet address --private-key $MEERA_KEY)
 
+RUN_JSON=${RUN_JSON:-$ROOT/scripts/demo-v2/last-run.json}
+[[ $DRY_RUN == 1 ]] && RUN_JSON=${RUN_JSON_DRY:-}
+record_init() {
+  [[ -n $RUN_JSON ]] || return 0
+  jq -n --arg started "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg company "$1" --arg salt "$COMPANY_SALT" \
+    '{startedAt: $started, company: $company, salt: $salt, txs: []}' > $RUN_JSON
+}
+record_tx() {   # <step> <label> <chain> <hash>
+  [[ -n $RUN_JSON && -f $RUN_JSON ]] || return 0
+  local tmp=$RUN_JSON.tmp
+  jq --argjson step $1 --arg label "$2" --arg chain $3 --arg hash $4 \
+    '.txs += [{step: $step, label: $label, chain: $chain, hash: $hash}]' $RUN_JSON > $tmp && mv $tmp $RUN_JSON
+}
+
 typeset -a SUMMARY
 STEP=0
 step() { STEP=$1; print; print -r -- "== STEP $1: $2" }
 info() { print -r -- "   $*" }
 pass() { print -r -- "STEP $STEP PASS  $*" }
 die() { print -r -- "STEP $STEP FAIL  $*"; print_summary; exit 1 }
-row() { SUMMARY+=("$STEP|$1|$2|${3:--}") }
+row() {
+  SUMMARY+=("$STEP|$1|$2|${3:--}")
+  local hash=${1##* } label=${1% *} chain=whitechain
+  [[ $label == *"(Sepolia)"* ]] && chain=sepolia
+  record_tx $STEP "$label" $chain $hash
+}
 print_summary() {
   print; print -r -- "== Summary"
   printf '%-5s | %-66s | %9s | %s\n' step "tx" gas latency
@@ -166,6 +187,7 @@ sim=$(cd $C && env $company_env forge script script/CreateCompany.s.sol --rpc-ur
 ACCOUNT=$(print -r -- $sim | grep -oE 'TazorAccount \(v2\) 0x[0-9a-fA-F]{40}' | awk '{print $3}')
 [[ -n $ACCOUNT ]] || die "could not read the company address"
 [[ $(cast code $ACCOUNT -r $WC_RPC) == 0x ]] || die "$ACCOUNT already exists; rerun with COMPANY_SALT=<new name>"
+record_init $ACCOUNT
 out=$(cd $C && env $company_env forge script script/CreateCompany.s.sol --rpc-url $WC_RPC --broadcast 2>&1) || die "create failed: ${out[-400,-1]}"
 run=$C/broadcast/CreateCompany.s.sol/$(cast chain-id -r $WC_RPC)/run-latest.json
 LAST_TX=$(jq -r '.receipts[-1].transactionHash' $run); LAST_GAS=$(cast to-dec $(jq -r '.receipts[-1].gasUsed' $run))
