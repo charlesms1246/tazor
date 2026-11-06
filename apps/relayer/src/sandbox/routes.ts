@@ -1,7 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import { BadRequest } from '../payment.ts';
 import { SimulationFailed } from '../sender.ts';
-import { RateLimited, SandboxRefused, type Sandbox } from './service.ts';
+import { RateLimited, SandboxRefused, errorText, type Sandbox } from './service.ts';
 
 /** The caller's IP: the first X-Forwarded-For hop (set by Vercel and most proxies), else the socket address. */
 export function clientIp(req: IncomingMessage): string {
@@ -31,7 +31,7 @@ export async function handleSandbox(
     else if (e instanceof SandboxRefused) failed(403, e.message);
     else if (e instanceof RateLimited) failed(429, e.message, { retryAfterSec: e.retryAfterSec }, { 'retry-after': String(e.retryAfterSec) });
     else if (e instanceof SimulationFailed) failed(422, `simulation reverted: ${e.message}`);
-    else { console.error('sandbox', e instanceof Error ? e.message.split('\n')[0] : e); failed(502, 'upstream error'); }
+    else { const why = errorText(e); console.error('sandbox', route, why); failed(502, `upstream error: ${why}`); }
   }
   return true;
 }

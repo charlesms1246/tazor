@@ -24,6 +24,8 @@ export const factoryAbi = parseAbi([
   'function webAuthnVerifier() view returns (address)',
 ]);
 
+export const roleCacheAbi = parseAbi(['function rolesOf(address registry, address account) view returns (uint256 roles, uint64 l1Block)']);
+
 export const erc20Abi = parseAbi([
   'function balanceOf(address) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
@@ -77,6 +79,7 @@ export const ADDRESSES = {
   revocationListV2: '0x4AD540Fe50Fbb7bD8D8Df66Da3b9a1Bdd39B2f5a',
   mandateModuleV2: '0x24b6eC6f6bf7e58bB3266b0b2701aE451ab7220F',
   financingModule: '0x7BEBCFC47be110a0175452456267bFdaD45DdE8B',
+  roleCache: '0x8AC436e5BB681aE4d576e0131391aE3AACA88BDe',
 } as const;
 
 export const EXPLORERS = {

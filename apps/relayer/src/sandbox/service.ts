@@ -1,5 +1,5 @@
 import {
-  decodeErrorResult, encodeAbiParameters, encodeFunctionData, formatUnits, getAddress, isAddress, isAddressEqual, isHex, parseUnits,
+  BaseError, decodeErrorResult, encodeAbiParameters, encodeFunctionData, formatUnits, getAddress, isAddress, isAddressEqual, isHex, parseUnits,
   size, slice, type Abi, type Address, type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -13,7 +13,7 @@ import { SimulationFailed } from '../sender.ts';
 import type { SyncResult } from '../sync.ts';
 import {
   EXPLORERS, IS_VERIFIED_ATTRIBUTE, MAX_SANDBOX_AMOUNT, ROLE_APPROVER, ensRegistryAbi, erc20Abi, factoryAbi, financingAbi,
-  mandateV2Abi, mirrorOperatorAbi, paymentV2Abi, revocationV2Abi, soulMirrorAbi,
+  mandateV2Abi, mirrorOperatorAbi, paymentV2Abi, revocationV2Abi, roleCacheAbi, soulMirrorAbi,
 } from './abi.ts';
 import type { SandboxConfig, SandboxWho } from './config.ts';
 import { createRateLimiter, type RateLimiter } from './ratelimit.ts';
@@ -30,6 +30,8 @@ export type SandboxPorts = {
   simulate(net: Net, from: From, to: Address, data: Hex): Promise<SimResult>;
   /** RoleCache sync (POST /sync logic); absent when the relayer has no prover. */
   sync?: (registry: Address, account: Address) => Promise<SyncResult>;
+  /** Resolves when the tx is mined; throws if it reverted or wasn't mined in time. */
+  wait(net: Net, tx: Hex): Promise<void>;
   sleep(ms: number): Promise<void>;
   now(): number;
   /** Whether 'relayer' (RELAYER_PRIVATE_KEY) can send on Whitechain; the operator key pays otherwise. */
@@ -68,6 +70,12 @@ type InvoiceAuth = { invoiceHash: Hex; account: Address; payee: Address; amount:
 const AUTH_VALIDITY_AFTER_DUE = 30n * 24n * 3600n;
 const DEFAULT_AMOUNT = '0.10';
 const errorAbi = [...fullPaymentV2Abi, ...fullRevocationAbi] as Abi;
+
+/** A short, key-free reason for a failed chain call (viem's short message plus its details line). */
+export function errorText(e: unknown): string {
+  if (e instanceof BaseError) return [e.shortMessage, e.details].filter(Boolean).join(' — ').split('\n')[0].slice(0, 300);
+  return (e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 300);
+}
 
 export const txUrl = (net: Net, tx: Hex | null) => (tx ? `${EXPLORERS[net]}/tx/${tx}` : null);
 export const addressUrl = (net: Net, a: Address) => `${EXPLORERS[net]}/address/${a}`;
@@ -226,8 +234,9 @@ export function createSandbox(o: {
       try {
         return stepTx(name, chain, remember(key, await p.send(chain, from, to, data)), 'done', detail);
       } catch (e) {
-        if (e instanceof SimulationFailed) return stepTx(name, chain, null, 'failed', `${detail}: ${e.message}`);
-        throw e;
+        const why = e instanceof SimulationFailed ? `simulation reverted: ${e.message}` : errorText(e);
+        console.error(`sandbox ${name} (${chain}, ${from}) failed: ${why}`);
+        return stepTx(name, chain, null, 'failed', `${detail} failed: ${why}`);
       }
     };
 
@@ -261,23 +270,38 @@ export function createSandbox(o: {
       steps.push(stepTx('sync', 'whitechain', null, 'skipped', 'role sync is not configured on this relayer'));
       return { status: 'pending-sync', account, registry: c.registry, steps };
     }
+    // Only the RoleCache itself proves admission: a sync can be sent and still prove an L1 block from before the grant.
     const started = p.now();
     const key = `${account}:sync`;
+    const earlier = recentSend(key);
+    let lastTx: Hex | null = null;
     for (;;) {
-      const pendingTx = recentSend(key);
-      const r = await p.sync(c.registry, account);
-      const approverInCache = r.roles !== undefined && (r.roles & ROLE_APPROVER) !== 0n;
+      const [cachedRoles, cachedAt] = await wc<readonly [bigint, bigint]>(k.roleCache, roleCacheAbi, 'rolesOf', [c.registry, account]);
+      if ((cachedRoles & ROLE_APPROVER) !== 0n) {
+        steps.push(stepTx('sync', 'whitechain', lastTx ?? earlier, lastTx ? 'done' : 'already', `Whitechain's role cache holds APPROVER (proved at L1 block ${cachedAt})`));
+        return { status: 'admitted', account, registry: c.registry, steps };
+      }
+      let r: SyncResult;
+      try {
+        r = await p.sync(c.registry, account);
+      } catch (e) {
+        console.error(`sandbox sync failed: ${errorText(e)}`);
+        return fail(stepTx('sync', 'whitechain', lastTx ?? earlier, 'failed', `role sync failed: ${errorText(e)}`));
+      }
       if (r.status === 'not-watched') return fail(stepTx('sync', 'whitechain', null, 'failed', 'the sandbox registry is not in WATCH_REGISTRIES'));
-      if (r.status === 'synced' && approverInCache) {
-        steps.push(stepTx('sync', 'whitechain', remember(key, r.tx!), 'done', `proved the ENS roles at L1 block ${r.l1Block}`));
-        return { status: 'admitted', account, registry: c.registry, steps };
+      if (r.status === 'synced' && r.tx) {
+        lastTx = remember(key, r.tx);
+        try {
+          await p.wait('whitechain', r.tx);
+        } catch (e) {
+          return fail(stepTx('sync', 'whitechain', r.tx, 'failed', `role sync tx failed: ${errorText(e)}`));
+        }
+        // the proof may still predate the grant: re-read the cache now, else wait like any pending sync
+        const [after] = await wc<readonly [bigint, bigint]>(k.roleCache, roleCacheAbi, 'rolesOf', [c.registry, account]);
+        if ((after & ROLE_APPROVER) !== 0n) continue;
       }
-      if (r.status === 'in-sync' && approverInCache) {
-        steps.push(stepTx('sync', 'whitechain', pendingTx, 'already', `the role cache holds APPROVER (L1 block ${r.l1Block})`));
-        return { status: 'admitted', account, registry: c.registry, steps };
-      }
-      if (pendingTx || p.now() - started + syncPollMs > syncBudgetMs) {
-        steps.push(stepTx('sync', 'whitechain', pendingTx, 'pending', 'Whitechain has not seen the ENS change yet (it lags Ethereum by about a minute); call admit again'));
+      if (p.now() - started + syncPollMs > syncBudgetMs) {
+        steps.push(stepTx('sync', 'whitechain', lastTx ?? earlier, 'pending', 'Whitechain cannot prove the ENS grant yet (it lags Ethereum by about a minute); call admit again'));
         return { status: 'pending-sync', account, registry: c.registry, steps };
       }
       await p.sleep(syncPollMs);
@@ -362,9 +386,16 @@ export function createSandbox(o: {
       const deadline = BigInt(Math.floor(p.now() / 1000) + 3600);
       const digest = await wc<Hex>(k.revocationListV2, revocationV2Abi, 'revokeDigest', [c.account, ravi, deadline]);
       const a = await approve('admin', digest);
-      return send('revoke-ravi', 'admin', k.revocationListV2,
+      const r = await send('revoke-ravi', 'admin', k.revocationListV2,
         encodeFunctionData({ abi: revocationV2Abi, functionName: 'revoke', args: [c.account, ravi, a.approver, deadline, a.signature] }),
         'the sandbox admin revoked Ravi on Whitechain (instant, local)', { ravi });
+      // answer only once mined, so an immediate ravi-pays already sees the revocation
+      try {
+        await p.wait('whitechain', r.tx!);
+      } catch (e) {
+        return { ...r, ok: false, status: 'failed', detail: `the revocation tx failed: ${errorText(e)}` };
+      }
+      return r;
     },
 
     async 'ravi-pays'(q) {
@@ -377,7 +408,12 @@ export function createSandbox(o: {
       const sim = await p.simulate('whitechain', 'operator', module, payOneData(auth, await approve('ravi', digest)));
       const revoked = await wc<boolean>(k.revocationListV2, revocationV2Abi, 'isRevoked', [c.account, ravi]);
       if (sim.ok) return noTx('ravi-pays', 'not-refused', 'the payment would have gone through, so nothing was sent; revoke Ravi first', { ravi, revoked, invoiceHash: l.invoiceHash });
-      return noTx('ravi-pays', 'refused', `Whitechain refused Ravi's payment: ${decodeRevert(sim)}`, { ravi, revoked, error: decodeRevert(sim), invoiceHash: l.invoiceHash });
+      const why = decodeRevert(sim);
+      // PaymentNotVerified covers unverified, revoked and expired approvers; name the cause when it's the revocation
+      const detail = revoked && why.startsWith('PaymentNotVerified')
+        ? "Whitechain refused Ravi's payment: Ravi was removed from the company (revocation list); contract error PaymentNotVerified"
+        : `Whitechain refused Ravi's payment: ${why}`;
+      return noTx('ravi-pays', 'refused', detail, { ravi, revoked, error: why, invoiceHash: l.invoiceHash });
     },
 
     async 'credit-note'(q) {

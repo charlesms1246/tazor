@@ -70,6 +70,7 @@ export function sandboxFromEnv(env: Record<string, string | undefined>): { confi
         revocationListV2: getAddress(env.REVOCATION_LIST_V2 || ADDRESSES.revocationListV2),
         mandateModuleV2: getAddress(env.MANDATE_MODULE_V2 || ADDRESSES.mandateModuleV2),
         financingModule: getAddress(env.FINANCING_MODULE || ADDRESSES.financingModule),
+        roleCache: getAddress(env.ROLE_CACHE || ADDRESSES.roleCache),
       },
     },
     missing: [],

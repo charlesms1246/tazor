@@ -40,6 +40,8 @@ function fakeChain(c: SandboxConfig) {
     deployed: new Set<string>(), souls: new Map<string, bigint>(), roles: new Map<string, bigint>(), cache: new Map<string, bigint>(),
     revoked: new Set<string>(), now: Date.parse('2026-11-06T12:00:00Z'), sent: [] as Sent[], syncCalls: 0, l2SeesAfter: 1,
     failNext: null as string | null, listing: 300_000n, dueDate: 0n,
+    /** syncs that are sent but prove an L1 block from before the grant (the cache stays as it was) */
+    staleProofs: 0, unmined: new Map<string, () => void>(), waited: [] as Hex[],
   };
   const lc = (a: string) => a.toLowerCase();
   const reads: Record<string, (args: readonly unknown[]) => unknown> = {
@@ -63,10 +65,12 @@ function fakeChain(c: SandboxConfig) {
     configV2Of: () => ({ registry: c.registry, twoApproverThreshold: 500_000n, perPaymentLimit: 1_000_000n, monthlyLimit: 5_000_000n, agentMonthlyCap: 0n }),
     windowAvailable: () => [4_000_000n, 0n],
     remainingToday: () => 17n,
+    rolesOf: ([, a]) => [s.cache.get(lc(a as string)) ?? 0n, 100n],
   };
   let txn = 0;
   const ports: SandboxPorts = {
-    read: async <T>(_net: Net, _to: Address, _abi: Abi, fn: string, args: readonly unknown[] = []) => {
+    read: async <T>(net: Net, _to: Address, _abi: Abi, fn: string, args: readonly unknown[] = []) => {
+      if (net === 'sepolia' && s.failNext === 'sepolia-read') throw new Error('HTTP request failed. Status: 401\nURL: https://rpc.example');
       const r = reads[fn];
       if (!r) throw new Error(`unexpected read ${fn}`);
       return r(args) as T;
@@ -75,13 +79,16 @@ function fakeChain(c: SandboxConfig) {
     async send(net, from, to, data) {
       const d = allAbis.map((abi) => { try { return decodeFunctionData({ abi, data }); } catch { return null; } }).find(Boolean)!;
       if (s.failNext === d.functionName) { s.failNext = null; throw new SimulationFailed(`${d.functionName} reverted`); }
+      if (s.failNext === `${d.functionName}:rpc`) { s.failNext = null; throw new Error('nonce too low: next nonce 3, tx nonce 2\nVersion: viem'); }
       const args = (d.args ?? []) as readonly unknown[];
       s.sent.push({ net, from, to, fn: d.functionName, args });
       if (d.functionName === 'createAccount') s.deployed.add(lc(predict((args[0] as Hex[])[0])));
       if (d.functionName === 'registerVerified') s.souls.set(lc(args[0] as string), BigInt(s.souls.size + 1));
       if (d.functionName === 'grantRootRoles') s.roles.set(lc(args[1] as string), args[0] as bigint);
-      if (d.functionName === 'revoke') s.revoked.add(`${lc(args[0] as string)}:${lc(args[1] as string)}`);
-      return `0x${(++txn).toString(16).padStart(64, '0')}`;
+      const hash = `0x${(++txn).toString(16).padStart(64, '0')}` as Hex;
+      // a revocation takes effect only once mined (when the relayer waits for it)
+      if (d.functionName === 'revoke') s.unmined.set(hash, () => s.revoked.add(`${lc(args[0] as string)}:${lc(args[1] as string)}`));
+      return hash;
     },
     async simulate(_net, _from, _to, data) {
       const d = decodeFunctionData({ abi: paymentV2Abi, data });
@@ -98,9 +105,12 @@ function fakeChain(c: SandboxConfig) {
       const cached = s.cache.get(lc(account)) ?? 0n;
       if (cached === ens) return { registry, account, status: 'in-sync', roles: ens, l1Block: 100n };
       if (s.syncCalls <= s.l2SeesAfter) return { registry, account, status: 'pending-l1', roles: cached, l1Block: 99n };
+      const tx = `0x${'5'.repeat(63)}${(s.syncCalls % 10).toString()}` as Hex;
+      if (s.staleProofs > 0) { s.staleProofs--; return { registry, account, status: 'synced', tx, roles: cached, l1Block: 98n }; }
       s.cache.set(lc(account), ens);
-      return { registry, account, status: 'synced', tx: `0x${'5'.repeat(64)}`, roles: ens, l1Block: 101n };
+      return { registry, account, status: 'synced', tx, roles: ens, l1Block: 101n };
     },
+    wait: async (_net, tx) => { s.waited.push(tx); s.unmined.get(tx)?.(); s.unmined.delete(tx); },
     sleep: async (ms) => { s.now += ms; },
     now: () => s.now,
     hasRelayer: true,
@@ -276,7 +286,7 @@ test('revoke-ravi then ravi-pays: revoked on Whitechain, payment refused, nothin
   const sentBefore = chain.s.sent.length;
   const pay = await act('ravi-pays', { amount: '0.20' });
   assert.equal(pay.body.status, 'refused');
-  assert.match(pay.body.reason, /refused Ravi's payment: PaymentNotVerified/);
+  assert.equal(pay.body.reason, "Whitechain refused Ravi's payment: Ravi was removed from the company (revocation list); contract error PaymentNotVerified");
   assert.match(pay.body.error, /^PaymentNotVerified\(/);
   assert.equal(pay.body.revoked, true);
   assert.equal(chain.s.sent.length, sentBefore);
@@ -352,4 +362,47 @@ test('counterparty: flat bodies, account must be the sandbox, setup mandate/clai
   assert.equal((await post('/sandbox/counterparty', { action: 'collect' })).body.status, 'sent');
   assert.equal((await post('/sandbox/counterparty', { action: 'finance-buy' })).body.status, 'sent');
   assert.equal((await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER })).body.companyId, 'sbx');
+});
+
+test('admit: a non-revert send error and an RPC failure are reported specifically, not as a bare upstream error', async () => {
+  chain.s.failNext = 'grantRootRoles:rpc';
+  const r = await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER });
+  assert.equal(r.code, 200);
+  assert.equal(r.body.ok, false);
+  assert.deepEqual(r.body.steps.map((x: any) => [x.name, x.status]), [['deploy', 'done'], ['soul', 'done'], ['ens-role', 'failed']]);
+  assert.match(r.body.error, /granted APPROVER.* failed: nonce too low: next nonce 3, tx nonce 2$/);
+
+  // a retry resumes at the failed step
+  const again = await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER });
+  assert.equal(again.body.status, 'admitted');
+
+  chain.s.failNext = 'sepolia-read';
+  const signer = `0x${'cd'.repeat(20)}` as Hex;
+  const down = await post('/sandbox/admit', { approver: predict(signer), signer });
+  assert.equal(down.code, 502);
+  assert.equal(down.body.error, 'upstream error: HTTP request failed. Status: 401');
+});
+
+test('admit: a sync whose proof predates the grant is not admission; it re-syncs, or answers pending-sync', async () => {
+  chain.s.staleProofs = 1;
+  const r = await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER });
+  assert.equal(r.body.status, 'admitted');
+  assert.equal(chain.s.waited.length, 2, 'waited for both sync txs, re-reading the cache after each');
+  assert.equal(r.body.steps.at(-1).status, 'done');
+
+  chain = fakeChain(config);
+  sandbox = createSandbox({ config, ports: chain.ports, syncPollMs: 5_000, syncBudgetMs: 30_000 });
+  chain.s.staleProofs = 1_000; // every proof stale: the cache never gets APPROVER
+  const stale = await post('/sandbox/admit', { approver: VISITOR, signer: VISITOR_SIGNER });
+  assert.equal(stale.body.status, 'pending-sync');
+  assert.equal(stale.body.ok, true);
+  assert.equal(stale.body.steps.at(-1).status, 'pending');
+  assert.ok(chain.s.waited.length <= 7, `bounded by the budget, not one sync per loop (${chain.s.waited.length})`);
+});
+
+test('revoke-ravi answers only after the revocation is mined, so ravi-pays right after is refused', async () => {
+  const r = await act('revoke-ravi');
+  assert.equal(r.body.status, 'sent');
+  assert.deepEqual(chain.s.waited, [r.body.tx]);
+  assert.equal((await act('ravi-pays')).body.status, 'refused');
 });

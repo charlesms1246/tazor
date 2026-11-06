@@ -25,7 +25,7 @@ type World = {
   logs: { address: Address; account: Address; block: bigint; roles: bigint }[];
 };
 
-function fakes(w: World) {
+function fakes(w: World, proofBlock?: bigint) {
   const calls = { prove: [] as [Address, Address][], send: [] as { to: Address; data: Hex }[], getLogs: [] as { fromBlock: bigint; toBlock: bigint }[], ensReads: [] as (bigint | undefined)[] };
   const l1 = {
     getBlockNumber: async () => w.head,
@@ -55,7 +55,7 @@ function fakes(w: World) {
   let t = 0;
   const sync = createRoleSync({
     l1: l1 as never, l2: l2 as never, roleCache: ROLE_CACHE, registries: [ACME],
-    prove: async (registry, account) => { calls.prove.push([registry, account]); t += 2300; return PROOF; },
+    prove: async (registry, account) => { calls.prove.push([registry, account]); t += 2300; return proofBlock === undefined ? PROOF : { proof: PROOF, l1Block: proofBlock }; },
     send: async (to, data) => { calls.send.push({ to, data }); return TX; },
     log: (l) => lines.push(l),
     now: () => t,
@@ -245,4 +245,28 @@ test('handlerFromEnv: role sync needs both a prover and a key; WATCH_REGISTRIES 
   assert.deepEqual(r.roleSync?.registries, [ACME, OTHER]);
   assert.equal(r.sepoliaRpc, 'https://sepolia.gateway.tenderly.co');
   assert.equal(handlerFromEnv({ RELAYER_PRIVATE_KEY: key, SEPOLIA_RPC: 'http://l1.test' }, { prover }).sepoliaRpc, 'http://l1.test');
+});
+
+test('syncAccount: never syncs a proof whose L1 block predates the latest ENS grant (pending-l1, nothing sent)', async () => {
+  // grant at L1 9_993; Whitechain's L1Block says 9_995, but the prover's commit is 9_990 (before the grant)
+  const ens = (_a: Address, block?: bigint) => (block === undefined || block >= 9_993n ? APPROVER : 0n);
+  const stale = fakes(world({ ens }), 9_990n);
+  const r = await stale.sync.syncAccount(ACME, ALICE);
+  assert.deepEqual(r, { registry: ACME, account: ALICE, status: 'pending-l1', roles: 0n, l1Block: 9_990n });
+  assert.equal(stale.calls.prove.length, 1);
+  assert.equal(stale.calls.send.length, 0);
+  assert.match(stale.lines[0], /^deferred .* proof block 9990/);
+
+  // once the proof's block includes the grant it syncs, reporting the proven roles and block
+  const fresh = fakes(world({ ens }), 9_994n);
+  const ok = await fresh.sync.syncAccount(ACME, ALICE);
+  assert.equal(ok.status, 'synced');
+  assert.deepEqual([ok.roles, ok.l1Block], [APPROVER, 9_994n]);
+  assert.equal(fresh.calls.send.length, 1);
+
+  // a proof that would write what the cache already holds is not sent either
+  const same = fakes(world({ ens: (_a, block) => (block === undefined || block >= 9_995n ? APPROVER | ADMIN : APPROVER), l2Known: 9_995n, cached: new Map([[`${ACME}:${ALICE}`, APPROVER]]) }), 9_991n);
+  const r2 = await same.sync.syncAccount(ACME, ALICE);
+  assert.equal(r2.status, 'pending-l1');
+  assert.equal(same.calls.send.length, 0);
 });

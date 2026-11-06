@@ -14,7 +14,10 @@ export const L1_BLOCK = '0x4200000000000000000000000000000000000015' as const;
 export const ROOT_RESOURCE = 0n;
 export const MAX_RANGE = 500n;
 
-export type Prover = (registry: Address, account: Address) => Promise<Hex>;
+/** The witness, and (when the prover reports it) the L1 block the proof reads ENS at: its commit index, which can be older than L1Block.number. */
+export type ProvedRoles = { proof: Hex; l1Block?: bigint };
+export type Prover = (registry: Address, account: Address) => Promise<Hex | ProvedRoles>;
+export const provedOf = (p: Hex | ProvedRoles): ProvedRoles => (typeof p === 'string' ? { proof: p } : p);
 export type RoleChange = { registry: Address; account: Address; block: bigint; roles: bigint };
 
 /** Root-resource role changes in [from, to], at most MAX_RANGE blocks per getLogs; the latest change per (registry, account) wins. */
@@ -37,7 +40,7 @@ export async function readRoleChanges(l1: PublicClient, registries: Address[], f
 export async function proveAndSend(
   o: { roleCache: Address; prove: Prover; send: (to: Address, data: Hex) => Promise<Hex> }, registry: Address, account: Address,
 ): Promise<Hex> {
-  const proof = await o.prove(registry, account);
+  const { proof } = provedOf(await o.prove(registry, account));
   return o.send(o.roleCache, encodeFunctionData({ abi: roleCacheAbi, functionName: 'syncRoles', args: [registry, account, proof] }));
 }
 
@@ -89,9 +92,22 @@ export function createRoleSync(opts: {
       return { registry, account, status: latest === atKnown ? 'in-sync' : 'pending-l1', roles: atKnown, l1Block: l2Known };
     }
     const started = now();
-    const tx = await proveAndSend({ roleCache: opts.roleCache, prove: opts.prove, send: opts.send }, registry, account);
-    log(`synced ${registry} ${account} roles=0x${atKnown.toString(16)} l1Block=${l2Known} tx=${tx} in ${((now() - started) / 1000).toFixed(1)}s`);
-    return { registry, account, status: 'synced', tx, roles: atKnown, l1Block: l2Known };
+    const proved = provedOf(await opts.prove(registry, account));
+    let roles = atKnown;
+    let l1Block = l2Known;
+    if (proved.l1Block !== undefined) {
+      // The proof reads ENS at its own block. Never write a value that lacks a bit ENS has now (the grant isn't
+      // provable yet) or that changes nothing: report pending-l1 and let a later call sync.
+      l1Block = proved.l1Block;
+      roles = l1Block === l2Known ? atKnown : await ens(l1Block);
+      if ((latest & ~roles) !== 0n || roles === cached) {
+        log(`deferred ${registry} ${account}: proof block ${l1Block} has roles=0x${roles.toString(16)}, ENS now 0x${latest.toString(16)}, cache 0x${cached.toString(16)}`);
+        return { registry, account, status: 'pending-l1', roles: cached, l1Block };
+      }
+    }
+    const tx = await opts.send(opts.roleCache, encodeFunctionData({ abi: roleCacheAbi, functionName: 'syncRoles', args: [registry, account, proved.proof] }));
+    log(`synced ${registry} ${account} roles=0x${roles.toString(16)} l1Block=${l1Block} tx=${tx} in ${((now() - started) / 1000).toFixed(1)}s`);
+    return { registry, account, status: 'synced', tx, roles, l1Block };
   }
 
   /** One stateless pass: role changes in the last `lookback` L1 blocks, each (registry, account) synced once. Stops starting new syncs after `budgetMs`. */

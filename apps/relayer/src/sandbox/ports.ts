@@ -45,6 +45,10 @@ export function createSandboxPorts(o: {
       }
     },
     sync: o.roleSync ? (registry, account) => o.roleSync!.syncAccount(registry, account) : undefined,
+    async wait(net, hash) {
+      const r = await clients[net].waitForTransactionReceipt({ hash, timeout: 45_000 });
+      if (r.status !== 'success') throw new Error(`tx ${hash} reverted`);
+    },
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     now: () => Date.now(),
     hasRelayer: !!o.relayer,
