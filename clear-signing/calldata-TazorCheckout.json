@@ -1,0 +1,485 @@
+{
+  "$schema": "https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/specs/erc7730-v1.schema.json",
+  "context": {
+    "$id": "TazorCheckout",
+    "contract": {
+      "deployments": [
+        {
+          "chainId": 1874,
+          "address": "0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670"
+        }
+      ],
+      "abi": [
+        {
+          "type": "function",
+          "name": "cancel",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "cancelBySig",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            },
+            {
+              "name": "by",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "sig",
+              "type": "bytes",
+              "internalType": "bytes"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "charge",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "pay",
+          "inputs": [
+            {
+              "name": "o",
+              "type": "tuple",
+              "internalType": "struct TazorCheckout.Order",
+              "components": [
+                {
+                  "name": "merchant",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "amount",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "ref",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                },
+                {
+                  "name": "deadline",
+                  "type": "uint64",
+                  "internalType": "uint64"
+                }
+              ]
+            },
+            {
+              "name": "payer",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "validAfter",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "validBefore",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "sig",
+              "type": "bytes",
+              "internalType": "bytes"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            }
+          ],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "refund",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            },
+            {
+              "name": "amount",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "validAfter",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "validBefore",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "sig",
+              "type": "bytes",
+              "internalType": "bytes"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable"
+        },
+        {
+          "type": "function",
+          "name": "subscribe",
+          "inputs": [
+            {
+              "name": "p",
+              "type": "tuple",
+              "internalType": "struct TazorCheckout.Plan",
+              "components": [
+                {
+                  "name": "merchant",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "amount",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "period",
+                  "type": "uint32",
+                  "internalType": "uint32"
+                },
+                {
+                  "name": "cycles",
+                  "type": "uint16",
+                  "internalType": "uint16"
+                },
+                {
+                  "name": "ref",
+                  "type": "bytes32",
+                  "internalType": "bytes32"
+                }
+              ]
+            },
+            {
+              "name": "payer",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "first",
+              "type": "tuple",
+              "internalType": "struct TazorCheckout.Auth",
+              "components": [
+                {
+                  "name": "validAfter",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "validBefore",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "sig",
+                  "type": "bytes",
+                  "internalType": "bytes"
+                }
+              ]
+            },
+            {
+              "name": "allowance",
+              "type": "tuple",
+              "internalType": "struct TazorCheckout.Auth",
+              "components": [
+                {
+                  "name": "validAfter",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "validBefore",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                {
+                  "name": "sig",
+                  "type": "bytes",
+                  "internalType": "bytes"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "id",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            }
+          ],
+          "stateMutability": "nonpayable"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "Tazor Checkout",
+    "info": {
+      "legalName": "Tazor (ETHGlobal Mumbai project, testnet)",
+      "url": "https://github.com/charlesms1246/tazor"
+    },
+    "constants": {
+      "usdt": "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7"
+    }
+  },
+  "display": {
+    "formats": {
+      "pay((address,uint256,bytes32,uint64),address,uint256,uint256,bytes)": {
+        "intent": "Settle a customer's signed USDT payment",
+        "fields": [
+          {
+            "path": "o.amount",
+            "label": "Amount",
+            "format": "tokenAmount",
+            "params": {
+              "token": "$.metadata.constants.usdt"
+            }
+          },
+          {
+            "path": "o.merchant",
+            "label": "Merchant",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "wallet",
+                "eoa",
+                "contract"
+              ],
+              "sources": [
+                "local",
+                "ens"
+              ]
+            }
+          },
+          {
+            "path": "payer",
+            "label": "Customer",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "wallet",
+                "eoa",
+                "contract"
+              ],
+              "sources": [
+                "local",
+                "ens"
+              ]
+            }
+          },
+          {
+            "path": "o.deadline",
+            "label": "Order expires",
+            "format": "date",
+            "params": {
+              "encoding": "timestamp"
+            }
+          }
+        ],
+        "required": [
+          "o.amount",
+          "o.merchant",
+          "payer"
+        ],
+        "excluded": [
+          "o.ref",
+          "validAfter",
+          "validBefore",
+          "sig"
+        ]
+      },
+      "refund(bytes32,uint256,uint256,uint256,bytes)": {
+        "intent": "Refund part of an order to the customer who paid",
+        "fields": [
+          {
+            "path": "amount",
+            "label": "Refund",
+            "format": "tokenAmount",
+            "params": {
+              "token": "$.metadata.constants.usdt"
+            }
+          },
+          {
+            "path": "id",
+            "label": "Order",
+            "format": "raw"
+          }
+        ],
+        "required": [
+          "amount",
+          "id"
+        ],
+        "excluded": [
+          "validAfter",
+          "validBefore",
+          "sig"
+        ]
+      },
+      "subscribe((address,uint256,uint32,uint16,bytes32),address,(uint256,uint256,bytes),(uint256,uint256,bytes))": {
+        "intent": "Start a USDT subscription (first period paid now)",
+        "fields": [
+          {
+            "path": "p.amount",
+            "label": "Per period",
+            "format": "tokenAmount",
+            "params": {
+              "token": "$.metadata.constants.usdt"
+            }
+          },
+          {
+            "path": "p.period",
+            "label": "Every (seconds)",
+            "format": "raw"
+          },
+          {
+            "path": "p.cycles",
+            "label": "Periods",
+            "format": "raw"
+          },
+          {
+            "path": "p.merchant",
+            "label": "Merchant",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "wallet",
+                "eoa",
+                "contract"
+              ],
+              "sources": [
+                "local",
+                "ens"
+              ]
+            }
+          },
+          {
+            "path": "payer",
+            "label": "Customer",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "wallet",
+                "eoa",
+                "contract"
+              ],
+              "sources": [
+                "local",
+                "ens"
+              ]
+            }
+          }
+        ],
+        "required": [
+          "p.amount",
+          "p.period",
+          "p.cycles",
+          "p.merchant",
+          "payer"
+        ],
+        "excluded": [
+          "p.ref",
+          "first",
+          "allowance"
+        ]
+      },
+      "charge(bytes32)": {
+        "intent": "Collect the next due subscription payment",
+        "fields": [
+          {
+            "path": "id",
+            "label": "Subscription",
+            "format": "raw"
+          }
+        ],
+        "required": [
+          "id"
+        ]
+      },
+      "cancel(bytes32)": {
+        "intent": "Cancel a USDT subscription",
+        "fields": [
+          {
+            "path": "id",
+            "label": "Subscription",
+            "format": "raw"
+          }
+        ],
+        "required": [
+          "id"
+        ]
+      },
+      "cancelBySig(bytes32,address,bytes)": {
+        "intent": "Cancel a USDT subscription with the payer's or merchant's signature",
+        "fields": [
+          {
+            "path": "id",
+            "label": "Subscription",
+            "format": "raw"
+          },
+          {
+            "path": "by",
+            "label": "Cancelled by",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "wallet",
+                "eoa",
+                "contract"
+              ],
+              "sources": [
+                "local",
+                "ens"
+              ]
+            }
+          }
+        ],
+        "required": [
+          "id",
+          "by"
+        ],
+        "excluded": [
+          "sig"
+        ]
+      }
+    }
+  }
+}

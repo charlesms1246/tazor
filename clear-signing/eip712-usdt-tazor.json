@@ -1,0 +1,108 @@
+{
+  "$schema": "https://github.com/LedgerHQ/clear-signing-erc7730-registry/blob/master/specs/erc7730-v1.schema.json",
+  "context": {
+    "$id": "Tether USD (Whitechain Sepolia) signatures used by Tazor Checkout",
+    "eip712": {
+      "deployments": [{ "chainId": 1874, "address": "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7" }],
+      "domain": { "name": "Tether USD", "version": "1", "chainId": 1874, "verifyingContract": "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7" },
+      "schemas": [
+        {
+          "primaryType": "ReceiveWithAuthorization",
+          "types": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" },
+              { "name": "version", "type": "string" },
+              { "name": "chainId", "type": "uint256" },
+              { "name": "verifyingContract", "type": "address" }
+            ],
+            "ReceiveWithAuthorization": [
+              { "name": "from", "type": "address" },
+              { "name": "to", "type": "address" },
+              { "name": "value", "type": "uint256" },
+              { "name": "validAfter", "type": "uint256" },
+              { "name": "validBefore", "type": "uint256" },
+              { "name": "nonce", "type": "bytes32" }
+            ]
+          }
+        },
+        {
+          "primaryType": "TransferWithAuthorization",
+          "types": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" },
+              { "name": "version", "type": "string" },
+              { "name": "chainId", "type": "uint256" },
+              { "name": "verifyingContract", "type": "address" }
+            ],
+            "TransferWithAuthorization": [
+              { "name": "from", "type": "address" },
+              { "name": "to", "type": "address" },
+              { "name": "value", "type": "uint256" },
+              { "name": "validAfter", "type": "uint256" },
+              { "name": "validBefore", "type": "uint256" },
+              { "name": "nonce", "type": "bytes32" }
+            ]
+          }
+        },
+        {
+          "primaryType": "Permit",
+          "types": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" },
+              { "name": "version", "type": "string" },
+              { "name": "chainId", "type": "uint256" },
+              { "name": "verifyingContract", "type": "address" }
+            ],
+            "Permit": [
+              { "name": "owner", "type": "address" },
+              { "name": "spender", "type": "address" },
+              { "name": "value", "type": "uint256" },
+              { "name": "nonce", "type": "uint256" },
+              { "name": "deadline", "type": "uint256" }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "Tazor Checkout",
+    "info": { "legalName": "Tazor (ETHGlobal Mumbai project, testnet)", "url": "https://github.com/charlesms1246/tazor" },
+    "constants": { "usdt": "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7", "checkout": "0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670" }
+  },
+  "display": {
+    "formats": {
+      "ReceiveWithAuthorization": {
+        "intent": "Pay (or refund) in USDT through Tazor Checkout",
+        "fields": [
+          { "path": "value", "label": "Amount", "format": "tokenAmount", "params": { "token": "$.metadata.constants.usdt" } },
+          { "path": "to", "label": "Collected by", "format": "addressName", "params": { "types": ["contract"], "sources": ["local", "ens"] } },
+          { "path": "from", "label": "From", "format": "addressName", "params": { "types": ["wallet", "eoa"], "sources": ["local", "ens"] } },
+          { "path": "validBefore", "label": "Valid until", "format": "date", "params": { "encoding": "timestamp" } }
+        ],
+        "required": ["value", "to", "validBefore"],
+        "excluded": ["validAfter", "nonce"]
+      },
+      "TransferWithAuthorization": {
+        "intent": "Pay for an API request in USDT (x402)",
+        "fields": [
+          { "path": "value", "label": "Amount", "format": "tokenAmount", "params": { "token": "$.metadata.constants.usdt" } },
+          { "path": "to", "label": "Paid to", "format": "addressName", "params": { "types": ["wallet", "eoa", "contract"], "sources": ["local", "ens"] } },
+          { "path": "validBefore", "label": "Valid until", "format": "date", "params": { "encoding": "timestamp" } }
+        ],
+        "required": ["value", "to", "validBefore"],
+        "excluded": ["from", "validAfter", "nonce"]
+      },
+      "Permit": {
+        "intent": "Allow a USDT subscription to pull later payments",
+        "fields": [
+          { "path": "spender", "label": "Allowed to pull", "format": "addressName", "params": { "types": ["contract"], "sources": ["local", "ens"] } },
+          { "path": "value", "label": "Up to", "format": "tokenAmount", "params": { "token": "$.metadata.constants.usdt" } },
+          { "path": "deadline", "label": "Approve before", "format": "date", "params": { "encoding": "timestamp" } }
+        ],
+        "required": ["spender", "value"],
+        "excluded": ["owner", "nonce"]
+      }
+    }
+  }
+}
