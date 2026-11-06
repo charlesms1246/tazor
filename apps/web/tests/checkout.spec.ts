@@ -4,7 +4,7 @@ import { mockExplorer } from './explorer-mock.ts';
 
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
 
-const setup = async (page: Page) => {
+const setup = async (page: Page, company = 'bluejay') => {
   await mockExplorer(page, { [CHECKOUT]: explorerItems(), [DEPOSIT]: depositExplorerItems() });
   await page.route('https://rpc.testnet.whitechain.io/', (route) => route.fulfill(json({ jsonrpc: '2.0', id: 1, result: null })));
   await page.route('http://relayer.test/webhooks/recent**', (route) => route.fulfill(json({
@@ -16,7 +16,7 @@ const setup = async (page: Page) => {
     payTo: '0xc1dce946D192e344251972470237F1471C93876c', storage: 'memory',
     items: [{ id: 'x_1', created: 1_794_002_400, txHash: `0x${'ee'.repeat(32)}`, payer: PAYER, amount: '10000', resource: 'https://api.example.com/report', network: 'whitechain-sepolia' }],
   })));
-  await page.addInitScript(() => { if (!localStorage.getItem('tazor.company.v1')) localStorage.setItem('tazor.company.v1', 'bluejay'); });
+  await page.addInitScript((c) => { if (!localStorage.getItem('tazor.company.v1')) localStorage.setItem('tazor.company.v1', c); }, company);
 };
 
 test('/checkout/: orders for the selected merchant with refunds and a receipt link; subscriptions show what is due', async ({ page }) => {
@@ -25,6 +25,9 @@ test('/checkout/: orders for the selected merchant with refunds and a receipt li
   await expect(page.getByTestId('co-scope')).toContainText('Bluejay Logistics');
   const all = page.getByTestId('co-order-row');
   await expect(all).toHaveCount(2, { timeout: 10_000 });
+  await expect(page.getByTestId('co-tab-orders')).toHaveText('Orders2');
+  await expect(page.getByTestId('co-tab-orders').locator('.tab-count')).toHaveText('2');
+  await expect(page.getByTestId('co-demo-toggle')).toHaveAttribute('aria-pressed', 'true');
   const dep = all.filter({ has: page.locator(`a[href="/receipt/?order=${DEP_ORDER.toLowerCase()}"]`) });
   await expect(dep.getByTestId('co-order-method')).toContainText('Sent from an exchange or wallet');
   await expect(dep).toContainText('2.00 USDT');
@@ -67,4 +70,31 @@ test('/checkout/: webhooks list recent deliveries and the signature scheme; agen
   await expect(a).toContainText('https://api.example.com/report');
   await expect(a).toContainText('0.01 USDT');
   await expect(a.locator('a').last()).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/0x${'ee'.repeat(32)}`);
+});
+
+test('/checkout/: a company with no orders still opens on the live demo merchants, labelled; the chip turns them off', async ({ page }) => {
+  await setup(page, 'acme');
+  await page.goto('/checkout/');
+  const rows = page.getByTestId('co-order-row');
+  await expect(rows).toHaveCount(2, { timeout: 10_000 });
+  await expect(rows.first().getByTestId('co-order-merchant')).toContainText('to Bluejay');
+  await expect(page.getByTestId('co-scope')).toContainText('plus the live demo merchants');
+  await page.getByTestId('co-demo-toggle').click();
+  await expect(page.getByTestId('co-orders-empty')).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('co-demo-toggle')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('/checkout/: ?merchant= and &tab= open a tab for a linked merchant', async ({ page }) => {
+  await setup(page, 'acme');
+  const asked: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/x402/settlements')) asked.push(r.url()); });
+  await page.goto(`/checkout/?merchant=${PAYER}&tab=agents`);
+  await expect(page.getByTestId('co-tab-agents')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('co-agent-row')).toHaveCount(1);
+  expect(asked.some((u) => u.toLowerCase().includes(`payto=${PAYER.toLowerCase()}`))).toBe(true);
+  expect(asked.some((u) => u.toLowerCase().includes('payto=0xbc9a2fc48f141162eaff4c0767dac50362f96bc6'))).toBe(true);
+  await page.getByTestId('co-tab-webhooks').click();
+  await expect(page).toHaveURL(/tab=webhooks/);
+  await expect(page.getByTestId('co-hook-row')).toHaveCount(1);
 });

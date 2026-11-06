@@ -25,6 +25,16 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'orders', label: 'Orders' }, { id: 'subscriptions', label: 'Subscriptions' }, { id: 'webhooks', label: 'Webhooks' }, { id: 'agents', label: 'Agents' },
 ];
 const WATCH_KEY = 'tazor.checkout.watch.v1';
+const DEMO_KEY = 'tazor.checkout.demo.v1';
+/** Live demo merchants with real orders on Whitechain, shown by default so the console never opens empty. */
+const DEMO_MERCHANTS: { name: string; account: Address }[] = [
+  { name: 'Bluejay demo shop', account: '0xc1dce946D192e344251972470237F1471C93876c' },
+  { name: 'Sandbox merchant', account: '0x6B4E065d08D2cC7723635c6df0CC5268C706cD93' },
+];
+/** The demo x402 resource server's payTo. */
+const DEMO_PAYTO: Address = '0xbc9A2fc48F141162eafF4c0767DAc50362f96bc6';
+const isTab = (t: string | null): t is Tab => t === 'orders' || t === 'subscriptions' || t === 'webhooks' || t === 'agents';
+const demoName = (a: string) => DEMO_MERCHANTS.find((d) => d.account.toLowerCase() === a.toLowerCase())?.name ?? (a.toLowerCase() === DEMO_PAYTO.toLowerCase() ? 'Demo AI resource' : null);
 const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 const nameOf = (a: string) => companyByAccount(a)?.name ?? ensLabelOf(a) ?? null;
 const every = (s: number) => (s % 86400 === 0 ? `${s / 86400} day${s === 86400 ? '' : 's'}` : s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`);
@@ -41,7 +51,29 @@ export default function CheckoutPage() {
   const company = useCompany();
   const checkout = checkoutAddress() ?? depositCheckoutAddress();
   const relayer = getRelayerUrl();
-  const [tab, setTab] = useState<Tab>('orders');
+  const [tab, setTabState] = useState<Tab>('orders');
+  const [linked, setLinked] = useState<Address | null>(null);
+  const [demo, setDemo] = useState(true);
+  // deep links: ?merchant=0x…&tab=agents, or /checkout/#subscriptions
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const m = q.get('merchant')?.trim() ?? '';
+    if (isAddress(m)) setLinked(getAddress(m));
+    const t = q.get('tab');
+    if (isTab(t)) setTabState(t);
+    try { if (localStorage.getItem(DEMO_KEY) === 'off') setDemo(false); } catch { /* private mode */ }
+    const read = () => { const h = location.hash.slice(1); if (isTab(h)) setTabState(h); };
+    read();
+    addEventListener('hashchange', read);
+    return () => removeEventListener('hashchange', read);
+  }, []);
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    const q = new URLSearchParams(location.search);
+    if (q.has('tab')) q.set('tab', t);
+    const search = q.toString() ? `?${q}` : '';
+    history.replaceState(null, '', `${location.pathname}${search}${q.has('tab') || t === 'orders' ? '' : `#${t}`}`);
+  };
   const [watch, setWatch] = useState<Address[]>([]);
   const [add, setAdd] = useState('');
   const [data, setData] = useState<{ orders: OrderRow[]; subs: SubRow[] } | null>(null);
@@ -52,7 +84,12 @@ export default function CheckoutPage() {
   const [agents, setAgents] = useState<Settlement[] | null | 'error'>(null);
 
   useEffect(() => { try { setWatch(JSON.parse(localStorage.getItem(WATCH_KEY) ?? '[]')); } catch { /* none */ } }, []);
-  const merchants: Address[] = company.status && company.status !== 'ready' ? watch : [company.account, ...company.aliases, ...watch];
+  const ready = !company.status || company.status === 'ready';
+  const demoAccounts = demo ? DEMO_MERCHANTS.map((d) => d.account) : [];
+  const own: Address[] = [...(linked ? [linked] : []), ...(ready ? [company.account, ...company.aliases] : [])];
+  const merchants: Address[] = [...new Map([...own, ...watch, ...demoAccounts].map((a) => [a.toLowerCase(), a])).values()];
+  const ownSet = new Set(own.map((a) => a.toLowerCase()));
+  const toggleDemo = () => { const next = !demo; setDemo(next); try { localStorage.setItem(DEMO_KEY, next ? 'on' : 'off'); } catch { /* storage full */ } };
 
   const load = useCallback(async () => {
     if (!checkout) return;
@@ -66,20 +103,32 @@ export default function CheckoutPage() {
   }, [checkout, merchants.join(',')]);
   useEffect(() => { void load(); }, [load]);
 
-  const merchant = company.status && company.status !== 'ready' ? null : company.account;
+  // the merchant webhooks are tested for: a linked ?merchant= first, else the selected company
+  const merchant = linked ?? (ready ? company.account : null);
+  const hookMerchants = [...new Set([...(merchant ? [merchant] : []), ...demoAccounts])];
+  const payTos = [...new Set([...(merchant ? [merchant] : []), ...(demo ? [DEMO_PAYTO] : [])])];
   useEffect(() => {
-    if (!relayer || !merchant) return;
-    if (tab === 'webhooks') {
+    if (!relayer) return;
+    // each address is asked separately; the tab errors only when every request fails
+    const gather = async <T,>(urls: string[], pick: (j: Record<string, unknown>) => T[]) => {
+      const parts = await Promise.allSettled(urls.map((u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))));
+      if (parts.every((p) => p.status === 'rejected')) throw new Error('relayer did not answer');
+      const ok = parts.filter((p): p is PromiseFulfilledResult<Record<string, unknown>> => p.status === 'fulfilled').map((p) => p.value);
+      return { items: ok.flatMap(pick), note: ok.find((j) => typeof j.note === 'string')?.note as string | undefined };
+    };
+    const byId = <T extends { id: string; created: number | string }>(xs: T[]) => [...new Map(xs.map((x) => [x.id, x])).values()].sort((a, b) => asMs(b.created) - asMs(a.created));
+    if (tab === 'webhooks' && hookMerchants.length) {
       setHooks(null);
-      fetch(`${relayer}/webhooks/recent?merchant=${merchant}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then((j: { items?: Delivery[]; deliveries?: Delivery[]; note?: string }) => setHooks({ items: j.items ?? j.deliveries ?? [], note: j.note })).catch(() => setHooks('error'));
+      gather(hookMerchants.map((m) => `${relayer}/webhooks/recent?merchant=${m}`), (j) => ((j.items ?? j.deliveries ?? []) as Delivery[]))
+        .then(({ items, note }) => setHooks({ items: byId(items), note })).catch(() => setHooks('error'));
     }
-    if (tab === 'agents') {
+    if (tab === 'agents' && payTos.length) {
       setAgents(null);
-      fetch(`${relayer}/x402/settlements?payTo=${merchant}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then((j: { items?: Settlement[] }) => setAgents(j.items ?? [])).catch(() => setAgents('error'));
+      gather(payTos.map((m) => `${relayer}/x402/settlements?payTo=${m}`), (j) => ((j.items ?? []) as Settlement[]))
+        .then(({ items }) => setAgents(byId(items))).catch(() => setAgents('error'));
     }
-  }, [tab, relayer, merchant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, relayer, hookMerchants.join(','), payTos.join(',')]);
 
   const onWatch = () => {
     if (!isAddress(add.trim())) return toast('Enter a merchant address (0x…)', 'error');
@@ -125,9 +174,13 @@ export default function CheckoutPage() {
         </div>
         <div style={{ padding: '12px var(--card-pad) 0' }} className="stack">
           <p className="small muted" style={{ margin: 0 }} data-testid="co-scope">
-            {merchant ? <>Showing payments to <b>{company.name}</b>{watch.length ? ` and ${watch.length} more address${watch.length === 1 ? '' : 'es'}` : ''}. </> : 'Loading the company from ENS… '}
+            {merchant ? <>Showing payments to <b>{linked ? (nameOf(linked) ?? demoName(linked) ?? `${linked.slice(0, 6)}…${linked.slice(-4)}`) : company.name}</b>{watch.length ? ` and ${watch.length} more address${watch.length === 1 ? '' : 'es'}` : ''}{demo ? ', plus the live demo merchants' : ''}. </> : 'Loading the company from ENS… '}
             Read from Whitechain.
           </p>
+          <div className="co-demo">
+            <button type="button" className="co-chip" aria-pressed={demo} data-testid="co-demo-toggle" onClick={toggleDemo}>{demo ? '✓ ' : ''}Show demo merchants</button>
+            {demo && <span className="small muted">{DEMO_MERCHANTS.map((d) => d.name).join(' and ')}{tab === 'agents' ? ', and the demo AI resource' : ''}: real orders on Whitechain Sepolia.</span>}
+          </div>
           {(tab === 'orders' || tab === 'subscriptions') && (
             <div className="co-form">
               <input className="input mono" data-testid="co-watch" value={add} onChange={(e) => setAdd(e.target.value)} placeholder="Another merchant address (0x…)" aria-label="Another merchant address" />
@@ -140,7 +193,7 @@ export default function CheckoutPage() {
         {tab === 'orders' && (data === null && !error ? <p className="muted" style={{ padding: 'var(--card-pad)' }}>Reading orders…</p> : orders.length === 0 ? (
           <div style={{ padding: 'var(--card-pad)' }}><Empty><span data-testid="co-orders-empty">No checkout orders paid to these addresses yet.</span></Empty></div>
         ) : (
-          <div className="table-wrap"><table className="table table-stack" data-testid="co-orders">
+          <div className="table-wrap"><table className="table table-stack co-orders" data-testid="co-orders">
             <thead><tr><th>Order</th><th>Customer</th><th className="num">Amount</th><th className="num">Refunded</th><th>Status</th><th /></tr></thead>
             <tbody>
               {orders.map((o) => {
@@ -148,7 +201,8 @@ export default function CheckoutPage() {
                 const status = o.refunded === 0n ? 'Paid' : left === 0n ? 'Refunded' : 'Partly refunded';
                 return (
                   <tr key={o.id} data-testid="co-order-row">
-                    <td>{shortRef(o.id)}<span className="cell-sub">{when(o.paidAt)}</span></td>
+                    <td>{shortRef(o.id)}<span className="cell-sub">{when(o.paidAt)}</span>
+                      {!ownSet.has(o.merchant.toLowerCase()) && <span className="cell-sub" data-testid="co-order-merchant">to {nameOf(o.merchant) ?? demoName(o.merchant) ?? `${o.merchant.slice(0, 6)}…${o.merchant.slice(-4)}`}</span>}</td>
                     <td>{o.method === 'signed' && nameOf(o.payer) && <b>{nameOf(o.payer)} </b>}<AddrChip value={o.payer} href={`${config.explorer}/address/${o.payer}`} />
                       <span className="cell-sub" data-testid="co-order-method">{methodLabel(o.method)}{o.method === 'transfer' ? ' (deposit address)' : ''}</span></td>
                     <td className="num">{usdtText(o.amount)}<span className="cell-sub"><Inr v={o.amount} /></span>{o.returned > 0n && <span className="cell-sub" data-testid="co-order-returned">{usdtText(o.returned)} extra sent back</span>}</td>
@@ -197,7 +251,8 @@ export default function CheckoutPage() {
                 const due = next !== null && next <= now;
                 return (
                   <tr key={s.id} data-testid="co-sub-row">
-                    <td>{nameOf(s.payer) && <b>{nameOf(s.payer)} </b>}<AddrChip value={s.payer} /><span className="cell-sub">since {when(s.started)}</span></td>
+                    <td>{nameOf(s.payer) && <b>{nameOf(s.payer)} </b>}<AddrChip value={s.payer} /><span className="cell-sub">since {when(s.started)}</span>
+                      {!ownSet.has(s.merchant.toLowerCase()) && <span className="cell-sub" data-testid="co-sub-merchant">to {nameOf(s.merchant) ?? demoName(s.merchant) ?? `${s.merchant.slice(0, 6)}…${s.merchant.slice(-4)}`}</span>}</td>
                     <td className="num">{usdtText(s.amount)}<span className="cell-sub">every {every(s.period)}</span></td>
                     <td>{s.charged} of {s.cycles}</td>
                     <td data-testid="co-sub-next">{s.cancelled ? <Pill>Cancelled</Pill> : next === null ? <Pill tone="positive">Finished</Pill> : due ? <Pill tone="warning">Due now</Pill> : when(next)}</td>
@@ -221,7 +276,7 @@ export default function CheckoutPage() {
             {!relayer ? <Notice testId="co-no-relayer">No relayer is set on this device (Security &amp; settings), so webhook deliveries can&apos;t be listed.</Notice>
               : hooks === null ? <p className="muted">Reading recent deliveries…</p>
                 : hooks === 'error' ? <Notice tone="warning" testId="co-hooks-error">The relayer did not answer; webhooks are listed by the relayer that delivers them.</Notice>
-                  : hooks.items.length === 0 ? <Empty><span data-testid="co-hooks-empty">No webhook deliveries yet for {company.name}.</span></Empty>
+                  : hooks.items.length === 0 ? <Empty><span data-testid="co-hooks-empty">No webhook deliveries yet for these merchants.</span></Empty>
                     : (
                       <div className="table-wrap"><table className="table table-stack" data-testid="co-hooks">
                         <thead><tr><th>Event</th><th>When</th><th>Delivery</th><th>Transaction</th></tr></thead>
@@ -264,7 +319,7 @@ const ok = Math.abs(Date.now() / 1000 - Number(t)) <= 300 &&
             {!relayer ? <Notice>No relayer is set on this device, so agent payments can&apos;t be listed.</Notice>
               : agents === null ? <p className="muted">Reading agent payments…</p>
                 : agents === 'error' ? <Notice tone="warning" testId="co-agents-error">The relayer did not answer.</Notice>
-                  : agents.length === 0 ? <Empty><span data-testid="co-agents-empty">No agent payments to {company.name} yet.</span></Empty>
+                  : agents.length === 0 ? <Empty><span data-testid="co-agents-empty">No agent payments to these addresses yet.</span></Empty>
                     : (
                       <div className="table-wrap"><table className="table table-stack" data-testid="co-agents">
                         <thead><tr><th>Agent</th><th>Resource</th><th className="num">Amount</th><th>When</th><th>Transaction</th></tr></thead>

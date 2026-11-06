@@ -11,6 +11,12 @@
 .receipt-hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .receipt-hero h2 { margin: 0; font-size: 28px; line-height: 34px; font-variant-numeric: tabular-nums; }
 .receipt-share { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.receipt-qr-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tab-count { display: inline-block; margin-left: 6px; min-width: 20px; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 999px; background: var(--pill-info-bg); color: var(--pill-info-ink); font-size: 11px; font-weight: 500; text-align: center; vertical-align: 1px; font-variant-numeric: tabular-nums; }
+.co-demo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.co-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.co-chip[aria-pressed="true"] { border-color: var(--control); background: var(--pill-info-bg); color: var(--pill-info-ink); }
+@media (max-width: 900px) { .co-chip { min-height: 44px; } }
 .receipt-share .ip-qr { width: 120px; height: 120px; }
 .co-tabs { padding: 0 var(--card-pad); }
 .co-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
@@ -20,4 +26,17 @@
 @media (max-width: 700px) {
   .finality { grid-template-columns: minmax(0, 1fr); }
   .co-tabs { padding: 0 16px; overflow-x: auto; }
+}
+/* phone: refund cards read "when · what" over "amount · transaction" */
+@media (max-width: 900px) {
+  .receipt-refunds tr { column-gap: 16px; }
+  .receipt-refunds td.num { text-align: left; font-weight: 500; }
+  .receipt-refunds td:nth-child(even) { text-align: right; }
+}
+/* phone: an order card reads order, customer, then amount · refunded, then status · actions */
+@media (max-width: 900px) {
+  .co-orders tr { column-gap: 16px; }
+  .co-orders td:nth-child(1), .co-orders td:nth-child(2) { grid-column: 1 / -1; }
+  .co-orders td:nth-child(3) { text-align: left; }
+  .co-orders td:nth-child(6) { justify-self: end; }
 }
