@@ -157,3 +157,34 @@ export const saveLogo = (dataUrl: string | null): boolean => {
     return true;
   } catch { return false; }
 };
+
+// ---- supplier account follows the payee (it drives the supplier check on /pay)
+
+type Party = { name: string; account: string };
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Applies a user edit; an untouched supplier account mirrors the payee. */
+export function applyFormEdit(f: InvoiceForm, patch: Partial<InvoiceForm>, touched: ReadonlySet<keyof InvoiceForm>): InvoiceForm {
+  const next = { ...f, ...patch };
+  if (patch.payee !== undefined && patch.supplierAccount === undefined && !touched.has('supplierAccount')) next.supplierAccount = patch.payee;
+  return next;
+}
+
+/** Fills untouched fields from the selected company (the supplier) and the other company (the customer). */
+export function prefillForm(f: InvoiceForm, company: Party, customer: Party | null, touched: ReadonlySet<keyof InvoiceForm>): InvoiceForm {
+  const payee = touched.has('payee') ? f.payee : company.account;
+  return {
+    ...f,
+    supplierName: touched.has('supplierName') ? f.supplierName : company.name,
+    payee,
+    supplierAccount: touched.has('supplierAccount') ? f.supplierAccount : payee,
+    customer: touched.has('customer') || !customer ? f.customer : customer.account,
+  };
+}
+
+/** A warning when the supplier account is still the selected company's while the name and payee say otherwise. */
+export function supplierAccountWarning(f: InvoiceForm, company: Party): string | null {
+  return f.supplierName.trim() !== company.name && same(f.supplierAccount, company.account) && !same(f.payee, company.account)
+    ? `This is ${company.name}'s account; check the supplier account matches the payee's company.`
+    : null;
+}

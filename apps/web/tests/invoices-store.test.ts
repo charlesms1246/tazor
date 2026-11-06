@@ -139,3 +139,38 @@ test('withTax: final line keeps amount == sum of lines, parseInvoice accepts it,
   const r3 = buildInvoice({ ...f, lines: [...f.lines, { description: 'GST 18%', quantity: '1', unitPrice: '17' }] }, 'INV-TAX-3');
   assert.ok('invoice' in r3 && splitTax(r3.invoice.lines).tax === null);
 });
+
+test('supplier account follows the payee until edited; prefill sets both; warning when it is still the company account', async () => {
+  const { applyFormEdit, prefillForm, supplierAccountWarning } = await import('../lib/invoices-store.ts');
+  const acme = { name: 'Acme Industries', account: '0xb99A12652BEe98429ae31EA0529A0b63f1073721' };
+  const bluejay = { name: 'Bluejay Logistics', account: '0xc1dce946D192e344251972470237F1471C93876c' };
+  const blank = { customer: '', payee: '', supplierName: '', supplierAccount: '', lines: [], dueDate: '', memo: '' };
+
+  const touched = new Set<keyof typeof blank>();
+  let f = prefillForm(blank, acme, bluejay, touched);
+  assert.equal(f.payee, acme.account);
+  assert.equal(f.supplierAccount, acme.account);
+  assert.equal(f.supplierName, acme.name);
+  assert.equal(f.customer, bluejay.account);
+  assert.equal(supplierAccountWarning(f, acme), null);
+
+  // typing a payee moves an untouched supplier account with it
+  f = applyFormEdit(f, { payee: bluejay.account }, touched); touched.add('payee');
+  assert.equal(f.supplierAccount, bluejay.account);
+  // a later company switch keeps the typed payee and the account that follows it
+  assert.equal(prefillForm(f, bluejay, acme, touched).supplierAccount, bluejay.account);
+
+  // once the supplier account itself is edited it stays put
+  f = applyFormEdit(f, { supplierAccount: acme.account }, touched); touched.add('supplierAccount');
+  f = applyFormEdit(f, { payee: '0xEA5A4Be313E05Eb254900b6aDBb7D655c55242F6' }, touched);
+  assert.equal(f.supplierAccount, acme.account);
+  assert.equal(prefillForm(f, bluejay, acme, touched).supplierAccount, acme.account);
+
+  // renaming alone does not change the account, but warns when name and payee no longer match the company
+  const named = applyFormEdit(prefillForm(blank, acme, null, new Set()), { supplierName: 'Bluejay Logistics' }, new Set());
+  assert.equal(named.supplierAccount, acme.account);
+  assert.equal(supplierAccountWarning(named, acme), null); // payee is still the company's
+  const odd = { ...named, payee: bluejay.account };
+  assert.match(supplierAccountWarning(odd, acme) ?? '', /^This is Acme Industries's account; check the supplier account matches the payee's company\.$/);
+  assert.equal(supplierAccountWarning({ ...odd, supplierAccount: bluejay.account }, acme), null);
+});
