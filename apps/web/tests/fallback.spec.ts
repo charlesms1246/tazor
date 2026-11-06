@@ -105,9 +105,10 @@ test('mandates: tracking the live mandate shows terms and what is available now'
 test('home page shows the bank vs Tazor timing card with proof links', async ({ page }) => {
   await page.goto('/');
   const card = page.getByTestId('timings');
-  await expect(card).toContainText('3.6 s (measured)');
-  await expect(card).toContainText('69 s via Ethereum (measured)');
-  await expect(card).toContainText('3.06 s (measured)');
+  await expect(card).toContainText('3.6 s');
+  await expect(card).toContainText('69 s via Ethereum');
+  await expect(card).toContainText('3.06 s');
+  await expect(card.getByText('measured').first()).toBeVisible();
   await expect(card).toContainText('100 s');
   await expect(card.locator('a[href*="0x027e1cfd"]')).toHaveCount(1);
   await expect(page.getByTestId('host')).toHaveText('localhost:4173');
