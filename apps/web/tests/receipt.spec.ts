@@ -35,6 +35,8 @@ test('/receipt/: a public receipt read from Whitechain: amount, refund, net, fin
   await expect(page.getByTestId('receipt-net')).toContainText('1.05 USDT');
   await expect(page.getByTestId('receipt-merchant')).toContainText('Bluejay Logistics');
   await expect(page.getByTestId('receipt-method')).toHaveText('Signed in wallet');
+  await expect(page.getByTestId('receipt-ship')).toHaveAttribute('data-ready', 'true');
+  await expect(page.getByTestId('receipt-ship')).toContainText('Ready to ship');
   await expect(page.getByTestId('receipt-refund-row')).toHaveCount(1);
   await expect(page.getByTestId('receipt-refund-row').locator('a')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/0x${'bb'.repeat(32)}`);
   // posted to Ethereum (safe passed the block), not final yet (finalized behind it)

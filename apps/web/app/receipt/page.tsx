@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { isHex, type Address, type Hex } from 'viem';
 import { config } from '@/lib/config.ts';
 import {
-  blockTime, checkoutAddress, depositCheckoutAddress, finalityStage, methodLabel, orderEvents, orderRef, readFinality, readPayment, shortRef,
+  blockTime, checkoutAddress, DEFAULT_SHIP_POLICY, depositCheckoutAddress, finalityStage, methodLabel, orderEvents, orderRef, readyToShip, readFinality, readPayment, shortRef,
   type CheckoutEvent, type Finality, type Payment,
 } from '@/lib/checkout.ts';
 import { companyByAccount } from '@/lib/company.ts';
@@ -110,6 +110,7 @@ export default function ReceiptPage() {
   const status = p.refunded === 0n ? 'Paid' : p.refunded >= p.amount ? 'Refunded' : 'Partly refunded';
   const refunds = events.filter((e): e is Extract<CheckoutEvent, { kind: 'refunded' | 'returned' }> => e.kind === 'refunded' || e.kind === 'returned');
   const stage = fin ? finalityStage(fin) : 1;
+  const ship = readyToShip(p.amount, (['pending', 'sequencer', 'ethereum', 'finalized'] as const)[stage]);
   const steps: [string, string, number | null][] = [
     ['Confirmed by Whitechain', 'about 1 second after paying', times.paid ?? p.paidAt * 1000],
     ['Posted to Ethereum', "in a batch on Ethereum (Whitechain's safe head passed the block)", times.safe],
@@ -137,6 +138,9 @@ export default function ReceiptPage() {
             <dt>{p.method === 'signed' ? 'Paid by' : 'Refunds go to'}</dt><dd>{payerName && <b>{payerName} </b>}<AddrChip value={p.payer} href={explorer(p.payer)} /></dd>
             <dt>Paid</dt><dd className="num" data-testid="receipt-paid-at">{when(p.paidAt * 1000)}{state.paidTx && <> · <a href={explorerTx(state.paidTx)} target="_blank" rel="noreferrer" data-tx={state.paidTx}>View transaction</a></>}</dd>
             {p.refunded > 0n && <><dt>Refunded</dt><dd className="num" data-testid="receipt-refunded">{usdtText(p.refunded)} in {p.refunds} refund{p.refunds === 1 ? '' : 's'}</dd></>}
+            <dt>For the merchant</dt><dd data-testid="receipt-ship" data-ready={ship.ready ? 'true' : 'false'} title={ship.reason}>
+              <Pill tone={ship.ready ? 'positive' : 'warning'}>{ship.ready ? 'Ready to ship' : 'Wait: big payment'}</Pill>
+              <span className="cell-sub">{ship.ready ? ship.reason.replace(/^Ready to ship: /, '') : `${DEFAULT_SHIP_POLICY.waitForEthereumAbove} USDT and above waits until Whitechain posts it to Ethereum (about 10 minutes)`}</span></dd>
             <dt>Net paid</dt><dd className="num" data-testid="receipt-net"><b>{usdtText(net)}</b> <Inr v={net} /></dd>
             <dt>Order</dt><dd data-testid="receipt-order">{state.number ?? shortRef(state.id)}</dd>
           </dl>
