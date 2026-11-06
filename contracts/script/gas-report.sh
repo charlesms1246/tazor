@@ -55,8 +55,8 @@ for label, full, z, nz in rows:
     floored = full <= floor
     note = 'EIP-7623 calldata floor charged; execution is an upper bound' if floored else ''
     out.append((label, full, ('<=' if floored else '') + f"{execution:,}", z + nz, note))
-    if label.startswith('payRun(10)'):
-        out.append(('  payRun(10) per invoice', full // 10, f"{execution // 10:,}", (z + nz) // 10, ''))
+    if label.startswith('payRun(10)') or label.startswith('v2 payRun(10)'):
+        out.append(('  ' + label.split(',')[0] + ' per invoice', full // 10, f"{execution // 10:,}", (z + nz) // 10, ''))
 
 w = max(len(r[0]) for r in out)
 print('Tazor gas summary (forge --isolate: each action is its own transaction, cold state)')

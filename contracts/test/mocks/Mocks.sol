@@ -90,3 +90,31 @@ contract MockRoleCache {
         return (roles[registry][account], uint64(block.number));
     }
 }
+
+/// Role cache with an explicit proof block per entry (for the fresh-proof rule).
+contract MockRoleCacheV2 {
+    struct Entry {
+        uint256 roles;
+        uint64 l1Block;
+    }
+
+    mapping(address registry => mapping(address account => Entry)) public entries;
+
+    function setRoles(address registry, address account, uint256 roles, uint64 l1Block) external {
+        entries[registry][account] = Entry(roles, l1Block);
+    }
+
+    function rolesOf(address registry, address account) external view returns (uint256, uint64) {
+        Entry memory e = entries[registry][account];
+        return (e.roles, e.l1Block);
+    }
+}
+
+/// Stand-in for the OP Stack L1Block predeploy when there is no fork.
+contract MockL1Block {
+    uint64 public number;
+
+    function setNumber(uint64 n) external {
+        number = n;
+    }
+}
