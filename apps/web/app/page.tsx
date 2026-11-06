@@ -239,11 +239,11 @@ export default function Home() {
           <span className="lane-value num">{today === null ? '…' : `${today.net < 0n ? '−' : ''}${usdtNumber(today.net < 0n ? -today.net : today.net)}`}<span className="kpi-unit">USDT net</span></span>
           <span className="lane-sub">{today === null ? 'Reading Checkout sales…' : `${today.orders} order${today.orders === 1 ? '' : 's'} today · ${today.all} in all${checkoutDemo ? ' (incl. demo shops)' : ''}`}</span>
         </a>
-        <a className="lane" href="/invoices/" data-testid="lane-receivables">
+        <a className="lane" href={overdue.length > 0 ? '/invoices/?tab=overdue' : '/invoices/'} data-testid="lane-receivables">
           <span className="lane-label">Receivables</span>
           <span className="lane-value num">{usdt2dp(openTotal)}<span className="kpi-unit">USDT</span></span>
           <span className="lane-sub">{open.length === 0 ? 'No unpaid invoices' : `${open.length} unpaid${overdue.length ? ` · ${overdue.length} overdue` : ''} · ${inrText(openTotal)}`}</span>
-          {overdue.length > 0 && <span className="pill pill-negative lane-pill">Overdue</span>}
+          {overdue.length > 0 && <span className="pill pill-negative lane-pill" data-testid="lane-overdue">{overdue.length} overdue</span>}
         </a>
         <a className="lane" href="/approvals/" data-testid="lane-payables">
           <span className="lane-label">Waiting for approval</span>
