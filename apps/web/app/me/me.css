@@ -1,0 +1,12 @@
+.me-who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.me-pick { gap: 8px; }
+.me-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.me-kpis > div { display: flex; flex-direction: column; gap: 4px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); }
+.me-kpis b { font-size: 22px; line-height: 28px; font-weight: 500; }
+@media (max-width: 900px) {
+  .me-kpis { grid-template-columns: minmax(0, 1fr); }
+  .me-orders tr { column-gap: 16px; }
+  .me-orders td:nth-child(1), .me-orders td:nth-child(2) { grid-column: 1 / -1; }
+  .me-orders td.num { text-align: left; }
+  .me-orders td[data-label]::before { content: attr(data-label) " "; color: var(--muted); }
+}
