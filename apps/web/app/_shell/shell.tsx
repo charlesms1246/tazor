@@ -7,6 +7,7 @@ import { CommandPalette, openPalette } from '../_cmdk/palette.tsx';
 import { Tour } from '../_tour/tour.tsx';
 import { AutopilotPanel } from '../_autopilot/panel.tsx';
 import { RelayerOffBanner } from '../security/relayer-off.tsx';
+import './nav.css';
 
 const ICONS: Record<string, ReactNode> = {
   home: <path d="M2.5 7.5 8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H9.5v-4h-3v4H3a.5.5 0 0 1-.5-.5z" />,
@@ -14,6 +15,7 @@ const ICONS: Record<string, ReactNode> = {
   invoice: <><path d="M4 2h6l2.5 2.5V14H4z" /><path d="M6.5 7.5h4M6.5 10h4M10 2v2.5h2.5" /></>,
   runs: <><path d="M3 4h10M3 8h10M3 12h6" /><path d="m11.5 11 1.5 1.5L15 10" /></>,
   mandate: <><path d="M13 8a5 5 0 1 1-1.5-3.5" /><path d="M13 2.5V5h-2.5" /><path d="M8 5.5V8l1.5 1.5" /></>,
+  start: <><circle cx="8" cy="8" r="6" /><path d="M8 5v6M5 8h6" /></>,
   checkout: <><path d="M2.5 3.5h1.5l1.6 7h7l1.4-5H5" /><circle cx="6.5" cy="13" r="1" /><circle cx="11.5" cy="13" r="1" /></>,
   export: <><path d="M8 2.5v7M5 6.5l3 3 3-3" /><path d="M3 11v2.5h10V11" /></>,
   team: <><circle cx="6" cy="5.5" r="2.25" /><path d="M2 13c.4-2.2 2-3.5 4-3.5s3.6 1.3 4 3.5" /><path d="M10.5 3.6a2.2 2.2 0 0 1 0 4M11.5 9.7c1.3.4 2.2 1.6 2.5 3.3" /></>,
@@ -41,47 +43,53 @@ export function Wordmark() {
 }
 
 type Item = { href: string; label: string; icon: string; short?: string };
-const GROUPS: { label?: string; items: Item[] }[] = [
-  { items: [{ href: '/', label: 'Home', icon: 'home' }, { href: '/autopilot/', label: 'Autopilot', icon: 'autopilot' }] },
-  {
-    label: 'Receive',
-    items: [
-      { href: '/invoices/', label: 'Invoices', icon: 'invoice' },
-      { href: '/mandates/', label: 'Collect', icon: 'mandate' },
-      { href: '/checkout/', label: 'Checkout', icon: 'checkout' },
-    ],
-  },
-  {
-    label: 'Pay',
-    items: [
-      { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
-      { href: '/runs/', label: 'Payment runs', icon: 'runs' },
-    ],
-  },
-  {
-    label: 'Company',
-    items: [
-      { href: '/company/', label: 'Company', icon: 'company' },
-      { href: '/policies/', label: 'Policies', icon: 'policy' },
-      { href: '/security/', label: 'Security & settings', icon: 'security' },
-    ],
-  },
-  {
-    label: 'Books',
-    items: [{ href: '/export/', label: 'Reports', icon: 'export' }],
-  },
+/** Selling first: what a merchant uses every day. */
+const MAIN: Item[] = [
+  { href: '/', label: 'Home', icon: 'home' },
+  { href: '/start/', label: 'Start accepting USDT', icon: 'start' },
+  { href: '/checkout/', label: 'Checkout', icon: 'checkout' },
+  { href: '/export/', label: 'Reports', icon: 'export' },
+  { href: '/autopilot/', label: 'Autopilot', icon: 'autopilot' },
+];
+/** Also built: business-to-business invoices and approvals by verified people. Collapsed by default. */
+const B2B: Item[] = [
+  { href: '/invoices/', label: 'Invoices', icon: 'invoice' },
+  { href: '/mandates/', label: 'Collect', icon: 'mandate' },
+  { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
+  { href: '/runs/', label: 'Payment runs', icon: 'runs' },
+  { href: '/company/', label: 'Company', icon: 'company' },
+  { href: '/policies/', label: 'Policies', icon: 'policy' },
 ];
 const FOOT: Item[] = [
+  { href: '/security/', label: 'Security & settings', icon: 'security' },
   { href: '/docs/', label: 'Docs', icon: 'docs' },
 ];
 const BOTTOM: Item[] = [
   { href: '/', label: 'Home', icon: 'home' },
-  { href: '/invoices/', label: 'Invoices', icon: 'invoice' },
-  { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
-  { href: '/company/', label: 'Company', icon: 'company' },
+  { href: '/checkout/', label: 'Checkout', icon: 'checkout' },
+  { href: '/export/', label: 'Reports', icon: 'export' },
+  { href: '/start/', label: 'Start', icon: 'start' },
 ];
+const B2B_KEY = 'tazor.nav.b2b.v1';
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+
+/** The B2B pages, folded away unless opened (remembered on this device) or one of them is the current page. */
+function B2BGroup({ path, link }: { path: string; link: (it: Item) => ReactNode }) {
+  const here = B2B.some((it) => isActive(path, it.href));
+  const [open, setOpen] = useState(false);
+  useEffect(() => { try { setOpen(localStorage.getItem(B2B_KEY) === 'open'); } catch { /* private mode */ } }, []);
+  const shown = open || here;
+  const toggle = () => { const next = !shown; setOpen(next); try { localStorage.setItem(B2B_KEY, next ? 'open' : 'closed'); } catch { /* storage full */ } };
+  return (
+    <div className="nav-group">
+      <button type="button" className="nav-label nav-toggle" aria-expanded={shown} onClick={toggle} data-testid="nav-b2b">
+        <span>B2B: invoices &amp; approvals</span><span className="nav-caret" aria-hidden="true">{shown ? '▾' : '▸'}</span>
+      </button>
+      {shown && <div data-testid="nav-b2b-items">{B2B.map(link)}</div>}
+    </div>
+  );
+}
 
 function NavLinks({ path, onNavigate }: { path: string; onNavigate?: () => void }) {
   const link = (it: Item) => (
@@ -92,12 +100,8 @@ function NavLinks({ path, onNavigate }: { path: string; onNavigate?: () => void 
   return (
     <>
       <nav aria-label="Main">
-        {GROUPS.map((g, i) => (
-          <div key={i} className={g.label ? 'nav-group' : undefined}>
-            {g.label && <div className="nav-label">{g.label}</div>}
-            {g.items.map(link)}
-          </div>
-        ))}
+        {MAIN.map(link)}
+        <B2BGroup path={path} link={link} />
       </nav>
       <div className="sidebar-foot">
         {FOOT.map(link)}

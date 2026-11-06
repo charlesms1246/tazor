@@ -1,0 +1,4 @@
+.nav-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 32px; margin: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--faint); cursor: pointer; text-align: left; border-radius: 8px; }
+.nav-toggle:hover { color: var(--muted); background: var(--active); }
+.nav-caret { font-size: 14px; line-height: 1; }
+@media (max-width: 900px) { .nav-toggle { min-height: 44px; font-size: 14px; } }

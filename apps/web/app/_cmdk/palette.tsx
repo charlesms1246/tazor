@@ -17,15 +17,18 @@ export function openPalette(): void {
 
 const PAGES: { href: string; title: string; keywords: string[] }[] = [
   { href: '/', title: 'Home', keywords: ['dashboard', 'balance', 'overview'] },
-  { href: '/invoices/', title: 'Invoices', keywords: ['bill', 'send', 'create', 'receive'] },
-  { href: '/mandates/', title: 'Collect', keywords: ['mandates', 'direct debit', 'recurring', 'subscription'] },
-  { href: '/approvals/', title: 'Approvals', keywords: ['approve', 'sign', 'passkey', 'pay an invoice', 'payment link', 'scan qr', 'paid'] },
-  { href: '/runs/', title: 'Payment runs', keywords: ['batch', 'payroll', 'many invoices'] },
-  { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'team', 'roles', 'profile'] },
-  { href: '/policies/', title: 'Policies', keywords: ['limits', 'spending', 'rules', 'payees'] },
+  { href: '/start/', title: 'Start accepting USDT', keywords: ['onboarding', 'merchant', 'pay button', 'payment link', 'snippet', 'setup', 'qr'] },
+  { href: '/checkout/', title: 'Checkout', keywords: ['orders', 'refund', 'receipt', 'subscriptions', 'webhooks', 'agents', 'x402', 'sales'] },
+  { href: '/export/', title: 'Reports', keywords: ['export', 'csv', 'statement', 'accounting', 'books', 'accountant'] },
+  { href: '/autopilot/', title: 'Autopilot', keywords: ['demo', 'story', 'tour', 'walkthrough'] },
+  { href: '/invoices/', title: 'Invoices (B2B)', keywords: ['bill', 'send', 'create', 'receive'] },
+  { href: '/mandates/', title: 'Collect (B2B)', keywords: ['mandates', 'direct debit', 'recurring'] },
+  { href: '/approvals/', title: 'Approvals (B2B)', keywords: ['approve', 'sign', 'passkey', 'pay an invoice', 'scan qr', 'paid'] },
+  { href: '/runs/', title: 'Payment runs (B2B)', keywords: ['batch', 'payroll', 'many invoices'] },
+  { href: '/company/', title: 'Company (B2B)', keywords: ['ens', 'people', 'team', 'roles', 'profile'] },
+  { href: '/policies/', title: 'Policies (B2B)', keywords: ['limits', 'spending', 'rules', 'payees'] },
+  { href: '/onboard/', title: 'Approver setup (B2B)', keywords: ['passkey', 'onboarding', 'join', 'add me', 'wb soul'] },
   { href: '/security/', title: 'Security & settings', keywords: ['settings', 'relayer', 'freeze', 'lost device', 'health', 'status', 'revoke', 'contracts'] },
-  { href: '/onboard/', title: 'Approver setup', keywords: ['passkey', 'onboarding', 'join', 'add me', 'wb soul'] },
-  { href: '/export/', title: 'Reports', keywords: ['export', 'csv', 'statement', 'accounting', 'books'] },
   { href: '/docs/', title: 'Docs', keywords: ['help', 'guide', 'documentation'] },
 ];
 
