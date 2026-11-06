@@ -4,6 +4,9 @@ import { createApproverDeployer } from './approver.ts';
 import { createSender } from './sender.ts';
 import { sepolia } from 'viem/chains';
 import { createRoleSync, type Prover } from './sync.ts';
+import { createMirrorService } from './mirror-service.ts';
+import { REVOCATION_LIST_V2 } from './revoke-list.ts';
+import { PAYMENT_MODULE_V2 } from './payrun.ts';
 
 export const DEFAULT_SEPOLIA_RPC = 'https://sepolia.gateway.tenderly.co';
 export const DEFAULT_ROLE_CACHE = '0x8AC436e5BB681aE4d576e0131391aE3AACA88BDe';
@@ -48,9 +51,22 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
     })
     : undefined;
   const cronSecret = env.CRON_SECRET || undefined;
+  // Mirroring sends on Sepolia with the same key, and only where that address is already an APPROVER admin.
+  const l1Sender = key ? createSender({ rpcUrl: sepoliaRpc, chain: sepolia, privateKey: key }) : undefined;
+  const mirror = env.MIRROR === '0' ? undefined : createMirrorService({
+    l1: createPublicClient({ chain: sepolia, transport: http(sepoliaRpc) }) as never,
+    l2: client as never,
+    lists: [
+      { list: revocationList, paymentModule },
+      { list: getAddress(env.REVOCATION_LIST_V2 || REVOCATION_LIST_V2), paymentModule: getAddress(env.PAYMENT_MODULE_V2 || PAYMENT_MODULE_V2) },
+    ],
+    registries: watchRegistries(env),
+    sender: l1Sender,
+    lookback: env.MIRROR_LOOKBACK ? BigInt(env.MIRROR_LOOKBACK) : undefined,
+  });
   const handler = createHandler({
     sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id,
-    roleSync, cronSecret,
+    roleSync, cronSecret, mirror,
   });
-  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc };
+  return { handler, sender, paymentModule, approverFactory, revocationList, mandateModule, paymaster, chainId: whitechainSepolia.id, roleSync, sepoliaRpc, mirror };
 }

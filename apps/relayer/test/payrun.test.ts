@@ -106,6 +106,33 @@ test('/pay with plain approvals is unchanged (no deploys, payOne to v1)', async 
   assert.equal(decodeFunctionData({ abi, data: sent[0].data }).functionName, 'payOne');
 });
 
+test('/pay for a v2 account sends payOne to PaymentModuleV2 and names it in the response', async () => {
+  sent.length = 0;
+  const a = auth(V2_ACCOUNT, 4);
+  const body = { account: V2_ACCOUNT, auth: a, approvers: ['0x00000000000000000000000000000000000a11ce'], signatures: ['0xaa01'] };
+  const r = await post('/pay', body);
+  const j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j));
+  assert.equal(j.paymentModule.toLowerCase(), PAYMENT_MODULE_V2.toLowerCase());
+  assert.deepEqual(j.deployTxs, []);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to.toLowerCase(), PAYMENT_MODULE_V2.toLowerCase());
+  const { functionName, args } = decodeFunctionData({ abi, data: sent[0].data });
+  assert.equal(functionName, 'payOne');
+  assert.equal((args![0] as string).toLowerCase(), V2_ACCOUNT);
+  // /pay/calldata is unchanged: it still names the v1 module
+  assert.equal((await (await post('/pay/calldata', body)).json()).to, V1);
+});
+
+test('/pay for an account configured on neither module is 400 before any send', async () => {
+  sent.length = 0;
+  const other = '0x00000000000000000000000000000000000000c0' as Address;
+  const r = await post('/pay', { account: other, auth: auth(other, 5), approvers: ['0x00000000000000000000000000000000000a11ce'], signatures: ['0xaa01'] });
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /no PaymentModule configuration/);
+  assert.equal(sent.length, 0);
+});
+
 test('/payrun for an account configured on neither module is 400 before any send', async () => {
   sent.length = 0;
   const r = await post('/payrun', run('0x00000000000000000000000000000000000000c0'));

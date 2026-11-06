@@ -224,7 +224,7 @@ test('GET /watch: 401 without the cron bearer, 200 with it (7200-block lookback)
 test('GET /health reports roleSync and the watched registries; GET / describes the relayer', async () => {
   assert.deepEqual(
     await (await fetch(`${withSync.base}/health`)).json(),
-    { ok: true, relayer: null, paymentModule: null, approverAccountFactory: null, revocationList: null, mandateModule: null, roleSync: true, watchRegistries: [ACME] },
+    { ok: true, relayer: null, paymentModule: null, approverAccountFactory: null, revocationList: null, mandateModule: null, roleSync: true, watchRegistries: [ACME], mirrorEnabled: false, mirrorReason: 'mirror not configured' },
   );
   const h = await (await fetch(`${withoutSync.base}/health`)).json();
   assert.equal(h.roleSync, false);

@@ -6,10 +6,11 @@ import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
 import { encodeCreateMandate, encodePull, parseMandateRequest, parsePullRequest } from './mandate.ts';
 import { getAddress, isAddress, type PublicClient } from 'viem';
 import type { RoleSync, ScanSummary, SyncResult } from './sync.ts';
-import { PAYMENT_MODULE_V2, parsePayRunRequest, preparePayRun } from './payrun.ts';
+import { PAYMENT_MODULE_V2, parsePayRunRequest, pickModule, preparePayRun } from './payrun.ts';
 import { preparePayOne } from './pay-counterfactual.ts';
 import { REVOCATION_LIST_V2, pickRevocationList } from './revoke-list.ts';
 import { ENTRY_POINT_V08, RpcError, encodeHandleOps, parseUserOp, paymasterRpc } from './userop.ts';
+import type { MirrorService } from './mirror-service.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -29,6 +30,11 @@ const scanJson = (s: ScanSummary) => ({
 });
 
 export const WATCH_LOOKBACK = 7200n;
+
+async function mirrorHealthJson(m: MirrorService) {
+  const h = await m.health();
+  return { mirrorEnabled: h.mirrorEnabled, ...(h.reason ? { mirrorReason: h.reason } : {}), mirrorSender: h.sender, mirrorRegistries: h.authorized };
+}
 export const DOCS_URL = 'https://taz0r.eth.limo/docs/relayer-api/';
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
@@ -50,6 +56,8 @@ export function createHandler(deps: {
   roleSync?: RoleSync;
   /** When set, GET /watch requires `authorization: Bearer <cronSecret>` (Vercel cron sends it). */
   cronSecret?: string;
+  /** Whitechain revocation → ENS mirroring (POST /mirror and a pass in GET /watch). */
+  mirror?: MirrorService;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -67,8 +75,19 @@ export function createHandler(deps: {
           ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null,
           approverAccountFactory: deps.approvers?.factory ?? null, revocationList: deps.revocationList ?? null,
           mandateModule: deps.mandateModule ?? null,
-          roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? [],
+          roleSync: !!deps.roleSync, watchRegistries: deps.roleSync?.registries ?? deps.mirror?.registries ?? [],
+          ...(deps.mirror ? await mirrorHealthJson(deps.mirror) : { mirrorEnabled: false, mirrorReason: 'mirror not configured' }),
         });
+      }
+      if (deps.mirror && req.method === 'POST' && path === '/mirror') {
+        const body = (await readJson(req)) as { account?: unknown; target?: unknown } | null;
+        const { account, target } = body ?? {};
+        if (typeof account !== 'string' || !isAddress(account) || typeof target !== 'string' || !isAddress(target)) {
+          throw new BadRequest('account and target must be addresses');
+        }
+        const h = await deps.mirror.health();
+        const r = await deps.mirror.mirrorOne(getAddress(account), getAddress(target));
+        return reply(200, { ...r, ...(r.status === 'not-authorized' && h.reason ? { reason: h.reason } : {}) });
       }
       if (deps.roleSync && req.method === 'POST' && path === '/sync') {
         const body = (await readJson(req)) as { registry?: unknown; account?: unknown } | null;
@@ -78,9 +97,11 @@ export function createHandler(deps: {
         }
         return reply(200, syncJson(await deps.roleSync.syncAccount(getAddress(registry), getAddress(account))));
       }
-      if (deps.roleSync && req.method === 'GET' && path === '/watch') {
+      if ((deps.roleSync || deps.mirror) && req.method === 'GET' && path === '/watch') {
         if (deps.cronSecret && req.headers.authorization !== `Bearer ${deps.cronSecret}`) return reply(401, { error: 'unauthorized' });
-        return reply(200, scanJson(await deps.roleSync.scanOnce({ lookback: WATCH_LOOKBACK })));
+        const roles = deps.roleSync ? scanJson(await deps.roleSync.scanOnce({ lookback: WATCH_LOOKBACK })) : {};
+        const mirror = deps.mirror ? await deps.mirror.scanOnce() : undefined;
+        return reply(200, { ...roles, ...(mirror ? { mirror } : {}) });
       }
       if (req.method === 'POST' && (req.url === '/mandate' || req.url === '/pull')) {
         const json = await readJson(req);
@@ -110,10 +131,12 @@ export function createHandler(deps: {
         if (req.url === '/pay/calldata') return reply(200, { to: deps.paymentModule ?? null, data });
         if (!deps.sender || !deps.paymentModule) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
         if (!deps.client || !deps.approvers) return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
-        const p = await preparePayOne(deps.client, deps.approvers.factory, deps.paymentModule, parsed);
+        // a v2 company pays through PaymentModuleV2 (same payOne signature, its own invoice digest and policy checks)
+        const to = await pickModule(deps.client, parsed.account, deps.paymentModule, deps.paymentModuleV2 ?? PAYMENT_MODULE_V2);
+        const p = await preparePayOne(deps.client, deps.approvers.factory, to, parsed);
         const deployTxs = [];
         for (const d of p.deploys) deployTxs.push(await deps.sender.send(d.to, d.data));
-        return reply(200, { txHash: await deps.sender.send(deps.paymentModule, p.data), deployTxs });
+        return reply(200, { txHash: await deps.sender.send(to, p.data), paymentModule: to, deployTxs });
       }
       if (req.method === 'POST' && req.url === '/payrun') {
         const parsed = parsePayRunRequest(await readJson(req));
