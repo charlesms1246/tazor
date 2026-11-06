@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { isCompanyAccount, useCompanies } from '@/lib/company.ts';
 import { formatEther, formatUnits, type Hex } from 'viem';
 import { invoiceHash, type Invoice } from '@/lib/invoice.ts';
 import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
@@ -58,13 +59,22 @@ export default function PayPage() {
   const [busy, setBusy] = useState(false);
   const [tx, setTx] = useState<{ hash: Hex; started: number; seconds?: number; status?: string } | null>(null);
   const [calldata, setCalldata] = useState('');
-  const [label, setLabel] = useState('acme');
+  const [label, setLabel] = useState('');
+  const labelTouched = useRef(false);
+  const companies = useCompanies();
   const [l1, setL1] = useState<L1 | null>(null);
   const [supplier, setSupplier] = useState<CompanyVerification | 'checking' | 'error'>('checking');
   const [v2, setV2] = useState<boolean | null>(null);
   const [paidBefore, setPaidBefore] = useState<Hex | null>(null);
   const subject = typeof state === 'object' ? subjectOf(state.invoice) : null;
   const history = useSubjectHistory(subject, typeof state === 'object' ? state.invoice.buyerAccount : null);
+  // The Ethereum fallback checks roles in the buyer company's ENS registry, so the label must be that company's.
+  useEffect(() => {
+    if (typeof state !== 'object' || labelTouched.current) return;
+    const c = companies.find((x) => isCompanyAccount(x, state.invoice.buyerAccount));
+    const suffix = '.taz0r.eth';
+    if (c?.ens?.endsWith(suffix)) setLabel(c.ens.slice(0, -suffix.length));
+  }, [state, companies]);
   /** Adds an event to this invoice's timeline (no-op before an invoice is loaded). */
   const story = (kind: TimelineEvent['kind'], title: string, extra: Partial<TimelineEvent> = {}) => {
     if (subject) recordEvent({ subject, kind, at: Date.now(), title, ...extra });
@@ -460,7 +470,7 @@ export default function PayPage() {
               </p>
               <Field label="Company name">
                 <span className="input-affix">
-                  <input data-testid="label" className="input" value={label} onChange={(e) => setLabel(e.target.value)} />
+                  <input data-testid="label" className="input" value={label} onChange={(e) => { labelTouched.current = true; setLabel(e.target.value); }} />
                   <span>.taz0r.eth</span>
                 </span>
               </Field>
