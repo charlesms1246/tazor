@@ -26,7 +26,7 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     title: 'Company',
     pages: [
-      { slug: 'company-page', title: 'The Company page', summary: 'Your company profile, its people, and whether Whitechain agrees with ENS about each of them.' },
+      { slug: 'company-page', title: 'The Company page', summary: 'Your company, its ENS data and its team in one place: people, roles, and the controls to add or remove someone.' },
       { slug: 'team-and-roles', title: 'Team and roles', summary: 'Approvers, admins and agents, and how a backup signer protects against a lost phone.' },
       { slug: 'policies', title: 'Policies', summary: 'Spending limits, payee rules, temporary access and the time-locked exit.' },
       { slug: 'removing-a-person', title: 'Removing a person', summary: 'Stop someone approving for your company in about three seconds.' },
@@ -40,6 +40,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { slug: 'censorship-resistance', title: 'Censorship resistance', summary: 'How a signed payment still gets through if Tazor or the sequencer stops it.' },
       { slug: 'security-model', title: 'Security model', summary: 'What protects a payment from being redirected, and what you still have to trust.' },
       { slug: 'testnet-simulations', title: 'Testnet simulations', summary: 'What is simulated on Whitechain Sepolia, and what is real.' },
+      { slug: 'wb-soul', title: 'WB Soul', summary: 'WhiteBIT-verified identity: the real registry on Whitechain mainnet, and the labelled mirror on testnet.' },
     ],
   },
   {

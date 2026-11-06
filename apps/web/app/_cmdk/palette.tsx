@@ -23,8 +23,8 @@ const PAGES: { href: string; title: string; keywords: string[] }[] = [
   { href: '/approvals/', title: 'Approvals', keywords: ['approve', 'sign', 'face id', 'passkey'] },
   { href: '/pay/', title: 'Pay an invoice', keywords: ['payment link', 'pay', 'fallback', 'ethereum'] },
   { href: '/runs/', title: 'Payment runs', keywords: ['batch', 'payroll', 'many invoices'] },
-  { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'profile'] },
-  { href: '/team/', title: 'Team & roles', keywords: ['approvers', 'admins', 'members', 'ens'] },
+  { href: '/company/', title: 'Company', keywords: ['ens', 'people', 'profile', 'team', 'roles', 'approvers', 'backup signer', 'remove'] },
+
   { href: '/policies/', title: 'Policies', keywords: ['limits', 'spending', 'rules', 'payees'] },
   { href: '/security/', title: 'Security', keywords: ['health', 'status', 'freeze', 'revoke'] },
   { href: '/onboard/', title: 'Approver setup', keywords: ['passkey', 'onboarding', 'wb soul'] },

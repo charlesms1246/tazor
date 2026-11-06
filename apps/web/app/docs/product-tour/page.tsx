@@ -17,9 +17,8 @@ export default function Page() {
       </ul>
       <h2>Control</h2>
       <ul>
-        <li><a href="/company/">Company</a>: who acts for the company, and whether Whitechain agrees with ENS.</li>
+        <li><a href="/company/">Company</a>: who acts for the company, their ENS data, and the controls to add a backup signer or remove someone.</li>
         <li><a href="/policies/">Policies</a>: limits, payee rules, temporary access and the time-locked exit.</li>
-        <li><a href="/team/">Team</a>: remove a person in seconds and add a backup signer.</li>
         <li><a href="/security/">Security</a>: system health, the Ethereum fallback and lost-device controls.</li>
       </ul>
       <h2>Books</h2>

@@ -60,7 +60,6 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     label: 'Company',
     items: [
       { href: '/company/', label: 'Company', icon: 'company' },
-      { href: '/team/', label: 'Team & roles', icon: 'team' },
       { href: '/policies/', label: 'Policies', icon: 'policy' },
       { href: '/security/', label: 'Security', icon: 'security' },
       { href: '/onboard/', label: 'Approver setup', icon: 'onboard' },

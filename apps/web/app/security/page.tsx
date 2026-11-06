@@ -70,7 +70,7 @@ export default function SecurityPage() {
       </Card>
 
       <Card title="Recent revocations" subtitle={`Removed approvers for ${company.ens}, and removals made from this device.`}>
-        {revokedPeople.length === 0 && events.length === 0 ? <Empty>No revocations yet. Removing someone on Team stops their approvals in seconds.</Empty> : (
+        {revokedPeople.length === 0 && events.length === 0 ? <Empty>No revocations yet. Removing someone on Company stops their approvals in seconds.</Empty> : (
           <div className="stack" style={{ gap: 10 }}>
             {revokedPeople.map((p) => (
               <div key={p.address} className="spread" data-testid="revoked-person">
