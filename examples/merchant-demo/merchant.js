@@ -165,7 +165,7 @@ async function hooks() {
     const list = Array.isArray(j) ? j : j.deliveries || [];
     const items = await Promise.all(list.slice(0, 12).map(async (d) => {
       const raw = d.rawBody ?? JSON.stringify(d.body ?? d);
-      const v = await T.verifyWebhook(raw, d.signature ?? d.header ?? null, DEMO_WEBHOOK_SECRET, 24 * 3600);
+      const v = await T.verifyWebhook(raw, d.signature ?? d.header ?? null, DEMO_WEBHOOK_SECRET, 7 * 24 * 3600);
       const li = el('li');
       const ev = v.ok ? v.event : (() => { try { return JSON.parse(raw); } catch { return {}; } })();
       li.append(el('b', ev.type || d.type || 'event'), el('span', ` ${new Date((ev.created || d.created || 0) * 1000).toLocaleTimeString()} `), el('span', v.ok ? '✓ signature verified' : `✗ ${v.reason}`, v.ok ? 'ok' : 'bad'));
