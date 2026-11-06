@@ -12,7 +12,7 @@ const item = (tx: string, from: string, to: string, value: string, timestamp: st
 
 async function mockExplorer(page: Page, responses: { status: number; body: unknown }[]) {
   let n = 0;
-  await page.route('**/api/v2/addresses/**', async (route) => {
+  await page.route('https://explorer.testnet.whitechain.io/api/v2/addresses/*/token-transfers**', async (route) => {
     const r = responses[Math.min(n++, responses.length - 1)];
     await route.fulfill({ status: r.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(r.body) });
   });

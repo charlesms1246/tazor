@@ -1,5 +1,5 @@
 .docs { display: grid; grid-template-columns: 220px minmax(0, 720px) 200px; gap: 48px; max-width: var(--content); margin: 0 auto; align-items: start; }
-.docs-nav { position: sticky; top: 60px; max-height: calc(100vh - 80px); overflow-y: auto; padding-bottom: 24px; }
+.docs-nav { padding-bottom: 24px; }
 .docs-nav-group { margin-bottom: 20px; }
 .docs-nav-title { padding: 0 10px 6px; font-size: 12px; font-weight: 600; color: var(--text); }
 .docs-nav a { display: block; padding: 5px 10px; border-radius: 8px; color: var(--muted); font-size: 14px; line-height: 20px; }
@@ -16,10 +16,13 @@
 .docs-article ul, .docs-article ol { margin: 0 0 16px; padding-left: 22px; }
 .docs-article li { margin: 4px 0; }
 .docs-article code { font-size: 14px; background: var(--raised); border-radius: 6px; padding: 1px 5px; overflow-wrap: anywhere; }
-.docs-article pre { margin: 0 0 16px; padding: 14px 16px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-inner); overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 20px; }
-.docs-article pre code { background: none; padding: 0; font-size: inherit; }
+.docs-article pre { margin: 0 0 16px; padding: 14px 16px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius-inner); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-family: var(--mono); font-size: 13px; line-height: 20px; }
+.docs-article pre code { background: none; padding: 0; font-size: inherit; white-space: inherit; }
 .docs-article .table-wrap { margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--radius-inner); }
-.docs-article .table { font-size: 14px; }
+.docs-article .table { font-size: 14px; table-layout: auto; }
+.docs-article .table td, .docs-article .table th { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.docs-article .table code { white-space: normal; }
+.docs-article .table-wrap { overflow-x: visible; }
 .docs-article .table td:first-child, .docs-article .table th:first-child { padding-left: 16px; }
 .docs-article .table td:last-child, .docs-article .table th:last-child { padding-right: 16px; }
 .docs-article .notice { margin: 0 0 16px; font-size: 14px; line-height: 22px; }
@@ -31,7 +34,7 @@
 .docs-related ul { list-style: none; padding-left: 0; }
 .docs-related a { font-weight: 500; }
 
-.docs-toc { position: sticky; top: 60px; font-size: 13px; line-height: 18px; }
+.docs-toc { font-size: 13px; line-height: 18px; }
 .docs-toc-title { font-weight: 600; margin-bottom: 8px; }
 .docs-toc a { display: block; padding: 4px 0 4px 10px; border-left: 1px solid var(--border); color: var(--muted); }
 .docs-toc a:hover { color: var(--text); text-decoration: none; border-left-color: var(--text); }
@@ -52,4 +55,13 @@
   .docs-nav { display: none; }
   .docs-topic { display: block; }
   .docs-article h1 { font-size: 28px; line-height: 36px; }
+}
+
+/* phones: docs tables stack one row per card, each cell labelled by data-label */
+@media (max-width: 640px) {
+  .docs-article .table thead { display: none; }
+  .docs-article .table tr { display: block; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
+  .docs-article .table tr:last-child { border-bottom: 0; }
+  .docs-article .table td { display: block; height: auto; padding: 2px 0 !important; border: 0; }
+  .docs-article .table td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; color: var(--faint); }
 }

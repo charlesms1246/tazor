@@ -12,7 +12,7 @@ export default function Page() {
         <li>Open <a href="/mandates/">Mandates</a>.</li>
         <li>Enter the company account, the payee, the cap per period in USDT, the period (monthly, 30 days, or weekly) and the expiry date.</li>
         <li>Choose <b>Review</b>. Tazor checks the mandate against the contract before you sign.</li>
-        <li>Approve with Face ID, and add a second approver if the cap needs two.</li>
+        <li>Approve with passkey, and add a second approver if the cap needs two.</li>
         <li>Choose <b>Create mandate</b>. It takes one transaction.</li>
       </Steps>
       <h2>Collecting</h2>

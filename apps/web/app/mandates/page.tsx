@@ -107,7 +107,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
   const step = !m ? 'review' : !mine && !approvals?.length ? 'approve' : 'create';
 
   return (
-    <Card title="Set up a mandate" subtitle="Lets a supplier collect up to a fixed amount per period from the company account, without a new approval each time.">
+    <Card title="Set up a mandate" subtitle="Approve once; the supplier then collects up to the cap each period, until it expires.">
       <div className="fields">
         <div className="fields-2">
           <Field label="Company account">
@@ -137,7 +137,7 @@ function CreateMandate({ onCreated }: { onCreated: (m: StoredMandate) => void })
         {m && (
           <div className="well stack">
             <p className="small muted" data-testid="m-digest">Contract digest matches: <code className="break">{m.digest}</code></p>
-            <div><button className={`btn${step === 'approve' ? ' btn-primary' : ''}`} data-testid="m-approve" onClick={onApprove} disabled={busy}>Approve with Face ID</button></div>
+            <div><button className={`btn${step === 'approve' ? ' btn-primary' : ''}`} data-testid="m-approve" onClick={onApprove} disabled={busy}>Approve with passkey</button></div>
             {mine && <p className="small">Your approval: <code className="break">{serializeApproval(mine)}</code></p>}
             <Field label="Approvals from other approvers" hint="Paste the JSON a second approver sends you, if the cap needs two.">
               <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
@@ -203,20 +203,22 @@ function MandateRow({ row, onRefresh }: { row: Row; onRefresh: () => void }) {
       <td className="num">{s ? <><Amount v={s.cap} /> / {days(BigInt(s.period))}</> : row.error ? <span className="error-text">{row.error}</span> : '…'}</td>
       <td>{s ? (s.cancelled ? <Pill tone="negative">cancelled</Pill> : expired ? <Pill>expired</Pill> : <Pill tone="positive" dot>active</Pill>) : <Pill>loading</Pill>}</td>
       <td className="num" data-testid="available">{row.available !== undefined ? <Amount v={row.available} /> : '…'}</td>
-      <td>
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
-          <div className="input-affix" style={{ width: 140 }}>
-            <input className="input num" style={{ textAlign: 'right', height: 30 }} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.trim())} placeholder="0.00" aria-label="Amount to collect" />
-            <span>USDT</span>
+      <td style={{ gridColumn: '1 / -1', minWidth: 260 }}>
+        <div className="stack" style={{ gap: 8 }}>
+          <div className="row" style={{ flexWrap: 'nowrap' }}>
+            <div className="input-affix" style={{ flex: 1, minWidth: 0 }}>
+              <input className="input num" style={{ textAlign: 'right' }} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.trim())} placeholder="0.00" aria-label="Amount to collect" />
+              <span>USDT</span>
+            </div>
+            <button className="btn" data-testid="collect" onClick={collect(true)} disabled={busy}>Collect now</button>
           </div>
-          <button className="btn btn-sm" data-testid="collect" onClick={collect(true)} disabled={busy}>Collect now</button>
-          <button className="btn btn-sm btn-ghost" onClick={collect(false)} disabled={busy}>Calldata</button>
-        </div>
-        {out.tx && <span className="cell-sub">Collected: <TxLink hash={out.tx} /></span>}
-        {out.calldata && <span className="cell-sub"><code className="break">{out.calldata}</code></span>}
-        {out.error && <div style={{ marginTop: 8 }}><Notice tone="negative">{out.error}</Notice></div>}
-        <div style={{ marginTop: 6, textAlign: 'right' }}>
-          <button className="btn btn-sm btn-ghost" data-testid="mandate-activity" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide activity' : 'Activity'}</button>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost" onClick={collect(false)} disabled={busy}>Calldata</button>
+            <button className="btn btn-ghost" data-testid="mandate-activity" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide activity' : 'Activity'}</button>
+          </div>
+          {out.tx && <span className="small">Collected: <TxLink hash={out.tx} /></span>}
+          {out.calldata && <code className="break small">{out.calldata}</code>}
+          {out.error && <Notice tone="negative">{out.error}</Notice>}
         </div>
       </td>
     </tr>
@@ -262,9 +264,9 @@ export default function MandatesPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Collect" subtitle="Mandates (direct debits): a supplier collects up to a fixed amount each period, within limits your approvers signed." />
+      <PageHeader title="Collect" subtitle="Direct debits: approve once, and a supplier collects up to a fixed amount each period." />
 
-      <Card title="Mandates" subtitle="Tracked on this device, with live terms and what can be collected now." flush>
+      <Card title="Mandates" subtitle="What each supplier can collect right now." flush>
         {rows.length === 0 ? (
           <div style={{ padding: '0 24px 16px' }}><Empty>No mandates on this device yet. Set one up below, or track an existing mandate id.</Empty></div>
         ) : (

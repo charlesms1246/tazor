@@ -9,9 +9,9 @@ export default function Page() {
       </p>
       <h2>Freeze</h2>
       <Steps>
-        <li>Open <a href="/settings/">Settings</a> on a device that has your passkey.</li>
+        <li>Open <a href="/security/">Security &amp; settings</a> on a device that has your passkey.</li>
         <li>Under <b>Freeze this device</b>, enter the company account and choose <b>Freeze…</b>.</li>
-        <li>Read the confirmation, then choose <b>Yes, freeze (Face ID)</b>.</li>
+        <li>Read the confirmation, then choose <b>Yes, freeze with passkey</b>.</li>
         <li>If the relayer is unavailable, send the calldata shown from any wallet.</li>
         <li>Choose <b>Check status</b> to confirm it is revoked.</li>
       </Steps>

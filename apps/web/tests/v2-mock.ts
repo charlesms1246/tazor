@@ -41,7 +41,11 @@ export async function mockV2(page: Page, s: V2State) {
     if (to === PM2.toLowerCase()) {
       const { functionName, args } = decodeFunctionData({ abi: paymentModuleV2Abi, data });
       const r = (result: unknown) => route.fulfill(json(id, encodeFunctionResult({ abi: paymentModuleV2Abi, functionName, result } as never)));
-      if (functionName === 'configV2Of') return r(s.config);
+      if (functionName === 'configV2Of') {
+        // No config in this test: answer like an unconfigured account (a revert), instead of encoding undefined.
+        if (!s.config) return route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ jsonrpc: '2.0', id, error: { code: 3, message: 'execution reverted' } }) });
+        return r(s.config);
+      }
       if (functionName === 'windowAvailable') return r(s.window ?? [0n, 0n]);
       if (functionName === 'pendingExit') return r(s.pendingExit ?? ['0x0000000000000000000000000000000000000000', 0n]);
       if (functionName === 'payeeAddedAt') return r(s.payeeAddedAt ?? 0n);

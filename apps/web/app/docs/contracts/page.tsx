@@ -31,13 +31,13 @@ export default function Page() {
         Sepolia. Each links to its block explorer.
       </p>
       <h2>Addresses</h2>
-      <div className="table-wrap"><table className="table table-stack" data-testid="docs-contracts">
+      <div className="table-wrap"><table className="table" data-testid="docs-contracts">
         <thead><tr><th>Contract</th><th>Address</th></tr></thead>
         <tbody>
           {ROWS.map(([name, a, chain]) => (
             <tr key={name}>
-              <td>{name}</td>
-              <td>{a
+              <td data-label="Contract">{name}</td>
+              <td data-label="Address">{a
                 ? <a className="mono break" href={`${chain === 'wc' ? config.explorer : config.sepolia.explorer}/address/${a}`} target="_blank" rel="noreferrer">{a}</a>
                 : <span className="faint">not configured</span>}</td>
             </tr>

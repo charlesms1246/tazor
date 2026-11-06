@@ -18,15 +18,15 @@ export default function Page() {
         prove it. Bank figures are typical published times for comparison.
       </p>
       <h2>Bank vs Tazor</h2>
-      <div className="table-wrap"><table className="table table-stack" data-testid="docs-timings">
+      <div className="table-wrap"><table className="table" data-testid="docs-timings">
         <thead><tr><th>Action</th><th>Typical bank</th><th>Tazor</th><th>Proof</th></tr></thead>
         <tbody>
           {TIMINGS.map((t) => (
             <tr key={t.action}>
-              <td>{t.action}</td>
-              <td className="muted">{t.bank}</td>
-              <td className="num">{t.tazor}{t.status !== 'measured' && <span className="cell-sub">{t.status}</span>}</td>
-              <td>{t.proof?.map((p, i) => <span key={p.url}>{i > 0 && ' · '}<a href={p.url} target="_blank" rel="noreferrer">{p.label}</a></span>)}</td>
+              <td data-label="Action">{t.action}</td>
+              <td data-label="Typical bank" className="muted">{t.bank}</td>
+              <td data-label="Tazor" className="num">{t.tazor}{t.status !== 'measured' && <span className="cell-sub">{t.status}</span>}</td>
+              <td data-label="Proof">{t.proof?.map((p, i) => <span key={p.url}>{i > 0 && ' · '}<a href={p.url} target="_blank" rel="noreferrer">{p.label}</a></span>)}</td>
             </tr>
           ))}
         </tbody>

@@ -12,7 +12,7 @@ export default function Page() {
         <li>Open <a href="/runs/">Payment runs</a>.</li>
         <li>Paste one payment link per line. Every invoice must be paid by the same buyer account.</li>
         <li>Review the run: each invoice, its amount and the total.</li>
-        <li>Approve with Face ID; a second approver joins if the total is above the threshold.</li>
+        <li>Approve with passkey; a second approver joins if the total is above the threshold.</li>
         <li>Pay through the relayer, or copy the calldata.</li>
       </Steps>
       <h2>Rules</h2>

@@ -5,7 +5,11 @@ const example = `<script src="./tazor-pay.js"></script>
   supplier-name="Bluejay Logistics"
   payee="0xc1dce946D192e344251972470237F1471C93876c"
   buyer="0xb99A12652BEe98429ae31EA0529A0b63f1073721"
-  lines='[{"description":"Freight Mumbai → Pune, 20 ft container","unitPrice":"1.20"},{"description":"Customs handling","quantity":2,"unitPrice":"0.15"},{"description":"Cargo insurance","unitPrice":"0.05"}]'
+  lines='[
+    {"description":"Freight Mumbai → Pune, 20 ft container","unitPrice":"1.20"},
+    {"description":"Customs handling","quantity":2,"unitPrice":"0.15"},
+    {"description":"Cargo insurance","unitPrice":"0.05"}
+  ]'
   memo="Order BJ-1042"
   label="Pay 1.55 USDT with Tazor"></tazor-pay-button>
 <script>
@@ -100,7 +104,7 @@ export default function Page() {
       <h2>&lt;tazor-pay-button&gt; attributes</h2>
       <div className="table-wrap"><table className="table">
         <thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
-        <tbody>{attrs.map(([a, m]) => <tr key={a}><td><code>{a}</code></td><td className="small">{m}</td></tr>)}</tbody>
+        <tbody>{attrs.map(([a, m]) => <tr key={a}><td data-label="Attribute"><code>{a}</code></td><td data-label="Meaning" className="small">{m}</td></tr>)}</tbody>
       </table></div>
       <p>
         Style it with CSS variables (<code>--tazor-bg</code>, <code>--tazor-fg</code>, <code>--tazor-accent</code>,{' '}
@@ -110,13 +114,13 @@ export default function Page() {
       <h2>Events</h2>
       <div className="table-wrap"><table className="table">
         <thead><tr><th>Event</th><th>Detail</th></tr></thead>
-        <tbody>{events.map(([e, d]) => <tr key={e}><td><code>{e}</code></td><td className="small">{d}</td></tr>)}</tbody>
+        <tbody>{events.map(([e, d]) => <tr key={e}><td data-label="Event"><code>{e}</code></td><td data-label="Detail" className="small">{d}</td></tr>)}</tbody>
       </table></div>
       <p>The events bubble and cross the shadow root, so you can listen on the element or on <code>document</code>.</p>
       <h2>API</h2>
       <div className="table-wrap"><table className="table">
         <thead><tr><th>Function</th><th>Returns</th></tr></thead>
-        <tbody>{api.map(([f, r]) => <tr key={f}><td><code>{f}</code></td><td className="small">{r}</td></tr>)}</tbody>
+        <tbody>{api.map(([f, r]) => <tr key={f}><td data-label="Function"><code>{f}</code></td><td data-label="Returns" className="small">{r}</td></tr>)}</tbody>
       </table></div>
       <h2>How payment is detected</h2>
       <p>

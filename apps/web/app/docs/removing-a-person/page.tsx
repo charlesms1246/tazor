@@ -11,7 +11,7 @@ export default function Page() {
       <Steps>
         <li>Open <a href="/company/">Company</a>. You need the admin role.</li>
         <li>Select the person in <b>People</b> to open their panel; the company and their approver account are filled in. You can also use <b>Manage access</b> on the page and enter both addresses yourself.</li>
-        <li>Choose <b>Remove with Face ID</b>. Tazor checks the request against the contract before you sign.</li>
+        <li>Choose <b>Remove with passkey</b>. Tazor checks the request against the contract before you sign.</li>
         <li>The page shows the transaction and confirms <b>Revoked</b> on-chain.</li>
       </Steps>
       <h2>Things to know</h2>

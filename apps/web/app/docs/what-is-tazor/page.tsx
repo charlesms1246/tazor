@@ -5,7 +5,7 @@ export default function Page() {
     <DocPage slug="what-is-tazor" related={['approver-passkey', 'company-on-ens', 'censorship-resistance']}>
       <p>
         Tazor is business invoicing and recurring billing in USDT on Whitechain. A supplier sends an invoice as a link; the
-        buyer&apos;s approvers check it and approve it with a passkey (Face ID, Touch ID or Windows Hello); the USDT moves on
+        buyer&apos;s approvers check it and approve it with a passkey (Face ID, a fingerprint or the device PIN); the USDT moves on
         Whitechain in a few seconds.
       </p>
       <h2>What makes it different</h2>

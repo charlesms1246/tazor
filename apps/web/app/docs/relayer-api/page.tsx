@@ -34,7 +34,7 @@ export default function Page() {
         <thead><tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr></thead>
         <tbody>
           {endpoints.map(([m, p, b, r]) => (
-            <tr key={p}><td>{m}</td><td><code>{p}</code></td><td className="small">{b}</td><td className="small">{r}</td></tr>
+            <tr key={p}><td data-label="Method">{m}</td><td data-label="Path"><code>{p}</code></td><td data-label="Body" className="small">{b}</td><td data-label="Response" className="small">{r}</td></tr>
           ))}
         </tbody>
       </table></div>
@@ -55,7 +55,7 @@ export default function Page() {
         <li><code>/rpc</code> only sponsors approver accounts bound to a verified WB Soul, within a daily quota per soul; it refuses others before anyone signs.</li>
         <li>CORS is open, so the static app can call it from <code>taz0r.eth.limo</code>.</li>
       </ul>
-      <Note>Choose which relayer this device uses in <a href="/settings/">Settings</a>.</Note>
+      <Note>Choose which relayer this device uses in <a href="/security/">Security &amp; settings</a>.</Note>
     </DocPage>
   );
 }

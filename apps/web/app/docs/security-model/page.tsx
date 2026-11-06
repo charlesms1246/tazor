@@ -10,7 +10,7 @@ export default function Page() {
       <h2>What you sign is what you see</h2>
       <p>
         Your device rebuilds the payment from the invoice link and compares its digest with the payment contract&apos;s
-        before asking for Face ID. If they differ, it refuses to sign.
+        before asking for your passkey. If they differ, it refuses to sign.
       </p>
       <h2>Checks on every payment</h2>
       <ul>

@@ -170,7 +170,7 @@ export default function PoliciesPage() {
 
       {account && cfg && pm && (
         <>
-          <Card title="Limits and rules" subtitle="Enforced by PaymentModule v2 on every payment.">
+          <Card title="Limits and rules" subtitle="Checked on every payment from this account.">
             <dl className="kv" data-testid="config">
               <dt>ENS registry</dt><dd className="mono">{cfg.registry}</dd>
               <dt>Two approvers above</dt><dd data-testid="cfg-two"><Amount v={cfg.twoApproverThreshold} /></dd>
@@ -220,14 +220,14 @@ export default function PoliciesPage() {
           </Card>
 
           <div className="grid-2">
-            <Card title="Provisional grant" subtitle="Up to 10 minutes. Never satisfies the fresh-proof rule and can never include admin.">
+            <Card title="Provisional grant" subtitle="Temporary access for up to 10 minutes. It can never include admin.">
               <div className="fields">
                 <Field label="Grantee">
                   <input className="input mono" data-testid="grantee" value={grantee} onChange={(e) => setGrantee(e.target.value)} placeholder="0x…" />
                 </Field>
                 <div className="row">
-                  <label className="check"><input type="checkbox" checked={grantRoles.approver} onChange={(e) => setGrantRoles({ ...grantRoles, approver: e.target.checked })} /> approver</label>
-                  <label className="check"><input type="checkbox" checked={grantRoles.agent} onChange={(e) => setGrantRoles({ ...grantRoles, agent: e.target.checked })} /> agent</label>
+                  <label className="check" style={{ minHeight: 40, paddingRight: 12, cursor: 'pointer' }}><input type="checkbox" checked={grantRoles.approver} onChange={(e) => setGrantRoles({ ...grantRoles, approver: e.target.checked })} /> approver</label>
+                  <label className="check" style={{ minHeight: 40, paddingRight: 12, cursor: 'pointer' }}><input type="checkbox" checked={grantRoles.agent} onChange={(e) => setGrantRoles({ ...grantRoles, agent: e.target.checked })} /> agent</label>
                 </div>
                 <div><button className="btn" data-testid="grant" disabled={grant.busy} onClick={grant.run(async () => {
                   if (!isAddress(grantee)) throw new Error('Enter the grantee address.');

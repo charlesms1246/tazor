@@ -9,8 +9,8 @@ export default function Page() {
       </p>
       <h2>Before you sign</h2>
       <p>
-        Your device rebuilds the payment from the invoice link and compares its digest with the contract&apos;s. Face ID is
-        only offered if they match, so you approve exactly what you see.
+        Your device rebuilds the payment from the invoice link and compares its digest with the contract&apos;s. Your passkey is
+        only requested if they match, so you approve exactly what you see.
       </p>
       <h2>One approver or two</h2>
       <ul>

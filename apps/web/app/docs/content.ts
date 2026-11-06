@@ -31,7 +31,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { slug: 'policies', title: 'Policies', summary: 'Spending limits, payee rules, temporary access and the time-locked exit.' },
       { slug: 'removing-a-person', title: 'Removing a person', summary: 'Stop someone approving for your company in about three seconds.' },
       { slug: 'freeze-device', title: 'Freeze a device', summary: 'Revoke your own approver for a company if your phone is lost or compromised.' },
-      { slug: 'security-page', title: 'The Security page', summary: 'Live health of everything a payment depends on, recent removals and lost-device controls.' },
+      { slug: 'security-page', title: 'The Security & settings page', summary: 'Live health of everything a payment depends on, the relayer, recent removals and lost-device controls.' },
     ],
   },
   {

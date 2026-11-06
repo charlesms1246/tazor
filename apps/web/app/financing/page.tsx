@@ -140,7 +140,7 @@ function Commit({ fm }: { fm: Address }) {
           <div className="well stack">
             <p className="small muted">Claim id <code className="break" data-testid="fin-claim-id">{claimId(prepared.digest).toString()}</code></p>
             <p className="small muted">Digest matches the contract: <code className="break" data-testid="fin-digest">{prepared.digest}</code></p>
-            <div><button className={`btn${primary === 'approve' ? ' btn-primary' : ''}`} data-testid="fin-approve" onClick={onApprove} disabled={busy}>Approve with Face ID</button></div>
+            <div><button className={`btn${primary === 'approve' ? ' btn-primary' : ''}`} data-testid="fin-approve" onClick={onApprove} disabled={busy}>Approve with passkey</button></div>
             {mine && <p className="small">Your approval: <code className="break">{serializeApproval(mine)}</code></p>}
             <Field label="Approvals from other approvers" hint="Paste the JSON a second approver sends you, if needed.">
               <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
@@ -186,7 +186,7 @@ function Claim({ fm }: { fm: Address }) {
   };
 
   return (
-    <Card title="2. Claim" subtitle="Look up a committed claim, list it for sale, or buy it as a financier. At the due date anyone can settle it from the buyer\u2019s account, paying whoever then holds it.">
+    <Card title="2. Claim" subtitle="Find a claim, list it for sale, buy it, or settle it on the due date.">
       <div className="fields">
         <Field label="Claim id">
           <div className="input-group">
@@ -239,7 +239,7 @@ function Claim({ fm }: { fm: Address }) {
 
 export default function FinancingPage() {
   const fm = configV2.financingModule;
-  const header = <PageHeader title="Financing" subtitle="Get paid now against an approved invoice: sell the claim at a discount to a WB Soul-verified financier (simulated on testnet)." />;
+  const header = <PageHeader title="Financing" subtitle="Get paid early: sell an approved invoice to a verified financier at a discount (verification simulated on testnet)." />;
   if (!fm) return <div className="page">{header}<Notice tone="negative">FinancingModule address is not configured for this build.</Notice></div>;
   return (
     <div className="page">

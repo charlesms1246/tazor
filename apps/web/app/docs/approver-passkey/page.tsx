@@ -5,7 +5,7 @@ export default function Page() {
     <DocPage slug="approver-passkey" related={['team-and-roles', 'freeze-device', 'passkey-check']}>
       <p>
         You approve payments with a passkey: a key your phone or laptop keeps in its keychain and unlocks with Face ID,
-        Touch ID, Android biometrics or Windows Hello. Tazor never sees it. Your approver account is a small smart account
+        a fingerprint or your device PIN (Windows Hello and Android work too). Tazor never sees it. Your approver account is a small smart account
         on Whitechain whose address is worked out from the passkey&apos;s public key.
       </p>
       <h2>Create your passkey</h2>

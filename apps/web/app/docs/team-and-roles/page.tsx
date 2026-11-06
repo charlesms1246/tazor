@@ -26,7 +26,7 @@ export default function Page() {
       <Steps>
         <li>Open <a href="/company/">Company</a> on the device that has your passkey.</li>
         <li>Select yourself in <b>People</b> (or use <b>Manage access</b>) and enter the backup wallet&apos;s address.</li>
-        <li>Choose <b>Add with Face ID</b>. The change is sponsored, so you need no WBT, within a daily quota per WB Soul.</li>
+        <li>Choose <b>Add with passkey</b>. The change is sponsored, so you need no WBT, within a daily quota per WB Soul.</li>
         <li>Wait for <b>Backup signer added</b>; the page checks it on-chain.</li>
       </Steps>
     </DocPage>

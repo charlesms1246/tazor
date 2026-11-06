@@ -12,7 +12,7 @@ export default function Page() {
         <li>Open the payment link. The invoice is decrypted on your device.</li>
         <li>Check the supplier. A &quot;Verified by WhiteBIT&quot; badge means at least one of the supplier company&apos;s admins is a WhiteBIT-verified person (simulated on testnet).</li>
         <li>Tazor rebuilds what you are about to sign from the link and compares it with the payment contract. If they differ, it refuses to sign and says so.</li>
-        <li>Choose <b>Approve with Face ID</b>.</li>
+        <li>Choose <b>Approve with passkey</b>.</li>
         <li>If the amount is above your company&apos;s threshold, a second approver approves too. Paste their approval into the page.</li>
         <li>Choose <b>Pay</b>. The page shows the transaction and how long it took.</li>
       </Steps>

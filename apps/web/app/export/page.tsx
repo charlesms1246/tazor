@@ -41,12 +41,12 @@ function Statement({ accounts }: { accounts: string[] }) {
   return (
     <Card
       title="On-chain statement"
-      subtitle="USDT transfers for this account, read live from the Whitechain explorer."
+      subtitle="Every USDT transfer in and out of this account, read live from Whitechain."
       flush
       testId="statement"
       actions={<>
         <a className="small" href={explorerUrl} target="_blank" rel="noreferrer">View all on explorer</a>
-        <button className="btn btn-sm" data-testid="statement-csv" disabled={rows.length === 0}
+        <button className="btn" data-testid="statement-csv" disabled={rows.length === 0}
           onClick={() => download(`tazor-statement-${acct.slice(2, 10).toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv', toStatementCsv(rows))}>Download CSV</button>
       </>}
     >
@@ -62,7 +62,7 @@ function Statement({ accounts }: { accounts: string[] }) {
           <Notice tone="negative">
             <span className="spread" style={{ width: '100%' }}>
               <span data-testid="statement-error">Couldn&apos;t load transfers from the explorer ({state.message}).</span>
-              <button className="btn btn-sm" data-testid="statement-retry" onClick={load}>Retry</button>
+              <button className="btn" data-testid="statement-retry" onClick={load}>Retry</button>
             </span>
           </Notice>
         </div>
@@ -117,15 +117,15 @@ export default function ExportPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Reports" subtitle="Accounting exports built in your browser from payments recorded on this device; nothing is sent anywhere." />
+      <PageHeader title="Reports" subtitle="Accounting files built on this device from your payments. Nothing is uploaded." />
       {payments.length === 0 ? (
         <div data-tour="reports"><Card>
           <div data-testid="empty"><Empty>No paid invoices recorded on this device yet. Pay an invoice and it appears here, ready to export.</Empty></div>
-          <div style={{ marginTop: 16 }}><a className="btn btn-sm" href="/pay/">Pay an invoice</a></div>
+          <div style={{ marginTop: 16 }}><a className="btn" href="/pay/">Pay an invoice</a></div>
         </Card></div>
       ) : (
         <>
-          <div data-tour="reports"><Card title="Export" subtitle="Tally, Xero and QuickBooks bank-statement CSVs, or an ISO 20022 camt.054-style notification (USDT, 6 dp; not XSD-valid).">
+          <div data-tour="reports"><Card title="Export" subtitle="CSV files for Tally, Xero or QuickBooks, or an ISO 20022 camt.054-style file (USDT, 6 decimals; not schema-validated).">
             <div className="fields">
               <Field label="Account">
                 <select className="select mono" data-testid="account" value={account} onChange={(e) => setAccount(e.target.value)}>
