@@ -15,8 +15,9 @@ import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { ethCall } from '@/lib/rpc.ts';
 import { decodeRunDigest, encodePayRun, encodeRunDigestCall, payRunRelayerBody, runDigest } from '@/lib/runs.ts';
 import { loadPasskey } from '@/lib/storage.ts';
+import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 
-const usdt = (v: bigint) => `${formatUnits(v, 6)} USDT`;
+const amt = (v: bigint) => <>{formatUnits(v, 6)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const MAX = 50;
 
@@ -100,33 +101,76 @@ export default function RunsPage() {
   });
 
   const total = run?.auths.reduce((s, a) => s + a.amount, 0n) ?? 0n;
+  const errorNotice = error && <Notice tone="negative" testId="run-error">{error}</Notice>;
   return (
-    <main>
-      <h1>Payment run</h1>
-      <p>Approve many invoices with one signature. Each link is decrypted and checked exactly as on the Pay page.</p>
-      <p><label>Invoice links (one per line)<br /><textarea data-testid="run-links" value={links} onChange={(e) => setLinks(e.target.value)} rows={6} cols={90} /></label></p>
-      <button data-testid="run-prepare" onClick={onPrepare} disabled={busy}>Check run</button>
-      {rows.length > 0 && <ul data-testid="run-bad">{rows.map((r) => <li key={r.line}>Link {r.line}: {r.error}</li>)}</ul>}
+    <div className="page">
+      <PageHeader title="Payment runs" subtitle="Approve many invoices with one signature; each link is decrypted and checked exactly as on the Pay page." />
+
+      <Card title="Invoices in this run" subtitle="Paste one payment link per line. Every invoice must be paid by the same buyer account.">
+        <div className="stack">
+          <Field label="Invoice links">
+            <textarea data-testid="run-links" className="textarea mono" value={links} onChange={(e) => setLinks(e.target.value)} rows={6} placeholder="https://…/pay/#v1.…" />
+          </Field>
+          <div className="row">
+            <button data-testid="run-prepare" className={run ? 'btn' : 'btn btn-primary'} onClick={onPrepare} disabled={busy}>Check run</button>
+          </div>
+          {rows.length > 0 && (
+            <Notice tone="negative" testId="run-bad">
+              <ul style={{ margin: 0, paddingLeft: 18 }}>{rows.map((r) => <li key={r.line}>Link {r.line}: {r.error}</li>)}</ul>
+            </Notice>
+          )}
+          {!run && errorNotice}
+        </div>
+      </Card>
+
       {run && (
-        <>
-          <table data-testid="run-table">
-            <thead><tr><th>Invoice</th><th>Supplier</th><th>Pay to</th><th>Amount</th></tr></thead>
-            <tbody>{run.invoices.map((i, n) => (
-              <tr key={n}><td>{i.id}</td><td>{i.supplierName}</td><td>{run.auths[n].payee}</td><td>{usdt(run.auths[n].amount)}</td></tr>
-            ))}</tbody>
-          </table>
-          <p>Buyer {run.account} · {run.auths.length} invoices · total <strong data-testid="run-total">{usdt(total)}</strong> · {run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} {run.module}</p>
-          <p data-testid="run-guard-ok">The contract run digest matches these invoices: <code>{run.digest}</code></p>
-          <button data-testid="run-approve" onClick={onApprove} disabled={busy}>Approve run with Face ID</button>
-          {mine && <p>Your approval:<br /><code data-testid="run-my-approval" style={{ wordBreak: 'break-all' }}>{serializeApproval(mine)}</code></p>}
-          <p><label>Approvals from other approvers (JSON)<br /><textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} cols={80} /></label></p>
-          <button data-testid="run-pay" onClick={onPay} disabled={busy || !approvals?.length}>Pay run</button>{' '}
-          <button data-testid="run-calldata" onClick={onCopy} disabled={busy || !approvals?.length}>Copy calldata</button>
-        </>
+        <div className="grid-2">
+          <Card title="Run" flush subtitle={<>{run.auths.length} invoices from buyer <Addr value={run.account} href={`${config.explorer}/address/${run.account}`} /></>}>
+            <div className="table-wrap"><table className="table table-stack" data-testid="run-table">
+              <thead><tr><th>Invoice</th><th>Pay to</th><th className="num">Amount</th></tr></thead>
+              <tbody>{run.invoices.map((i, n) => (
+                <tr key={n}>
+                  <td>{i.id}<span className="cell-sub">{i.supplierName}</span></td>
+                  <td><Addr value={run.auths[n].payee} /></td>
+                  <td className="num">{amt(run.auths[n].amount)}</td>
+                </tr>
+              ))}</tbody>
+              <tfoot><tr><td colSpan={2} style={{ fontWeight: 500 }}>Total</td><td className="num" style={{ fontWeight: 500 }}><span data-testid="run-total">{amt(total)}</span></td></tr></tfoot>
+            </table></div>
+          </Card>
+
+          <Card title="Approve and pay" subtitle={<>{run.v2 ? 'PaymentModuleV2' : 'PaymentModule'} <Addr value={run.module} href={`${config.explorer}/address/${run.module}`} /></>}>
+            <div className="stack">
+              <Notice tone="positive" testId="run-guard-ok">The contract run digest matches these invoices: <span className="mono break">{run.digest}</span></Notice>
+              <div className="row">
+                <button data-testid="run-approve" className={mine ? 'btn' : 'btn btn-primary'} onClick={onApprove} disabled={busy}>Approve run with Face ID</button>
+                {mine && <Pill tone="positive">Approved on this device</Pill>}
+              </div>
+              {mine && (
+                <div className="well">
+                  <p className="small muted">Your approval</p>
+                  <code data-testid="run-my-approval" className="mono break">{serializeApproval(mine)}</code>
+                </div>
+              )}
+              <Field label="Approvals from other approvers (JSON)">
+                <textarea className="textarea mono" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} />
+              </Field>
+              <div className="row">
+                <button data-testid="run-pay" className={mine ? 'btn btn-primary' : 'btn'} onClick={onPay} disabled={busy || !approvals?.length}>Pay run</button>
+                <button data-testid="run-calldata" className="btn" onClick={onCopy} disabled={busy || !approvals?.length}>Copy calldata</button>
+              </div>
+              {errorNotice}
+              {tx && <Notice tone="positive" testId="run-tx">Transaction <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer" className="mono break">{tx}</a></Notice>}
+              {calldata && (
+                <div className="well">
+                  <p className="small muted">To <span className="mono">{run.module}</span> on Whitechain</p>
+                  <code data-testid="run-calldata-out" className="mono break">{calldata}</code>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       )}
-      {error && <p data-testid="run-error" style={{ color: 'crimson' }}>{error}</p>}
-      {tx && <p data-testid="run-tx">Transaction <a href={`${config.explorer}/tx/${tx}`} target="_blank" rel="noreferrer">{tx}</a></p>}
-      {calldata && run && <p>To {run.module} on Whitechain:<br /><code data-testid="run-calldata-out" style={{ wordBreak: 'break-all' }}>{calldata}</code></p>}
-    </main>
+    </div>
   );
 }
