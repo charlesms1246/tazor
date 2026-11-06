@@ -36,6 +36,9 @@ Notes from building Tazor on Whitechain Sepolia at ETHGlobal Mumbai, November 20
 - **Which explorer verifies where:** Whitechain's explorers are Blockscout; for the Sepolia side we found Blockscout verification more reliable to script than Etherscan (which needs an API key).
 - **A tested public Sepolia RPC list:** free Sepolia RPCs rate-limit (Tenderly returned "Request exceeds defined limit"), and some refuse `eth_getProof` (publicnode). Our relayer now uses one for sending and another for proofs.
 
+- **USDT's EIP-712 domain isn't discoverable:** the track USDT has no `version()` or `eip712Domain()` (both revert), so to sign EIP-3009 or permit you have to guess the domain. We matched `DOMAIN_SEPARATOR()` by brute force: `{ name: "Tether USD", version: "1", chainId: 1874 }`. One line in the docs, next to the USDT address, would save every Scale team an hour. It's worth noting that the 3009 and permit `bytes`-signature overloads exist and accept ERC-1271 signatures.
+- **What "finalized" means on testnet:** in our measurements `safe` and `finalized` were the same block, about 1,600 blocks (~27 min) behind `latest`. A short table of the soft, safe and finalized timings, and what a merchant should wait for, would help everyone building receipts.
+
 ## Answers we got from DevRel during the event (and what we did)
 
 - **Simulated WB Soul on testnet is fine if clearly labelled.** It's labelled in the app and the README, and the real registry is exercised on a Whitechain mainnet fork.
