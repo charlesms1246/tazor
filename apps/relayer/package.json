@@ -7,13 +7,16 @@
     "watch:roles": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/watch-main.ts",
     "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts"
+    "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning test/*.test.ts",
+    "build:vercel": "rm -rf dist/tazor-relayer/api && esbuild src/vercel.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/tazor-relayer/api/index.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && cp vercel/vercel.json vercel/package.json dist/tazor-relayer/",
+    "deploy:vercel": "pnpm build:vercel && cd dist/tazor-relayer && vercel deploy --prod --yes"
   },
   "dependencies": {
     "viem": "2.57.16"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "0.25.12",
     "typescript": "7.0.2"
   }
 }
