@@ -13,7 +13,12 @@ const mockWhitechain = async (page: Page, o: { paid: boolean | 'deposit'; safe: 
       if (o.paid === 'deposit') return ok(to === DEPOSIT.toLowerCase() ? depositPaymentResult() : ZEROS);
       return ok(o.paid && to === CHECKOUT.toLowerCase() ? paymentResult() : ZEROS);
     }
-    if (method === 'eth_getLogs') return ok(o.paid === 'deposit' ? rpcDepositLogs() : rpcOrderLogs());
+    if (method === 'eth_blockNumber') return ok(toHex(12_500_000));
+    if (method === 'eth_getLogs') {
+      // answer each block range with only the logs inside it, as the RPC does
+      const from = Number(BigInt(params[0].fromBlock)); const to = Number(BigInt(params[0].toBlock));
+      return ok((o.paid === 'deposit' ? rpcDepositLogs() : rpcOrderLogs()).filter((l) => { const b = Number(BigInt(l.blockNumber)); return b >= from && b <= to; }));
+    }
     if (method === 'eth_getBlockByNumber') {
       const tag = params[0];
       if (tag === 'safe') return ok({ number: toHex(o.safe), timestamp: toHex(1_794_003_000) });

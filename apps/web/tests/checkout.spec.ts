@@ -21,7 +21,7 @@ const setup = async (page: Page, company = 'bluejay') => {
 
 test('/checkout/: orders for the selected merchant with refunds and a receipt link; subscriptions show what is due', async ({ page }) => {
   await setup(page);
-  await page.goto('/checkout/');
+  await page.goto('/checkout/?tab=orders');
   await expect(page.getByTestId('co-scope')).toContainText('Bluejay Logistics');
   const all = page.getByTestId('co-order-row');
   await expect(all).toHaveCount(2, { timeout: 10_000 });
@@ -74,7 +74,7 @@ test('/checkout/: webhooks list recent deliveries and the signature scheme; agen
 
 test('/checkout/: a company with no orders still opens on the live demo merchants, labelled; the chip turns them off', async ({ page }) => {
   await setup(page, 'acme');
-  await page.goto('/checkout/');
+  await page.goto('/checkout/?tab=orders');
   const rows = page.getByTestId('co-order-row');
   await expect(rows).toHaveCount(2, { timeout: 10_000 });
   await expect(rows.first().getByTestId('co-order-merchant')).toContainText('to Bluejay');
@@ -97,4 +97,28 @@ test('/checkout/: ?merchant= and &tab= open a tab for a linked merchant', async 
   await page.getByTestId('co-tab-webhooks').click();
   await expect(page).toHaveURL(/tab=webhooks/);
   await expect(page.getByTestId('co-hook-row')).toHaveCount(1);
+});
+
+test('/checkout/ Overview (default tab): net sales, payments, refund rate, repeat customers, 14-day chart, paid-with mix, top customers; no sideways scroll on a phone', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-07T12:00:00Z'));
+  await setup(page);
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto('/checkout/');
+  await expect(page.getByTestId('co-tab-overview')).toHaveAttribute('aria-selected', 'true');
+  // Bluejay: 1.55 (wallet, 0.50 refunded) + 1.00 (subscription charge) + 2.00 (exchange transfer)
+  await expect(page.getByTestId('ov-net')).toContainText('4.05', { timeout: 10_000 });
+  await expect(page.getByTestId('ov-payments')).toHaveText('3');
+  await expect(page.getByTestId('ov-refund-rate')).toHaveText('11%');
+  await expect(page.getByTestId('ov-repeat')).toHaveText('1');
+  await expect(page.getByTestId('ov-day')).toHaveCount(14);
+  await expect(page.locator('[data-testid="ov-day"][data-day="2026-11-06"]')).toHaveAttribute('data-net', '3050000');
+  await expect(page.locator('[data-testid="ov-day"][data-day="2026-11-01"]')).toHaveAttribute('data-net', '1000000');
+  await expect(page.getByTestId('ov-mix-wallet')).toContainText('1.55 USDT');
+  await expect(page.getByTestId('ov-mix-transfer')).toContainText('2.00 USDT');
+  await expect(page.getByTestId('ov-mix-subscription')).toContainText('1.00 USDT');
+  await expect(page.getByTestId('ov-top-row').first()).toContainText('2.05 USDT');
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.getByTestId('co-tab-orders').click();
+  await expect(page.getByTestId('co-order-row')).toHaveCount(2);
 });

@@ -41,7 +41,7 @@ test('/export/: Checkout sales as accountant rows (payment, refund, transfer) wi
   expect(lines.find((l) => l.includes(',Refund,'))).toContain(',0.00,0.50,-0.50,');
   expect(lines.find((l) => l.includes(',Payment,') && l.includes(ORDER.toLowerCase()))).toContain(',1.55,0.00,1.55,');
 
-  await page.goto('/checkout/');
+  await page.goto('/checkout/?tab=orders');
   await expect(page.getByTestId('co-order-row')).toHaveCount(2, { timeout: 10_000 });
   expect(await csvOf(page, 'co-csv')).toBe(fromReports);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
@@ -50,7 +50,7 @@ test('/export/: Checkout sales as accountant rows (payment, refund, transfer) wi
 
 test('/checkout/ and /receipt/: small payments are ready to ship at once', async ({ page }) => {
   await setup(page);
-  await page.goto('/checkout/');
+  await page.goto('/checkout/?tab=orders');
   const ship = page.getByTestId('co-order-ship');
   await expect(ship.first()).toHaveText('Ready to ship', { timeout: 10_000 });
   await expect(ship.first()).toHaveAttribute('title', 'Ready to ship: under 100 USDT, confirmation on Whitechain is enough');

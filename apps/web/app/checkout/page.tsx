@@ -21,12 +21,14 @@ import { Card, Empty, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import '../_invoice/touch.css';
 import '../_checkout/checkout.css';
 import { downloadCsv } from '../_checkout/ledger.tsx';
+import { demoWalletSigner } from '@/lib/start.ts';
+import { Overview } from './overview.tsx';
 
-type Tab = 'orders' | 'subscriptions' | 'webhooks' | 'agents';
+type Tab = 'overview' | 'orders' | 'subscriptions' | 'webhooks' | 'agents';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'orders', label: 'Orders' }, { id: 'subscriptions', label: 'Subscriptions' }, { id: 'webhooks', label: 'Webhooks' }, { id: 'agents', label: 'Agents' },
+  { id: 'overview', label: 'Overview' }, { id: 'orders', label: 'Orders' }, { id: 'subscriptions', label: 'Subscriptions' }, { id: 'webhooks', label: 'Webhooks' }, { id: 'agents', label: 'Agents' },
 ];
-const isTab = (t: string | null): t is Tab => t === 'orders' || t === 'subscriptions' || t === 'webhooks' || t === 'agents';
+const isTab = (t: string | null): t is Tab => t === 'overview' || t === 'orders' || t === 'subscriptions' || t === 'webhooks' || t === 'agents';
 const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 const nameOf = (a: string) => companyByAccount(a)?.name ?? ensLabelOf(a) ?? null;
 const every = (s: number) => (s % 86400 === 0 ? `${s / 86400} day${s === 86400 ? '' : 's'}` : s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`);
@@ -43,7 +45,7 @@ export default function CheckoutPage() {
   const company = useCompany();
   const checkout = checkoutAddress() ?? depositCheckoutAddress();
   const relayer = getRelayerUrl();
-  const [tab, setTabState] = useState<Tab>('orders');
+  const [tab, setTabState] = useState<Tab>('overview');
   const [linked, setLinked] = useState<Address | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [demo, setDemo] = useState(true);
@@ -145,6 +147,9 @@ export default function CheckoutPage() {
 
   /** The merchant's browser wallet signs; the relayer submits (gasless for the merchant). */
   const withWallet = async (who: Address, fn: (wallet: Awaited<ReturnType<typeof walletSigner>>) => Promise<unknown>) => {
+    // a demo wallet made on /start/ in this browser signs for its own merchant address
+    const demo = demoWalletSigner(who);
+    if (demo) return fn(demo as Awaited<ReturnType<typeof walletSigner>>);
     const eth = injected();
     if (!eth) throw new Error('Open this page in a browser with a wallet (for example MetaMask) that holds the merchant key.');
     const wallet = await walletSigner(eth as never);
@@ -187,7 +192,7 @@ export default function CheckoutPage() {
             <button type="button" className="co-chip" aria-pressed={demo} data-testid="co-demo-toggle" onClick={toggleDemo}>{demo ? '✓ ' : ''}Show demo merchants</button>
             {demo && <span className="small muted">{DEMO_MERCHANTS.map((d) => d.name).join(' and ')}{tab === 'agents' ? ', and the demo AI resource' : ''}: real orders on Whitechain Sepolia.</span>}
           </div>
-          {(tab === 'orders' || tab === 'subscriptions') && (
+          {(tab === 'overview' || tab === 'orders' || tab === 'subscriptions') && (
             <div className="co-form">
               <input className="input mono" data-testid="co-watch" value={add} onChange={(e) => setAdd(e.target.value)} placeholder="Another merchant address (0x…)" aria-label="Another merchant address" />
               <button type="button" className="btn" data-testid="co-watch-add" onClick={onWatch}>Show its payments too</button>
@@ -196,6 +201,7 @@ export default function CheckoutPage() {
           {error && <Notice tone="negative" testId="co-error">Whitechain&apos;s explorer could not be read: {error}</Notice>}
         </div>
 
+        {tab === 'overview' && <Overview orders={orders} subs={subs} loading={data === null && !error} nameOf={(a) => nameOf(a) ?? demoName(a as Address) ?? null} />}
         {tab === 'orders' && (data === null && !error ? <p className="muted" style={{ padding: 'var(--card-pad)' }}>Reading orders…</p> : orders.length === 0 ? (
           <div style={{ padding: 'var(--card-pad)' }}><Empty><span data-testid="co-orders-empty">No checkout orders paid to these addresses yet.</span></Empty></div>
         ) : (<>

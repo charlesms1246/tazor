@@ -36,6 +36,7 @@ import { loadPayments } from '@/lib/storage.ts';
 import { partyName } from '@/lib/story.ts';
 import { usdtNumber } from '@/lib/money.ts';
 import { AddrChip } from '../_human/chip.tsx';
+import { SupplierPayouts } from './payouts.tsx';
 
 const amt = (v: bigint) => <>{usdtNumber(v)} <span className="faint">USDT</span></>;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -267,6 +268,9 @@ export default function RunsPage() {
           </>
         )}
       </Card>
+
+      <SupplierPayouts company={company} billsTotal={selectedTotal}
+        onAddLinks={(ls) => { setLinks((prev) => [prev.trim(), ...ls].filter(Boolean).join('\n')); setRun(null); }} />
 
       <Card>
         <details className="tech-details" data-testid="run-add-by-link" open={unpaid.length === 0 || !!links.trim() || undefined}>

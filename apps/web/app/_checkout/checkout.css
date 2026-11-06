@@ -58,3 +58,14 @@
   .ck-table tbody td[data-label="Gross"] .faint, .ck-table tbody td[data-label="Refund"] .faint { display: none; }
   .ck-table tbody td[data-label]:has(> .faint:only-child) { display: none; }
 }
+
+/* Overview tab (merchant analytics): stacks on phones, never scrolls sideways */
+.ov .kpis { flex-wrap: wrap; }
+.ov-h { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.ov-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.ov-mix, .ov-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.ov-mix li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; }
+.ov-mix .progress { grid-column: 1 / -1; margin: 0; }
+.ov-mix-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ov-top li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: 14px; min-width: 0; }
+.ov-top-net { font-variant-numeric: tabular-nums; }

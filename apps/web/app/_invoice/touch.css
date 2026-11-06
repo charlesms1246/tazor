@@ -18,3 +18,7 @@
 .tech-details[open] > summary { margin-bottom: 12px; }
 .error-detail { overflow-wrap: anywhere; }
 .inr { margin-left: 6px; color: var(--faint); font-size: 0.86em; font-weight: 400; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* /runs/ supplier payouts: one line per supplier on wide screens, stacked on phones */
+.po-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(120px, 160px) auto; gap: 8px; align-items: center; }
+@media (max-width: 640px) { .po-row { grid-template-columns: 1fr; } }
