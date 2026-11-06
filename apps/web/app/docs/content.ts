@@ -5,7 +5,7 @@ export const DOC_GROUPS: DocGroup[] = [
   {
     title: 'Get started',
     pages: [
-      { slug: 'what-is-tazor', title: 'What is Tazor', summary: 'B2B invoices, payment runs and direct debits in USDT on Whitechain, approved by verified people.' },
+      { slug: 'what-is-tazor', title: 'What is Tazor', summary: 'USDT checkout for businesses on Whitechain: customers pay without gas, merchants refund in one click, accountants get the export. Also: B2B approvals.' },
       { slug: 'approver-passkey', title: 'Your approver passkey', summary: 'Create the passkey you approve with, and the approver account that goes with it.' },
       { slug: 'company-on-ens', title: 'Your company on ENS', summary: 'How a company name such as acme.taz0r.eth holds who may approve.' },
       { slug: 'product-tour', title: 'Product tour', summary: 'The whole cycle in one pass: receive, pay, control and keep the books.' },
