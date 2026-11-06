@@ -49,6 +49,7 @@ console.log(`l1Block(commit)=${commit.index} context=${AbiCoder.defaultAbiCoder(
 console.log(`proven=${values[0]} exitCode=${exitCode}`);
 console.log(`direct=${direct}`);
 console.log(`MATCH=${values[0] === direct}`);
+if (process.env.WITNESS_OUT) (await import('node:fs')).writeFileSync(process.env.WITNESS_OUT, JSON.stringify({ registry: target, slot, l1Block: Number(commit.index), value: values[0], witness }));
 console.log(`witnessBytes=${getBytes(witness).length} verifyGas=${gas}`);
 
 const bad = getBytes(witness);
