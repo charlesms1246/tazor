@@ -61,6 +61,20 @@ $('#sub-cancel').addEventListener('click', async () => {
 if (localStorage.getItem(subKey)) $('#sub-cancel').hidden = false;
 
 // ---- merchant: wallet, orders, refunds
+const DEMO_MERCHANT = 'bluejay.demo-merchant.v1';
+function useMerchant(wallet, note) {
+  merchantWallet = wallet;
+  button.setAttribute('merchant', wallet.address);
+  localStorage.setItem(SAVED, wallet.address);
+  $('#merchant-addr').textContent = short(wallet.address);
+  $('#merchant-addr').title = wallet.address;
+  $('#merchant-note').textContent = note;
+  refresh();
+}
+$('#merchant-demo').addEventListener('click', () => {
+  useMerchant(T.demoWallet(DEMO_MERCHANT), 'Demo merchant wallet (kept in this browser, testnet only). Checkouts on the left now pay it, and it refunds here with one signature: no extension, no gas.');
+});
+if (localStorage.getItem(DEMO_MERCHANT) && localStorage.getItem(SAVED) === T.demoWallet(DEMO_MERCHANT).address) merchantWallet = T.demoWallet(DEMO_MERCHANT);
 $('#merchant-connect').addEventListener('click', async () => {
   try {
     merchantWallet = await T.walletSigner(window.ethereum);
@@ -92,13 +106,19 @@ function renderOrders() {
     status.append(el('span', back === 0n ? 'Paid' : back >= o.amount ? 'Refunded' : `Refunded ${usdt(back)}`, `pill ${back === 0n ? 'paid' : ''}`), document.createTextNode(' '), txLink(o.tx, 'tx'));
     const action = el('td');
     if (merchantWallet && merchantWallet.address.toLowerCase() === merchant().toLowerCase() && back < o.amount) {
-      const b = el('button', 'Refund', 'btn btn-sm');
-      b.addEventListener('click', async () => {
-        b.disabled = true; b.textContent = 'Sign in your wallet…';
-        try { await T.refundOrder({ id: o.id, amount: o.amount - back, wallet: merchantWallet }); b.textContent = 'Refund sent'; setTimeout(refresh, 4000); }
-        catch (e) { b.disabled = false; b.textContent = 'Refund'; $('#merchant-note').textContent = e.message; }
-      });
-      action.append(b);
+      const left = o.amount - back;
+      const part = left > o.amount / 4n ? o.amount / 4n : left;
+      const mk = (label, amount) => {
+        const b = el('button', label, 'btn btn-sm');
+        b.addEventListener('click', async () => {
+          b.disabled = true; b.textContent = 'Signing…';
+          try { await T.refundOrder({ id: o.id, amount, wallet: merchantWallet }); b.textContent = 'Refund sent'; setTimeout(refresh, 4000); }
+          catch (e) { b.disabled = false; b.textContent = label; $('#merchant-note').textContent = e.message; }
+        });
+        return b;
+      };
+      action.append(mk(`Refund ${usdt(part)}`, part));
+      if (left > part) action.append(document.createTextNode(' '), mk('Refund all', left));
     }
     tr.append(el('td', `${short(o.id)} · from ${short(o.payer)}`, 'mono'), el('td', `${usdt(o.amount)} USDT`, 'num'), status, action);
     return tr;
