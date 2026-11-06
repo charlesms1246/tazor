@@ -15,6 +15,10 @@ export const config = {
   wbSoulMirror: addr(process.env.NEXT_PUBLIC_WB_SOUL, '0x9822650A99bD33F29E383345F570dAE1e4E00928'),
   entryPoint: addr(process.env.NEXT_PUBLIC_ENTRY_POINT, '0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108'),
   revocationList: addr(process.env.NEXT_PUBLIC_REVOCATION_LIST, '0x407a8605Fc6fe002Eb025b2dcf9f9C630d5D311e'),
+  /** TazorCheckout (gasless checkout, refunds, subscriptions), deployed at Whitechain Sepolia block 12391780. */
+  checkout: addr(process.env.NEXT_PUBLIC_CHECKOUT, '0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670'),
+  /** TazorDepositCheckout: the customer pays by a plain USDT transfer to a per-order address (e.g. an exchange withdrawal). */
+  depositCheckout: addr(process.env.NEXT_PUBLIC_DEPOSIT_CHECKOUT, '0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab'),
   sepolia: {
     chainId: 11155111,
     rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com',
