@@ -11,6 +11,13 @@ contract TazorAccountFactory {
 
     event TazorAccountCreated(address indexed account, bytes[] admins, uint64 threshold, address[] executors);
 
+    struct Config {
+        bytes[] admins;
+        uint64 threshold;
+        address[] executors;
+        bytes[] executorData;
+    }
+
     constructor(address policyHook_) {
         implementation = address(new TazorAccount());
         policyHook = policyHook_;
@@ -18,32 +25,23 @@ contract TazorAccountFactory {
 
     /// @notice Idempotent. The CREATE2 salt binds every init parameter, so a predicted address
     /// cannot be taken with a different configuration.
-    function createAccount(bytes[] calldata admins, uint64 threshold, address[] calldata executors, bytes32 salt)
-        external
-        returns (address account)
-    {
-        bytes32 fullSalt = _salt(admins, threshold, executors, salt);
+    function createAccount(Config calldata config, bytes32 salt) external returns (address account) {
+        bytes32 fullSalt = _salt(config, salt);
         account = Clones.predictDeterministicAddress(implementation, fullSalt);
         if (account.code.length == 0) {
             Clones.cloneDeterministic(implementation, fullSalt);
-            TazorAccount(payable(account)).initialize(admins, threshold, executors, policyHook);
-            emit TazorAccountCreated(account, admins, threshold, executors);
+            TazorAccount(payable(account)).initialize(
+                config.admins, config.threshold, config.executors, config.executorData, policyHook
+            );
+            emit TazorAccountCreated(account, config.admins, config.threshold, config.executors);
         }
     }
 
-    function predictAddress(bytes[] calldata admins, uint64 threshold, address[] calldata executors, bytes32 salt)
-        external
-        view
-        returns (address)
-    {
-        return Clones.predictDeterministicAddress(implementation, _salt(admins, threshold, executors, salt));
+    function predictAddress(Config calldata config, bytes32 salt) external view returns (address) {
+        return Clones.predictDeterministicAddress(implementation, _salt(config, salt));
     }
 
-    function _salt(bytes[] calldata admins, uint64 threshold, address[] calldata executors, bytes32 salt)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(admins, threshold, executors, salt));
+    function _salt(Config calldata config, bytes32 salt) private pure returns (bytes32) {
+        return keccak256(abi.encode(config, salt));
     }
 }

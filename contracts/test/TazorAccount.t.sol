@@ -55,7 +55,7 @@ contract TazorAccountTest is Test {
         executors[0] = address(executor);
 
         uint256 g = gasleft();
-        company = TazorAccount(payable(factory.createAccount(admins, 2, executors, SALT)));
+        company = TazorAccount(payable(factory.createAccount(_cfg(admins, 2, executors), SALT)));
         console2.log("gas TazorAccountFactory.createAccount (2 admins, 1 executor, hook)", g - gasleft());
 
         ep = address(company.entryPoint());
@@ -63,6 +63,14 @@ contract TazorAccountTest is Test {
     }
 
     // ---- helpers
+
+    function _cfg(bytes[] memory admins, uint64 threshold, address[] memory executors)
+        internal
+        pure
+        returns (TazorAccountFactory.Config memory)
+    {
+        return TazorAccountFactory.Config(admins, threshold, executors, new bytes[](executors.length));
+    }
 
     function _one(bytes memory b) internal pure returns (bytes[] memory a) {
         a = new bytes[](1);
@@ -130,23 +138,26 @@ contract TazorAccountTest is Test {
         admins[1] = abi.encodePacked(approverB);
         address[] memory executors = new address[](1);
         executors[0] = address(executor);
-        assertEq(factory.predictAddress(admins, 2, executors, SALT), address(company));
-        assertEq(factory.createAccount(admins, 2, executors, SALT), address(company));
-        assertTrue(factory.predictAddress(admins, 1, executors, SALT) != address(company));
+        assertEq(factory.predictAddress(_cfg(admins, 2, executors), SALT), address(company));
+        assertEq(factory.createAccount(_cfg(admins, 2, executors), SALT), address(company));
+        assertTrue(factory.predictAddress(_cfg(admins, 1, executors), SALT) != address(company));
+        TazorAccountFactory.Config memory other = _cfg(admins, 2, executors);
+        other.executorData[0] = hex"01";
+        assertTrue(factory.predictAddress(other, SALT) != address(company), "salt binds executorData");
 
         address[] memory none = new address[](0);
         TazorAccount impl = TazorAccount(payable(factory.implementation()));
         vm.expectRevert();
-        company.initialize(admins, 1, none, address(hook));
+        company.initialize(admins, 1, none, new bytes[](0), address(hook));
         vm.expectRevert();
-        impl.initialize(admins, 1, none, address(hook));
+        impl.initialize(admins, 1, none, new bytes[](0), address(hook));
     }
 
     function test_minimalCloneGas() public {
         address[] memory executors = new address[](1);
         executors[0] = address(executor);
         uint256 g = gasleft();
-        factory.createAccount(_one(abi.encodePacked(approverA)), 1, executors, keccak256("min"));
+        factory.createAccount(_cfg(_one(abi.encodePacked(approverA)), 1, executors), keccak256("min"));
         console2.log("gas TazorAccountFactory.createAccount (1 admin, 1 executor, hook)", g - gasleft());
     }
 

@@ -16,21 +16,27 @@ import {MultiSignerERC7913} from "@openzeppelin/contracts/utils/cryptography/sig
 /// to configuration of this account. Funds move only through installed executors.
 contract TazorAccount is AccountERC7579Hooked, MultiSignerERC7913, Initializable {
     error TazorAccountMissingHook();
+    error TazorAccountExecutorDataMismatch();
 
     constructor() MultiSignerERC7913(_unusableSigners(), 1) {
         _disableInitializers();
     }
 
     /// @dev Executors are installed before the hook, so the hook does not gate initialization.
-    function initialize(bytes[] calldata admins, uint64 threshold_, address[] calldata executors, address hook_)
-        external
-        initializer
-    {
+    /// executorData[i] is passed to executors[i].onInstall.
+    function initialize(
+        bytes[] calldata admins,
+        uint64 threshold_,
+        address[] calldata executors,
+        bytes[] calldata executorData,
+        address hook_
+    ) external initializer {
         require(hook_ != address(0), TazorAccountMissingHook());
+        require(executors.length == executorData.length, TazorAccountExecutorDataMismatch());
         _addSigners(admins);
         _setThreshold(threshold_);
         for (uint256 i; i < executors.length; ++i) {
-            _installModule(MODULE_TYPE_EXECUTOR, executors[i], "");
+            _installModule(MODULE_TYPE_EXECUTOR, executors[i], executorData[i]);
         }
         _installModule(MODULE_TYPE_HOOK, hook_, "");
     }

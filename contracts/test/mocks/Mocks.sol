@@ -78,3 +78,15 @@ library ModeLib {
         );
     }
 }
+
+contract MockRoleCache {
+    mapping(address registry => mapping(address account => uint256)) public roles;
+
+    function setRoles(address registry, address account, uint256 roles_) external {
+        roles[registry][account] = roles_;
+    }
+
+    function rolesOf(address registry, address account) external view returns (uint256, uint64) {
+        return (roles[registry][account], uint64(block.number));
+    }
+}
