@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { STORY } from './story.ts';
-import { appliesTo, type RunState } from './engine.ts';
+import { stepApplies, type RunState } from './engine.ts';
 import { AUTOPILOT_EVENT, explorerTx, findTestId, getRunner } from './browser.ts';
 import { explain } from './explain.ts';
 import { plain } from '@/lib/human.ts';
@@ -55,7 +55,7 @@ export function AutopilotPanel() {
 
   if (!s) return null;
   const r = getRunner();
-  const steps = STORY.filter((x) => appliesTo(x, s.mode));
+  const steps = STORY.filter((x) => stepApplies(x, s.mode));
   const step = STORY[s.step];
   const index = step ? steps.indexOf(step) : steps.length;
   const tapping = s.status === 'waiting-user';
@@ -69,7 +69,7 @@ export function AutopilotPanel() {
           <button type="button" className="ap-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-testid="autopilot-toggle">
             <span className="ap-badge">Autopilot</span>
             <span className="ap-count" data-testid="autopilot-progress">{Math.min(index + 1, steps.length)} / {steps.length}</span>
-            <span className="ap-mode">{s.mode === 'guest' ? 'Try it yourself' : 'Presenter'}</span>
+            <span className="ap-mode">{s.mode === 'guest' ? 'Try it yourself' : s.mode === 'story' ? 'The story' : 'Presenter'}</span>
           </button>
           <div className="ap-bar" aria-hidden="true"><span style={{ width: `${(s.done.length / steps.length) * 100}%` }} /></div>
         </header>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunner, parseState, pathOf, satisfied, type ApiResult, type Deps, type Dom, type RunState, type Step } from '../app/_autopilot/engine.ts';
+import { createRunner, parseState, pathOf, satisfied, stepApplies, type ApiResult, type Deps, type Dom, type RunState, type Step } from '../app/_autopilot/engine.ts';
 import { toResult } from '../app/_autopilot/sandbox-port.ts';
 import { STORY } from '../app/_autopilot/story.ts';
 
@@ -234,7 +234,9 @@ test('helpers: satisfied, parseState, toResult', () => {
 
 test('the story: unique ids, a why for every step, every userTap waits on a page state', () => {
   assert.equal(new Set(STORY.map((s) => s.id)).size, STORY.length);
-  assert.equal(STORY.filter((s) => s.id !== 'ready').length, 16, 'including the Checkout chapter');
+  assert.equal(STORY.filter((s) => s.id !== 'ready' && !s.modes?.includes('story')).length, 15, 'the full tour, including the Checkout chapter');
+  assert.deepEqual(STORY.filter((s) => stepApplies(s, 'story')).map((s) => s.id), ['story-pay', 'story-refund', 'story-export'], 'the 2-minute story');
+  for (const m of ['presenter', 'guest'] as const) assert.ok(!STORY.some((s) => s.id.startsWith('story-') && stepApplies(s, m)), `the story steps stay out of ${m}`);
   for (const s of STORY) {
     assert.ok(s.why.length > 10, s.id);
     for (const a of s.actions) if (a.do === 'userTap') assert.ok(Object.keys(a.until).length > 0, s.id);

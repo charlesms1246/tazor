@@ -5,7 +5,7 @@
  */
 import type { ApiResult, Chain, Ctx } from './engine.ts';
 
-export type CounterpartyAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect' | 'finance-buy' | 'finance-settle';
+export type CounterpartyAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect';
 
 export interface SandboxPort {
   /** Admits the guest's approver account to the sandbox company; data carries the company the guest now acts for. */

@@ -16,3 +16,7 @@
 .ap-story li[data-done="true"] .ap-story-n { background: var(--wc-ink); border-color: var(--wc-ink); color: var(--wc-lime); }
 .ap-story li[data-current="true"] .ap-story-n { border-color: var(--wc-blue); color: var(--wc-blue); box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15); }
 @media (max-width: 640px) { .ap-modes { grid-template-columns: minmax(0, 1fr); } }
+.ap-featured-head { display: grid; gap: 4px; }
+.ap-featured-title { margin: 0; font-size: 20px; line-height: 28px; }
+.ap-story-short { padding: 0; }
+.ap-more-h { margin: 8px 0 0; font-size: 15px; font-weight: 600; color: var(--muted); }

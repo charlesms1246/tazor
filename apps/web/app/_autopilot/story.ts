@@ -42,7 +42,8 @@ export const LABELS: Record<string, string> = {
   create: 'the "Create passkey" button', 'approver-account': 'your approver account',
   'co-watch': 'the merchant address field', 'co-watch-add': 'the "Show its payments too" button', 'co-orders': 'the orders list', 'co-order-row': 'the new order',
   'co-order-focus': 'the new order', 'co-tab-webhooks': 'the Webhooks tab', 'co-tab-agents': 'the Agents tab', 'co-tab-orders': 'the Orders tab', 'co-hooks': 'the webhook deliveries', 'co-agents': 'the agent payments',
-  'receipt-amount': 'the receipt', 'receipt-finality': 'the finality stages', 'receipt-refund-row': 'the refund on the receipt',
+  'receipt-amount': 'the receipt', 'receipt-finality': 'the finality stages', 'receipt-refund-row': 'the refund on the receipt', 'receipt-net': 'the net paid',
+  'ck-ledger': 'the checkout rows for the accountant', 'ck-focus-refund': 'the refund row', 'ck-focus-payment': 'the payment row',
 };
 
 /** /checkout/ for one merchant (watched like any other address), opened on a tab. */
@@ -92,6 +93,36 @@ const approveLink = (link: string): Action[] => [
 ];
 
 export const STORY: Step[] = [
+  // ---- the story (2 min): a customer pays without gas → the merchant refunds part of it → the accountant gets the export
+  {
+    id: 'story-pay', title: 'A customer pays', why: 'One signature, no gas, no WBT: the customer only needs USDT.', modes: ['story'],
+    actions: [
+      { do: 'goto', path: '/checkout/' },
+      { do: 'api', call: { name: 'wallet-address' }, say: 'Choosing the merchant: your browser wallet, or the sandbox merchant if there is none…' },
+      { do: 'api', call: { name: 'customer-pays' }, say: 'Simulated customer: a wallet with USDT and no WBT pays 0.12 USDT with one signature…', sim: true, saveAs: 'checkoutTx' },
+      { do: 'goto', path: (c) => `/receipt/?order=${c.orderId}` },
+      { do: 'waitFor', wait: { testid: 'receipt-amount' }, timeout: 60_000, say: 'The customer’s receipt, read straight from Whitechain: anyone can check it…' },
+      { do: 'highlight', testid: 'receipt-finality', say: 'Confirmed by Whitechain in about a second; posted to Ethereum in about 10 minutes, final about 30 minutes later.', ms: 3000 },
+    ],
+  },
+  {
+    id: 'story-refund', title: 'The merchant refunds part of it', why: 'Only to the address that paid, and never more than was paid.', modes: ['story'],
+    actions: [
+      { do: 'api', call: { name: 'merchant-refund' }, say: 'The merchant refunds 0.02 USDT: it can only go back to the customer…', saveAs: 'refundTx' },
+      { do: 'goto', path: (c) => `/receipt/?order=${c.orderId}&r=1` },
+      { do: 'waitFor', wait: { testid: 'receipt-refund-row' }, timeout: 60_000, say: 'The receipt now shows the refund and the net paid…' },
+      { do: 'highlight', testid: 'receipt-net', say: 'Net paid after the refund, on the customer’s receipt.', ms: 2500 },
+    ],
+  },
+  {
+    id: 'story-export', title: 'The accountant gets the export', why: 'Every payment and refund, with its transaction, as a CSV.', modes: ['story'],
+    actions: [
+      { do: 'goto', path: (c) => `/export/?merchant=${encodeURIComponent(c.merchant ?? '')}&order=${encodeURIComponent(c.orderId ?? '')}` },
+      { do: 'waitFor', wait: { testid: 'ck-focus-refund' }, timeout: 60_000, say: 'Reports: the payment and the refund as accountant rows…' },
+      { do: 'highlight', testid: 'ck-ledger', say: 'Date, customer, order, gross, refund, net and the transaction for each row; Download CSV for any accounting tool.', ms: 3500 },
+      { do: 'log', text: 'That is the story: paid without gas, refunded safely, booked by the accountant. More chapters are below on the Autopilot page.', kind: 'ok' },
+    ],
+  },
   {
     id: 'ready', title: 'Get ready', why: 'Everything runs on the sandbox company, so simulated counterparties never touch a real company.',
     actions: [
@@ -231,14 +262,6 @@ export const STORY: Step[] = [
       { do: 'click', testid: 'relayer-simulate-on', optional: true, timeout: 5000 },
       { do: 'click', testid: 'health-refresh' },
       { do: 'waitFor', wait: { textIn: ['health-relayer', 'Up'] }, timeout: 20_000, say: 'System health: the relayer is up again.' },
-    ],
-  },
-  {
-    id: 'financing', title: 'Financing', why: 'An approved invoice becomes a claim a financier can buy before the due date.',
-    actions: [
-      { do: 'api', call: { name: 'counterparty', args: () => ({ action: 'finance-buy' }) }, say: 'Simulated counterparty: a financier buys the claim…', sim: true },
-      { do: 'api', call: { name: 'counterparty', args: () => ({ action: 'finance-settle' }) }, say: 'Simulated counterparty: the claim settles at the due date…', sim: true },
-      { do: 'goto', path: '/financing/' },
     ],
   },
   {

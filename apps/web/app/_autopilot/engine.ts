@@ -4,7 +4,8 @@
  * so a full page navigation resumes where it left off.
  */
 
-export type Mode = 'presenter' | 'guest';
+/** presenter and guest run the full tour; story runs only the steps marked for it (the 2-minute pay → refund → export). */
+export type Mode = 'presenter' | 'guest' | 'story';
 export type Status = 'idle' | 'running' | 'paused' | 'waiting-user' | 'failed' | 'done';
 export type Ctx = Record<string, string>;
 export type Chain = 'whitechain' | 'sepolia';
@@ -111,6 +112,8 @@ export function parseState(raw: string | null): RunState | null {
 }
 
 export const appliesTo = (x: { mode?: Mode; modes?: Mode[] }, m: Mode) => (x.modes ? x.modes.includes(m) : x.mode ? x.mode === m : true);
+/** Whether a whole step runs in this mode: the story mode runs only the steps that name it. */
+export const stepApplies = (x: { modes?: Mode[] }, m: Mode) => (m === 'story' ? !!x.modes?.includes('story') : appliesTo(x, m));
 
 /** Keys a step writes into ctx; keys written by more than one step (e.g. "the last link seen") are shared and kept. */
 export function ownKeys(steps: Step[], index: number): string[] {
@@ -311,7 +314,7 @@ export function createRunner(steps: Step[], deps: Deps) {
         if (s.status !== 'running' && s.status !== 'waiting-user') return;
         const step = steps[s.step];
         if (!step) { s.status = 'done'; s.highlight = undefined; s.prompt = undefined; log('ok', 'Autopilot finished: every step ran on the real pages.'); return; }
-        if (!appliesTo(step, s.mode)) { s.step++; s.action = 0; emit(); continue; }
+        if (!stepApplies(step, s.mode)) { s.step++; s.action = 0; emit(); continue; }
         if (s.action === 0) {
           // a fresh attempt never reuses values captured by an earlier attempt of this step
           const own = ownKeys(steps, s.step);

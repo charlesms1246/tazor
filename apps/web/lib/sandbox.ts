@@ -6,7 +6,7 @@
 import { getRelayerUrl } from './relayer-url.ts';
 
 export type SandboxChain = 'whitechain' | 'sepolia';
-export type SandboxAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect' | 'finance-buy' | 'finance-settle'
+export type SandboxAction = 'create-invoice' | 'approve-second' | 'revoke-ravi' | 'ravi-pays' | 'credit-note' | 'collect'
   | 'checkout-customer-pay' | 'checkout-merchant-refund' | 'deposit-customer-pay' | 'agent-x402';
 
 export type SandboxStep = {
@@ -42,10 +42,6 @@ export type SandboxActionExtras = {
   ravi: string; revoked: boolean; error: string; invoiceHash: string;
   /** collect */
   amount: string; available: string;
-  /** finance-buy */
-  approveTx: string | null; price: string; faceValue: string; financier: string;
-  /** finance-settle when not due */
-  dueDate: string;
 };
 
 /** Errors (400 bad input, 403 not the sandbox / over the cap, 422 reverted, 429 rate limited, 502 upstream). */
@@ -57,9 +53,9 @@ export type SandboxError = {
 export type SandboxStatus = {
   enabled: true;
   company: { account: string; registry: string; supplier: string; supplierName: string; explorerUrl: string };
-  people: Record<'admin' | 'ravi' | 'supplier' | 'financier', { eoa: string; approver: string | null }>;
+  people: Record<'admin' | 'ravi' | 'supplier', { eoa: string; approver: string | null }>;
   /** USDT, decimal strings; null when a read failed. */
-  balances: { account: string | null; supplier: string | null; financier: string | null };
+  balances: { account: string | null; supplier: string | null };
   limits: { perPayment: string | null; monthly: string | null; twoApproverThreshold: string | null; agentMonthlyCap: string | null; monthlyAvailable: string | null; agentAvailable: string | null } | null;
   raviRevoked: boolean | null;
   sandboxCaps: { maxAmount: string; admissionsPerDay: number; admissionsPerIpHour: number; admittedSinceStart: number };
@@ -98,7 +94,7 @@ export function createSandboxClient(base: () => string = getRelayerUrl, f: typeo
     /**
      * One counterparty action. Params by action:
      * create-invoice {amount?, description?} · approve-second {link} or {links} · revoke-ravi {} · ravi-pays {amount?} ·
-     * credit-note {amount?} · collect {mandate?, amount?} · finance-buy {tokenId?} · finance-settle {tokenId?}.
+     * credit-note {amount?} · collect {mandate?, amount?}.
      * Amounts are USDT decimal strings ≤ "1"; mandate/tokenId default to the setup's.
      */
     counterparty: (action: SandboxAction, params: Record<string, unknown> = {}) =>
