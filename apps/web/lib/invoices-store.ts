@@ -1,6 +1,6 @@
-import { getAddress, isAddress, parseUnits, type Address } from 'viem';
+import { formatUnits, getAddress, isAddress, parseUnits, type Address } from 'viem';
 import { WHITECHAIN_SEPOLIA_USDT } from './invoice-auth.ts';
-import { canonicalInvoiceJson, invoiceHash, parseInvoice, type Invoice } from './invoice.ts';
+import { canonicalInvoiceJson, invoiceHash, parseInvoice, type Invoice, type InvoiceLine } from './invoice.ts';
 import type { PaymentRecord } from './export.ts';
 
 export type LineForm = { description: string; quantity: string; unitPrice: string };
@@ -67,6 +67,50 @@ export function buildInvoice(f: InvoiceForm, id: string): { invoice: Invoice } |
   }
 }
 
+// ---- tax as a final line item (the invoice amount stays the sum of its lines)
+
+const RATE_RE = /^(0|[1-9]\d{0,2})(\.\d{1,2})?$/;
+const TAX_DESC_RE = /^(.*\S) (\d{1,3}(?:\.\d{1,2})?)%$/;
+
+/** Tax rate in basis points (0.01 %), or null unless it is a plain number from 0 to 100 with up to 2 decimals. */
+export function parseRate(v: string): bigint | null {
+  const t = v.trim();
+  if (!RATE_RE.test(t)) return null;
+  const bp = parseUnits(t, 2);
+  return bp <= 10_000n ? bp : null;
+}
+
+/** Tax in base units, rounded half-up: round(subtotal × bp / 10 000). */
+export const taxFor = (subtotal: bigint, bp: bigint): bigint => (subtotal * bp + 5_000n) / 10_000n;
+
+export type TaxInfo = { label: string; rate: string; amount: bigint };
+
+/** The tax for a draft (complete lines only), or null when there is no positive tax to add. */
+export function draftTax(f: InvoiceForm, rateText: string, label: string): TaxInfo | null {
+  const bp = parseRate(rateText);
+  if (bp === null || bp === 0n) return null;
+  const amount = taxFor(formTotal(f), bp);
+  return amount > 0n ? { label: label.trim() || 'Tax', rate: formatUnits(bp, 2), amount } : null;
+}
+
+/** The form with a final "<label> <rate>%" line (quantity 1) when the tax is above zero. */
+export function withTax(f: InvoiceForm, rateText: string, label: string): InvoiceForm {
+  const tax = draftTax(f, rateText, label);
+  if (!tax) return f;
+  return { ...f, lines: [...f.lines, { description: `${tax.label} ${tax.rate}%`, quantity: '1', unitPrice: formatUnits(tax.amount, 6) }] };
+}
+
+/** Splits a final tax line (as written by withTax) back off an invoice's lines; otherwise tax is null. */
+export function splitTax(lines: InvoiceLine[]): { lines: InvoiceLine[]; tax: TaxInfo | null } {
+  const last = lines.at(-1);
+  const m = last && lines.length > 1 && last.quantity === 1n ? TAX_DESC_RE.exec(last.description) : null;
+  const bp = m ? parseRate(m[2]) : null;
+  if (!last || !m || bp === null || bp === 0n) return { lines, tax: null };
+  const rest = lines.slice(0, -1);
+  const subtotal = rest.reduce((s, l) => s + l.quantity * l.unitPrice, 0n);
+  return taxFor(subtotal, bp) === last.unitPrice ? { lines: rest, tax: { label: m[1], rate: m[2], amount: last.unitPrice } } : { lines, tax: null };
+}
+
 // ---- invoices created on this device
 
 const KEY = 'tazor.invoices.v1';
@@ -100,3 +144,16 @@ export function invoiceStatus(invoice: Invoice, payments: PaymentRecord[]): 'pai
   const h = invoiceHash(invoice);
   return payments.some((p) => { try { return invoiceHash(p.invoice) === h; } catch { return false; } }) ? 'paid' : 'sent';
 }
+
+// ---- supplier logo, kept on this device only (never put in the link)
+
+const LOGO_KEY = 'tazor.logo.v1';
+export const LOGO_MAX_BYTES = 200 * 1024;
+export const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml'];
+export const loadLogo = (): string | null => { try { return globalThis.localStorage?.getItem(LOGO_KEY) ?? null; } catch { return null; } };
+export const saveLogo = (dataUrl: string | null): boolean => {
+  try {
+    if (dataUrl) globalThis.localStorage.setItem(LOGO_KEY, dataUrl); else globalThis.localStorage.removeItem(LOGO_KEY);
+    return true;
+  } catch { return false; }
+};

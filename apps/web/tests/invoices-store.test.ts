@@ -98,3 +98,44 @@ test('status is paid only when a payment for the same invoice exists', () => {
   assert.equal(invoiceStatus(a.invoice, [{ invoice: b.invoice, txHash: '0x01', blockTimestamp: 1 }]), 'sent');
   assert.equal(invoiceStatus(a.invoice, [{ invoice: a.invoice, txHash: '0x02', blockTimestamp: 1 }]), 'paid');
 });
+
+test('tax line: rate parsing and half-up rounding in 6-dp base units', async () => {
+  const { parseRate, taxFor } = await import('../lib/invoices-store.ts');
+  assert.equal(parseRate('18'), 1800n);
+  assert.equal(parseRate('12.5'), 1250n);
+  assert.equal(parseRate('0'), 0n);
+  for (const bad of ['', '-1', '101', '1.234', 'abc', '018']) assert.equal(parseRate(bad), null, bad);
+  assert.equal(taxFor(100_000_000n, 1800n), 18_000_000n);
+  assert.equal(taxFor(5n, 1000n), 1n); // 0.5 rounds up
+  assert.equal(taxFor(4n, 1250n), 1n); // 0.5 rounds up
+  assert.equal(taxFor(3n, 1000n), 0n); // 0.3 rounds down
+  assert.equal(taxFor(14n, 1000n), 1n); // 1.4 rounds down
+  assert.equal(taxFor(15n, 1000n), 2n); // 1.5 rounds up
+});
+
+test('withTax: final line keeps amount == sum of lines, parseInvoice accepts it, splitTax recovers it', async () => {
+  const { withTax, draftTax, splitTax } = await import('../lib/invoices-store.ts');
+  const f = { ...form, lines: [{ description: 'Freight', quantity: '1', unitPrice: '100' }] };
+  assert.deepEqual(draftTax(f, '18', 'GST'), { label: 'GST', rate: '18', amount: 18_000_000n });
+  const taxed = withTax(f, '18', 'GST');
+  assert.deepEqual(taxed.lines.at(-1), { description: 'GST 18%', quantity: '1', unitPrice: '18' });
+  const r = buildInvoice(taxed, 'INV-TAX-1');
+  assert.ok('invoice' in r, 'error' in r ? r.error : '');
+  assert.equal(r.invoice.amount, 118_000_000n);
+  assert.equal(r.invoice.amount, r.invoice.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0n));
+  const split = splitTax(r.invoice.lines);
+  assert.equal(split.lines.length, 1);
+  assert.deepEqual(split.tax, { label: 'GST', rate: '18', amount: 18_000_000n });
+
+  const odd = withTax({ ...form, lines: [{ description: 'Tiny', quantity: '1', unitPrice: '0.000005' }] }, '10', ' ');
+  assert.deepEqual(odd.lines.at(-1), { description: 'Tax 10%', quantity: '1', unitPrice: '0.000001' });
+  const r2 = buildInvoice(odd, 'INV-TAX-2');
+  assert.ok('invoice' in r2 && r2.invoice.amount === 6n);
+
+  assert.equal(withTax(f, '', 'GST'), f);
+  assert.equal(withTax(f, '0', 'GST'), f);
+  assert.equal(withTax({ ...form, lines: [{ description: 'x', quantity: '1', unitPrice: '0.000001' }] }, '10', 'GST').lines.length, 1); // rounds to 0: no line
+  // a final line that only looks like tax (wrong amount) is left as a line
+  const r3 = buildInvoice({ ...f, lines: [...f.lines, { description: 'GST 18%', quantity: '1', unitPrice: '17' }] }, 'INV-TAX-3');
+  assert.ok('invoice' in r3 && splitTax(r3.invoice.lines).tax === null);
+});
