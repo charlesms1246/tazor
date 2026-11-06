@@ -78,20 +78,6 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
     sender: l1Sender,
     lookback: env.MIRROR_LOOKBACK ? BigInt(env.MIRROR_LOOKBACK) : undefined,
   });
-  // Autopilot sandbox: on only when every SANDBOX_* address and key is set.
-  const sandboxEnv = sandboxFromEnv(env);
-  const sandbox = sandboxEnv.config
-    ? createSandbox({
-      config: sandboxEnv.config,
-      ports: createSandboxPorts({ config: sandboxEnv.config, whitechain: whitechainSepolia, wcRpc: rpcUrl, sepoliaRpc, relayer: sender, roleSync }),
-    })
-    : undefined;
-  // drain protection: rate limits plus a balance floor and daily budget read from the relayer's own WBT balance
-  const guard = sender ? createGuard({
-    limits: limitsFromEnv(env),
-    balance: () => client.getBalance({ address: sender.address }),
-    gasPrice: () => client.getGasPrice(),
-  }) : undefined;
   // checkout + x402 + webhooks: webhooks always (deliveries need no key); checkout and x402 need the relayer key
   const webhooks = createWebhooks({
     // the public demo merchant signs with its public test secret unless WEBHOOKS_JSON configures it
@@ -111,6 +97,21 @@ export function handlerFromEnv(env: Record<string, string | undefined> = process
   const x402 = chain ? createX402({ chain, webhooks }) : undefined;
   const payToRaw = env.X402_PAYTO || env.SANDBOX_SUPPLIER;
   const x402PayTo = payToRaw && isAddressLike(payToRaw) ? getAddress(payToRaw) : undefined;
+  // drain protection: rate limits plus a balance floor and daily budget read from the relayer's own WBT balance
+  const guard = sender ? createGuard({
+    limits: limitsFromEnv(env),
+    balance: () => client.getBalance({ address: sender.address }),
+    gasPrice: () => client.getGasPrice(),
+  }) : undefined;
+  // Autopilot sandbox: on only when every SANDBOX_* address and key is set.
+  const sandboxEnv = sandboxFromEnv(env);
+  const sandbox = sandboxEnv.config
+    ? createSandbox({
+      config: sandboxEnv.config,
+      ports: createSandboxPorts({ config: sandboxEnv.config, whitechain: whitechainSepolia, wcRpc: rpcUrl, sepoliaRpc, relayer: sender, roleSync }),
+      commerce: { checkout, deposit, x402, x402PayTo, relayerUrl: env.RELAYER_PUBLIC_URL, budget: guard ? () => guard.checkBudget() : undefined },
+    })
+    : undefined;
   const handler = createHandler({
     sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id,
     mandateModuleV2: getAddress(env.MANDATE_MODULE_V2 || MANDATE_MODULE_V2), paymentModuleV2: getAddress(env.PAYMENT_MODULE_V2 || PAYMENT_MODULE_V2),

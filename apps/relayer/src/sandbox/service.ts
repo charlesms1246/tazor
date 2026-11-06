@@ -17,6 +17,10 @@ import {
 } from './abi.ts';
 import type { SandboxConfig, SandboxWho } from './config.ts';
 import { createRateLimiter, type RateLimiter } from './ratelimit.ts';
+import { COMMERCE_ACTIONS, createCommerce, type CommerceAction } from './commerce.ts';
+import type { Checkout } from '../checkout/service.ts';
+import type { Deposit } from '../checkout/deposit.ts';
+import type { X402 } from '../checkout/x402.ts';
 
 export type Net = 'whitechain' | 'sepolia';
 export type From = 'relayer' | SandboxWho;
@@ -107,6 +111,8 @@ export function createSandbox(o: {
   /** How long one /sandbox/admit call waits for the role to reach Whitechain before answering pending-sync. */
   syncBudgetMs?: number;
   syncPollMs?: number;
+  /** Checkout chapter: simulated customers, exchange deposits and x402 agents (each spends test USDT; capped daily). */
+  commerce?: { checkout?: Checkout; deposit?: Deposit; x402?: X402; x402PayTo?: Address; relayerUrl?: string; budget?: () => Promise<void> };
 }) {
   const { config: c, ports: p } = o;
   const k = c.contracts;
@@ -470,9 +476,17 @@ export function createSandbox(o: {
     },
   };
 
+  const commerce = createCommerce({ config: c, ports: p, supplier: signers.supplier, ...o.commerce });
+  const ALL_ACTIONS: readonly string[] = [...ACTIONS, ...COMMERCE_ACTIONS];
+
   async function counterparty(body: unknown): Promise<ActionResult> {
     const b = (body ?? {}) as { action?: unknown; params?: unknown };
-    if (typeof b.action !== 'string' || !(ACTIONS as readonly string[]).includes(b.action)) throw new BadRequest(`action must be one of ${ACTIONS.join(', ')}`);
+    if (typeof b.action !== 'string' || !ALL_ACTIONS.includes(b.action)) throw new BadRequest(`action must be one of ${ALL_ACTIONS.join(', ')}`);
+    if ((COMMERCE_ACTIONS as readonly string[]).includes(b.action)) {
+      const nested = typeof b.params === 'object' && b.params !== null ? (b.params as Record<string, unknown>) : {};
+      const r = await commerce.handlers[b.action as CommerceAction]({ ...(body as Record<string, unknown>), ...nested });
+      return record({ ok: true, ...r });
+    }
     // params may be nested ({action, params}) or flat ({action, mandate, account, ...})
     const nested = typeof b.params === 'object' && b.params !== null ? (b.params as Record<string, unknown>) : {};
     const params: Record<string, unknown> = { ...(body as Record<string, unknown>), ...nested };
