@@ -1,0 +1,17 @@
+.start-flow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.start-node { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px 14px 52px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); }
+.start-node b { font-size: 15px; }
+.start-node span:last-child { font-size: 13px; line-height: 18px; color: var(--muted); }
+.start-n { position: absolute; left: 14px; top: 14px; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--pill-info-bg); color: var(--pill-info-ink); font-weight: 600; font-size: 13px; }
+.start-arrow { align-self: center; font-size: 20px; color: var(--faint); }
+.start-wallet-actions { gap: 8px; }
+.start-err { color: var(--negative); margin: -4px 0 0; }
+.start-link-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.start-share { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 12px; }
+.start-share .ip-qr { width: 132px; height: 132px; }
+.start-code { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
+@media (max-width: 900px) {
+  .start-flow { grid-template-columns: minmax(0, 1fr); }
+  .start-arrow { transform: rotate(90deg); justify-self: center; line-height: 1; }
+  .start-link-fields { grid-template-columns: minmax(0, 1fr); }
+}
