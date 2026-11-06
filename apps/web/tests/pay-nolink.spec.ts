@@ -32,7 +32,7 @@ test('/pay/ without a link redirects to Approvals: opener, empty history and how
   await page.getByTestId('open-link').fill(link);
   await page.getByTestId('open-link-go').click();
   await expect(page.locator('h1')).toHaveText('Invoice INV-NOLINK-1');
-  await expect(page.getByTestId('amount')).toHaveText('1.2 USDT');
+  await expect(page.getByTestId('amount')).toHaveText('1.20 USDT');
 });
 
 test('Approvals lists payments made from this device', async ({ page }) => {
@@ -44,7 +44,7 @@ test('Approvals lists payments made from this device', async ({ page }) => {
   await expect(page.getByTestId('paid-row')).toHaveCount(1);
   await expect(page.getByTestId('paid-row')).toContainText('Bluejay Logistics');
   await expect(page.getByTestId('paid-row')).toContainText('INV-NOLINK-1');
-  await expect(page.getByTestId('paid-row')).toContainText('1.2 USDT');
+  await expect(page.getByTestId('paid-row')).toContainText('1.20 USDT');
 });
 
 test('a real but tampered link still shows the invalid state', async ({ page }) => {

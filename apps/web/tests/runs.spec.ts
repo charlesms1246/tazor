@@ -46,7 +46,7 @@ async function setup(page: Page, deployed: boolean, posts: unknown[]) {
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true } });
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER);
 }
 
 async function fill(page: Page) {
@@ -55,7 +55,7 @@ async function fill(page: Page) {
   await page.getByTestId('run-links').fill(links.join('\n'));
   await page.getByTestId('run-prepare').click();
   await expect(page.getByTestId('run-guard-ok')).toBeVisible();
-  await expect(page.getByTestId('run-total')).toHaveText('3.5 USDT');
+  await expect(page.getByTestId('run-total')).toHaveText('3.50 USDT');
 }
 
 test('/runs/: one approval for two invoices, posted to /payrun; calldata uses payRun', async ({ page }) => {
@@ -64,7 +64,7 @@ test('/runs/: one approval for two invoices, posted to /payrun; calldata uses pa
   await fill(page);
   await page.getByTestId('run-approve').click();
   await page.getByTestId('run-pay').click();
-  await expect(page.getByTestId('run-tx')).toContainText('0xcdcd');
+  await expect(page.getByTestId('run-tx')).toHaveAttribute('data-tx', /^0xcdcd/);
   expect(posts).toHaveLength(1);
   expect(getAddress(posts[0].account)).toBe(BUYER);
   expect(posts[0].auths).toHaveLength(2);

@@ -2,6 +2,8 @@
  * Turns machine strings into text a person can read: no hashes, no 42-character addresses, no huge integers.
  * Shared by every page (with app/_human/chip.tsx for addresses shown as chips).
  */
+import { parseUnits } from 'viem';
+import { usdtNumber } from './money.ts';
 
 export const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -28,8 +30,16 @@ export function plain(text: string, names: Record<string, string> = {}): string 
     .trim();
 }
 
-/** "0.20 USDT" from base units (6 decimals) or a decimal string. */
+/**
+ * "0.20 USDT" from base units (bigint, 6 decimals) or a decimal USDT string/number. Exact (bigint), 2 decimals,
+ * more only when non-zero ("0.000005 USDT"); the one formatter is usdtNumber in lib/money.ts.
+ */
 export function usdtText(v: bigint | string | number): string {
-  const n = typeof v === 'bigint' ? Number(v) / 1e6 : Number(v);
-  return `${(Number.isFinite(n) ? n : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
+  let base: bigint;
+  try {
+    base = typeof v === 'bigint' ? v : parseUnits(String(v).trim(), 6);
+  } catch {
+    base = 0n;
+  }
+  return `${usdtNumber(base)} USDT`;
 }

@@ -48,7 +48,7 @@ async function setup(page: Page, userop: { status: number; body: unknown }) {
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true } });
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
   await page.goto('/company/');
   await page.getByTestId('eoa').fill(BACKUP);
   return seen;

@@ -22,10 +22,10 @@ test('/invoices/: tabs count and total, search filters, and the drawer shows the
   await create(page, 'Storage', '2.5', '2020-01-31');
 
   await expect(page.getByTestId('inv-tab-count-all')).toHaveText('2');
-  await expect(page.getByTestId('inv-tab-total-all')).toHaveText('12.5 USDT');
+  await expect(page.getByTestId('inv-tab-total-all')).toHaveText('12.50 USDT');
   await expect(page.getByTestId('inv-tab-count-sent')).toHaveText('1');
   await expect(page.getByTestId('inv-tab-count-overdue')).toHaveText('1');
-  await expect(page.getByTestId('inv-tab-total-overdue')).toHaveText('2.5 USDT');
+  await expect(page.getByTestId('inv-tab-total-overdue')).toHaveText('2.50 USDT');
   await expect(page.getByTestId('inv-tab-count-paid')).toHaveText('0');
 
   await page.getByTestId('inv-tab-overdue').click();

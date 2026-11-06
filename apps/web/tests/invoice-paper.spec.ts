@@ -44,12 +44,12 @@ test('/invoices/: 18% tax on 100 shows 18.00 and a total of 118.00, and the link
   await expect(paper.getByTestId('paper-tax')).toHaveText('18.00');
   await expect(paper).toContainText('GST 18%');
   await expect(paper.getByTestId('paper-total')).toHaveText('118.00');
-  await expect(page.getByTestId('inv-total')).toHaveText('118 USDT');
+  await expect(page.getByTestId('inv-total')).toHaveText('118.00 USDT');
 
   await page.getByTestId('inv-create').click();
-  const link = (await page.getByTestId('inv-link').textContent())!;
+  const link = (await page.getByTestId('inv-link').getAttribute('data-link'))!;
   await page.goto(link.replace('http://localhost:4173', ''));
-  await expect(page.getByTestId('amount')).toHaveText('118 USDT');
+  await expect(page.getByTestId('amount')).toHaveText('118.00 USDT');
   await expect(page.getByTestId('paper-tax')).toHaveText('18.00');
   await expect(page.getByTestId('paper-total')).toHaveText('118.00');
   await expect(page.getByTestId('paper-stamp')).toHaveText('SENT');
@@ -68,7 +68,7 @@ test('/invoices/: after create the QR is drawn and the stamp says SENT; a row re
   await expect(paper.getByTestId('paper-qr-placeholder')).toHaveCount(0);
   await expect(paper.getByTestId('paper-number')).toHaveText(/^INV-\d{8}-[0-9A-F]{4}$/);
   // the paper shows the QR and a Copy payment link button (not the long link); the button carries the same link
-  const created = (await page.getByTestId('inv-link').textContent()) ?? '';
+  const created = (await page.getByTestId('inv-link').getAttribute('data-link')) ?? '';
   await expect(paper.getByTestId('paper-copy-link')).toHaveAttribute('data-link', created);
   await expect(paper.getByTestId('paper-open-link')).toHaveAttribute('href', created);
   await expect(paper).not.toContainText('/pay/#v1.');

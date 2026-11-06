@@ -73,11 +73,11 @@ test('relayer down: Send via Ethereum builds forward calldata, estimates the fee
 
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
 
   await page.goto((await encodeInvoiceLink(invoice, 'http://x')).replace('http://x', ''));
   await page.getByTestId('approve').click();
-  const approval = JSON.parse((await page.getByTestId('my-approval').textContent())!);
+  const approval = JSON.parse((await page.getByTestId('my-approval').getAttribute('data-value'))!);
 
   await page.getByTestId('pay').click();
   await expect(page.getByTestId('error')).toContainText('Relayer unreachable');
@@ -98,8 +98,8 @@ test('mandates: tracking the live mandate shows terms and what is available now'
   await page.goto('/mandates/');
   await page.getByTestId('track-id').fill('0x08d47f1cfdc3adfe04d41ce6135822149f4440ebf88fdc6b34612c9049c2e574');
   await page.getByTestId('track').click();
-  await expect(page.getByTestId('available')).toHaveText('0.5 USDT');
-  await expect(page.getByTestId('mandate-row')).toContainText('2 USDT / 30 days');
+  await expect(page.getByTestId('available')).toHaveText('0.50 USDT');
+  await expect(page.getByTestId('mandate-row')).toContainText('2.00 USDT / 30 days');
 });
 
 test('home page shows the measured payment time, linked to the timing docs', async ({ page }) => {

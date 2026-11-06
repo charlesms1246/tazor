@@ -18,6 +18,11 @@ test('plain: no hashes, short addresses (or names), no huge integers, no calldat
   assert.equal(plain('INV-0042 paid in 3.6 s'), 'INV-0042 paid in 3.6 s');
   assert.equal(usdtText(200_000n), '0.20 USDT');
   assert.equal(usdtText('1.5'), '1.50 USDT');
+  assert.equal(usdtText(5n), '0.000005 USDT', 'more decimals only when non-zero');
+  assert.equal(usdtText(118_000_000n), '118.00 USDT');
+  assert.equal(usdtText(123_456_789_012_345_678n), '123456789012.345678 USDT', 'exact for large values');
+  assert.equal(usdtText('0.000005'), '0.000005 USDT');
+  assert.equal(usdtText('not a number'), '0.00 USDT');
 });
 
 test('friendly errors: the Autopilot cases read as a sentence with a fix', () => {

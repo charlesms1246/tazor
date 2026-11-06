@@ -301,3 +301,14 @@ test('story: every invoice is small, the mandate cap is under the two-approver t
   assert.equal(payees.length >= 3, true);
   for (const p of payees) assert.ok(p.do === 'fill' && typeof p.value === 'function' && p.value({ supplierAccount: '0xS' }) === '0xS', 'payee is the sandbox supplier');
 });
+
+test('story reads raw values from attributes, never from the readable text', () => {
+  const caps = STORY.flatMap((s) => s.actions).filter((a) => a.do === 'capture');
+  const attrOf = (testid: string) => caps.filter((a) => a.do === 'capture' && a.testid === testid).map((a) => (a.do === 'capture' ? `${a.attr ?? 'text'}${a.inner ? ` in ${a.inner}` : ''}` : ''));
+  assert.deepEqual([...new Set(attrOf('inv-link'))], ['data-link']);
+  assert.deepEqual(attrOf('approver-account'), ['data-value']);
+  assert.deepEqual(attrOf('m-digest'), ['data-value']);
+  assert.deepEqual(attrOf('m-tx'), ['href in a']);
+  assert.deepEqual(attrOf('run-tx'), ['href in a']);
+  assert.deepEqual([...new Set(attrOf('pay-success-tx'))], ['href']);
+});

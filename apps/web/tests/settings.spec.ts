@@ -55,7 +55,7 @@ async function payOnce(page: Page) {
   await page.getByTestId('approve').click();
   await expect(page.getByTestId('my-approval')).toBeVisible();
   await page.getByTestId('pay').click();
-  await expect(page.getByTestId('tx')).toContainText(TX);
+  await expect(page.getByTestId('tx')).toHaveAttribute('data-tx', TX);
 }
 
 test('/security/ relayer URL: saved override is used by /pay/, clearing reverts to the default', async ({ page }) => {
@@ -66,7 +66,7 @@ test('/security/ relayer URL: saved override is used by /pay/, clearing reverts 
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true } });
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
 
   await page.goto('/security/');
   await expect(page.getByTestId('relayer-current')).toContainText(`${DEFAULT} (default for this build)`);
@@ -78,7 +78,9 @@ test('/security/ relayer URL: saved override is used by /pay/, clearing reverts 
   await page.getByTestId('relayer-save').click();
   await expect(page.getByTestId('relayer-current')).toContainText(`${CUSTOM} (set on this device)`);
   await page.getByTestId('relayer-test').click();
-  await expect(page.getByTestId('relayer-health')).toContainText('Relayer OK: sender 0x000000000000000000000000000000000000beef');
+  await expect(page.getByTestId('relayer-health')).toContainText('Relayer OK');
+  await expect(page.getByTestId('relayer-sender')).toHaveAttribute('data-value', '0x000000000000000000000000000000000000beef');
+  await expect(page.getByTestId('relayer-health')).not.toContainText('0x000000000000000000000000000000000000beef');
 
   await payOnce(page);
   expect(posts).toEqual([`${CUSTOM}/pay`]);

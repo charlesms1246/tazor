@@ -37,7 +37,7 @@ test('/invoices/: "Fill with sample data" as Acme switches the supplier to Bluej
 
   await page.getByTestId('inv-create').click();
   await expect(page.getByTestId('toast').filter({ hasText: /Payment link for INV-\d{8}-[0-9A-F]{4} created/ })).toBeVisible();
-  const link = (await page.getByTestId('inv-link').textContent())!;
+  const link = (await page.getByTestId('inv-link').getAttribute('data-link'))!;
   await page.goto(link.replace('http://localhost:4173', ''));
   await expect(page.locator('h1')).toContainText('Invoice INV-');
   await expect(page.getByTestId('pay-steps')).toBeVisible();

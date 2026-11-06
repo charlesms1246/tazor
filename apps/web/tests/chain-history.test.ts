@@ -42,7 +42,7 @@ test('mapLogs: a v2 buyer sees its payments, mandate, provisional grants, Ethere
   assert.equal(paid.amount, '100000');
   assert.equal(paid.payee, BLUEJAY);
   assert.equal(paid.chain, 'whitechain');
-  assert.match(paid.title, /^Invoice 0x0000…[0-9a-f]{4} paid: 0\.1 USDT from Acme Industries to Bluejay Logistics$/);
+  assert.match(paid.title, /^Invoice #000000 paid: 0\.10 USDT from Acme Industries to Bluejay Logistics$/);
 
   // two InvoicePaid in one tx = a payment run; AgentPaid names the agent
   assert.ok(ev.filter((e) => e.tx?.startsWith('0x2673ffbd')).every((e) => e.title.endsWith('in a payment run (2 invoices)')));
@@ -52,7 +52,7 @@ test('mapLogs: a v2 buyer sees its payments, mandate, provisional grants, Ethere
   const dep = ev.find((e) => e.kind === 'fallback-sent')!;
   assert.equal(dep.chain, 'sepolia');
   assert.match(dep.title, /sent via Ethereum \(acme\.taz0r\.eth\)$/);
-  assert.match(ev.find((e) => e.kind === 'collected')!.title, /^Mandate 0x56ab…[0-9a-f]{4} collected 0\.6 USDT$/);
+  assert.match(ev.find((e) => e.kind === 'collected')!.title, /^Mandate #56ab56 collected 0\.60 USDT$/);
 });
 
 test('mapLogs: without a known registry, role syncs are left out', () => {
@@ -72,7 +72,7 @@ test('mapLogs: a supplier sees invoices paid to it (and the mandates that pay it
 
 test('mapLogs: names this device knows replace the hash in titles', () => {
   const ev = mapLogs(batches, { account: ACME_V2, names: (h) => (h.endsWith('1a1e5') ? 'INV-20261106-ABCD' : null) });
-  assert.ok(ev.some((e) => e.title.startsWith('INV-20261106-ABCD paid: 0.1 USDT')));
+  assert.ok(ev.some((e) => e.title.startsWith('INV-20261106-ABCD paid: 0.10 USDT')));
 });
 
 test('mergeEvents: a device event with the same subject, kind and tx is kept once and marked confirmed', () => {

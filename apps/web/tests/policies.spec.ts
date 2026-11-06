@@ -16,17 +16,17 @@ const config = {
 test('/policies/ renders the v2 config and add-payee produces the right calldata', async ({ page }) => {
   await mockV2(page, { config, window: [12_000_000n, 2_000_000n], pendingExit: [EXIT, BigInt(Math.floor(Date.now() / 1000) + 90)] });
   await onboard(page);
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
 
   await page.goto('/policies/');
-  await expect(page.getByTestId('cfg-per-payment')).toHaveText('8 USDT');
-  await expect(page.getByTestId('cfg-monthly')).toContainText('20 USDT');
-  await expect(page.getByTestId('win-company')).toHaveText('12 USDT');
+  await expect(page.getByTestId('cfg-per-payment')).toHaveText('8.00 USDT');
+  await expect(page.getByTestId('cfg-monthly')).toContainText('20.00 USDT');
+  await expect(page.getByTestId('win-company')).toHaveText('12.00 USDT');
   await expect(page.getByTestId('cfg-payee-delay')).toHaveText('120 s');
-  await expect(page.getByTestId('cfg-fresh')).toContainText('3 USDT (roles cached within 300 L1 blocks)');
-  await expect(page.getByTestId('cfg-agent')).toContainText('3 USDT');
-  await expect(page.getByTestId('win-agent')).toHaveText('2 USDT');
-  await expect(page.getByTestId('cfg-exits')).toContainText(EXIT);
+  await expect(page.getByTestId('cfg-fresh')).toContainText('3.00 USDT (roles cached within 300 L1 blocks)');
+  await expect(page.getByTestId('cfg-agent')).toContainText('3.00 USDT');
+  await expect(page.getByTestId('win-agent')).toHaveText('2.00 USDT');
+  await expect(page.getByTestId('cfg-exits')).toHaveAttribute('data-value', EXIT);
   await expect(page.getByTestId('exit-status')).toContainText('Exit pending to');
   await expect(page.getByTestId('exit-countdown')).toBeVisible();
   await expect(page.getByTestId('execute-exit')).toBeDisabled();

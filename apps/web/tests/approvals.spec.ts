@@ -38,7 +38,7 @@ test('/approvals/: opening a payment link adds a Needs-approval row with a timel
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Invoice INV-20261106-A1B2');
   await expect(row).toContainText('Bluejay Logistics');
-  await expect(row).toContainText('2.5 USDT');
+  await expect(row).toContainText('2.50 USDT');
   await expect(row.getByTestId('approval-status')).toHaveText('Needs approval');
   await expect(row.getByTestId('approval-review')).toHaveAttribute('href', `http://localhost:4173${path}`);
 

@@ -76,16 +76,16 @@ test('matching digest enables Approve; passkey approval feeds the payOne calldat
   await page.goto('/onboard/');
   await expect(page.getByTestId('wb-label')).toHaveText('Verified by WhiteBIT (simulated on testnet)');
   await page.getByTestId('create').click();
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
   await expect(page.getByTestId('signer')).toHaveText(new RegExp(`^${VERIFIER}[0-9a-f]{128}$`, 'i'));
   await expect(page.getByTestId('deploy').locator('a')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${deployTx}`);
   expect(relayed).toEqual({ signer: await page.getByTestId('signer').textContent() });
 
   await page.goto(await link());
-  await expect(page.getByTestId('guard-ok')).toContainText(digest);
+  await expect(page.getByTestId('guard-ok')).toHaveAttribute('data-digest', digest);
   await expect(page.getByTestId('approve')).toBeEnabled();
   await page.getByTestId('approve').click();
-  const approval = JSON.parse((await page.getByTestId('my-approval').textContent())!);
+  const approval = JSON.parse((await page.getByTestId('my-approval').getAttribute('data-value'))!);
   expect(approval.approver.toLowerCase()).toBe(APPROVER_ACCOUNT);
   await expect(page.getByTestId('approval-count')).toHaveText('1');
 

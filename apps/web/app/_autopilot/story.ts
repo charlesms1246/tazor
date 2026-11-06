@@ -48,9 +48,9 @@ const createInvoice = (as: string, say: string): Action[] => [
   { do: 'highlight', testid: 'inv-preview', say: 'The invoice paper updates as the form is filled.', ms: 1200 },
   { do: 'capture', testid: 'inv-total', as: `${as}Total` },
   { do: 'click', testid: 'inv-create' },
-  { do: 'waitFor', wait: { test: (d, c) => { const t = d.text('inv-link'); return !!t && t !== c.lastLink; } }, timeout: 20_000, say: 'Encrypting the invoice into a payment link…' },
-  { do: 'capture', testid: 'inv-link', as, say: () => say },
-  { do: 'capture', testid: 'inv-link', as: 'lastLink' },
+  { do: 'waitFor', wait: { test: (d, c) => { const t = d.attr('inv-link', 'data-link'); return !!t && t !== c.lastLink; } }, timeout: 20_000, say: 'Encrypting the invoice into a payment link…' },
+  { do: 'capture', testid: 'inv-link', attr: 'data-link', as, say: () => say },
+  { do: 'capture', testid: 'inv-link', attr: 'data-link', as: 'lastLink' },
 ];
 
 const asBuyer: Action = { do: 'company', id: (c: Ctx) => c.buyerCompany };
@@ -71,7 +71,7 @@ export const STORY: Step[] = [
       { do: 'api', mode: 'presenter', call: { name: 'preflight' }, say: 'Using the approver passkey already on this device…' },
       { do: 'goto', mode: 'guest', path: '/onboard/' },
       { do: 'userTap', mode: 'guest', testid: 'create', prompt: 'Your turn: tap "Create passkey". It stays in this device’s keychain.', until: { testid: 'approver-account' } },
-      { do: 'capture', mode: 'guest', testid: 'approver-account', as: 'approver' },
+      { do: 'capture', mode: 'guest', testid: 'approver-account', attr: 'data-value', as: 'approver' },
       {
         do: 'api', call: { name: 'sandbox-admit', args: (c) => ({ approver: c.approver }) }, say: 'Adding this passkey as an approver of the sandbox company…', sim: true,
         retry: { while: (r) => r.status === 'pending-sync', everyMs: 10_000, maxMs: 180_000, say: 'Waiting for Whitechain to see your new role (~1 min)…' },
@@ -137,11 +137,11 @@ export const STORY: Step[] = [
       { do: 'fill', testid: 'm-cap', value: '0.30' },
       { do: 'fill', testid: 'm-expiry', value: in90days },
       { do: 'click', testid: 'm-prepare' },
-      { do: 'capture', testid: 'm-digest', as: 'mandate', say: () => '✓ The contract agrees with the mandate shown on this page.' },
+      { do: 'capture', testid: 'm-digest', attr: 'data-value', as: 'mandate', say: () => '✓ The contract agrees with the mandate shown on this page.' },
       { do: 'userTap', testid: 'm-approve', prompt: 'Your turn: tap "Approve with passkey" to sign the mandate (up to 0.30 USDT a period).', until: { enabled: 'm-submit' } },
       { do: 'click', testid: 'm-submit' },
       { do: 'waitFor', wait: { testid: 'm-tx' }, timeout: 120_000, say: 'Creating the mandate on Whitechain…' },
-      { do: 'capture', testid: 'm-tx', as: 'mandateCreated', tx: 'whitechain', say: (_v, c) => `✓ Mandate approved: ${c.supplierName || 'the supplier'} may collect up to 0.30 USDT a period` },
+      { do: 'capture', testid: 'm-tx', attr: 'href', inner: 'a', as: 'mandateCreated', tx: 'whitechain', say: (_v, c) => `✓ Mandate approved: ${c.supplierName || 'the supplier'} may collect up to 0.30 USDT a period` },
       { do: 'api', call: { name: 'counterparty', args: (c) => ({ action: 'collect', mandate: (c.mandate.match(/0x[0-9a-fA-F]{64}/) ?? [''])[0] }) }, say: 'Simulated counterparty: Bluejay collects under the mandate…', sim: true },
     ],
   },

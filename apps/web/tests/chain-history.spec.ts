@@ -61,7 +61,7 @@ test('a payment made on another device shows on /pay/ and in the invoice drawer 
 
   await page.goto(link.replace('http://localhost:4173', ''));
   const tl = page.getByTestId('pay-timeline');
-  await expect(tl.locator('li[data-kind="paid"]')).toContainText('INV-20261106-C0DE paid: 2.5 USDT from Acme Industries to Bluejay Logistics');
+  await expect(tl.locator('li[data-kind="paid"]')).toContainText('INV-20261106-C0DE paid: 2.50 USDT from Acme Industries to Bluejay Logistics');
   await expect(tl.locator('li[data-kind="paid"]')).toContainText('on-chain');
   await expect(tl.locator('li[data-kind="paid"] a')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${PAID_TX}`);
   await expect(tl.locator('li[data-tone="pending"]')).toHaveCount(0);

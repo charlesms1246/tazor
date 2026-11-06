@@ -10,7 +10,7 @@ const IH = keccak256(toBytes('financing e2e invoice'));
 test('/financing/ commit calldata is right', async ({ page }) => {
   await mockV2(page, {});
   await onboard(page);
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
 
   await page.goto('/financing/');
   await page.getByTestId('fin-hash').fill(IH);
@@ -44,9 +44,9 @@ test('/financing/ claim view, list, buy and settle calldata are right', async ({
   await page.goto('/financing/');
   await page.getByTestId('claim-id').fill(id.toString());
   await page.getByTestId('claim-view').click();
-  await expect(page.getByTestId('claim-owner')).toHaveText(HOLDER);
-  await expect(page.getByTestId('claim-amount')).toHaveText('2 USDT');
-  await expect(page.getByTestId('claim-price')).toHaveText('1.9 USDT');
+  await expect(page.getByTestId('claim-owner')).toHaveAttribute('data-value', HOLDER);
+  await expect(page.getByTestId('claim-amount')).toHaveText('2.00 USDT');
+  await expect(page.getByTestId('claim-price')).toHaveText('1.90 USDT');
 
   await page.getByTestId('list-price').fill('1.9');
   await page.getByTestId('claim-list').click();

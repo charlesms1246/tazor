@@ -22,13 +22,13 @@ test('/pay/ for a v2 company signs for PaymentModuleV2 (domain v2) and builds pa
     exitAccounts: [], exitDelay: 0,
   } });
   await onboard(page);
-  await expect(page.getByTestId('approver-account')).toHaveText(APPROVER_ACCOUNT);
+  await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
 
   const { nonce, expiry } = defaultAuthParams(invoice);
   const auth = buildInvoiceAuth(invoice, nonce, expiry);
   await page.goto((await encodeInvoiceLink(invoice, 'http://x')).replace('http://x', ''));
-  await expect(page.getByTestId('v2-account')).toContainText(PM2);
-  await expect(page.getByTestId('guard-ok')).toContainText(invoiceAuthDigestV2(auth, { chainId: 1874, verifyingContract: PM2 }));
+  await expect(page.getByTestId('v2-account')).toHaveAttribute('data-module', PM2);
+  await expect(page.getByTestId('guard-ok')).toHaveAttribute('data-digest', invoiceAuthDigestV2(auth, { chainId: 1874, verifyingContract: PM2 }));
 
   await page.getByTestId('approve').click();
   await page.getByTestId('pay-as-agent').click();
@@ -59,14 +59,14 @@ test('/pay/ for a v2 company signs for PaymentModuleV2 (domain v2) and builds pa
   });
   await expect(page.getByTestId('pay-step-2')).toHaveAttribute('data-state', 'done');
   await page.getByTestId('pay').click();
-  await expect(page.getByTestId('tx')).toContainText(TX);
+  await expect(page.getByTestId('tx')).toHaveAttribute('data-tx', TX);
   expect(getAddress(relayed.account!)).toBe(ACCOUNT);
   expect(BigInt(relayed.auth!.nonce!)).toBe(nonce);
-  await expect(page.getByTestId('pay-success-amount')).toHaveText('Paid 1 USDT to Bluejay');
+  await expect(page.getByTestId('pay-success-amount')).toHaveText('Paid 1.00 USDT to Bluejay');
   await expect(page.getByTestId('pay-success-time')).toContainText(/Settled on Whitechain in \d+\.\d s/);
   await expect(page.getByTestId('pay-success-tx')).toHaveAttribute('href', `https://explorer.testnet.whitechain.io/tx/${TX}`);
   for (const n of [1, 2, 3, 4]) await expect(page.getByTestId(`pay-step-${n}`)).toHaveAttribute('data-state', 'done');
   await expect(page.getByTestId('paper-stamp')).toHaveText('PAID');
-  await expect(page.getByTestId('toast').filter({ hasText: 'Paid 1 USDT to Bluejay' })).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: 'Paid 1.00 USDT to Bluejay' })).toBeVisible();
   await expect(page.getByTestId('pay-back')).toHaveAttribute('href', '/invoices/');
 });

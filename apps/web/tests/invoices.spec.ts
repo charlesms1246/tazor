@@ -29,7 +29,7 @@ test('/invoices/: create an invoice, and its link opens /pay/ with that invoice 
   await page.getByTestId('inv-memo').fill('PO 77');
 
   await page.getByTestId('inv-create').click();
-  const link = (await page.getByTestId('inv-link').textContent())!;
+  const link = (await page.getByTestId('inv-link').getAttribute('data-link'))!;
   expect(link).toMatch(/^http:\/\/localhost:4173\/pay\/#v1\./);
   await expect(page.getByTestId('inv-row')).toHaveCount(1);
   await expect(page.getByTestId('inv-status')).toHaveText('Sent');
