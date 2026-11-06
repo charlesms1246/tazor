@@ -2,16 +2,11 @@ import { DocPage, Note, Simulated, Steps } from '../_doc.tsx';
 
 const example = `<script src="./tazor-pay.js"></script>
 <tazor-pay-button
-  supplier-name="Bluejay Logistics"
-  payee="0xc1dce946D192e344251972470237F1471C93876c"
-  buyer="0xb99A12652BEe98429ae31EA0529A0b63f1073721"
-  lines='[
-    {"description":"Freight Mumbai → Pune, 20 ft container","unitPrice":"1.20"},
-    {"description":"Customs handling","quantity":2,"unitPrice":"0.15"},
-    {"description":"Cargo insurance","unitPrice":"0.05"}
-  ]'
-  memo="Order BJ-1042"
-  label="Pay 1.55 USDT with Tazor"></tazor-pay-button>
+  mode="wallet"
+  merchant="0xc1dce946D192e344251972470237F1471C93876c"
+  amount="0.20"
+  order-ref="BJ-1042"
+  label="Pay 0.20 USDT"></tazor-pay-button>
 <script>
   document.querySelector('tazor-pay-button').addEventListener('tazor-paid', (e) => {
     document.querySelector('#order-status').textContent = 'Paid';
@@ -41,6 +36,13 @@ const stop = watchPayment({
 });`;
 
 const attrs: [string, string][] = [
+  ['mode', '"wallet" for wallet checkout (one EIP-3009 signature, no gas) with a "Pay from WhiteBIT or any exchange" option; leave it out for Tazor company invoices.'],
+  ['merchant', 'Wallet mode, required. The address that receives the USDT (and signs refunds).'],
+  ['amount', 'The USDT amount, e.g. "0.20" (up to 6 decimals). Required in wallet mode.'],
+  ['order-ref', 'Wallet mode, required. Your order number; it becomes the on-chain order reference.'],
+  ['deadline', 'Wallet mode. Minutes the customer has to pay (default 30).'],
+  ['deposit', 'Wallet mode. "false" hides "Pay from WhiteBIT or any exchange".'],
+  ['relayer', 'Wallet mode. The relayer that submits the signature (default Tazor\'s).'],
   ['supplier-name', 'Required. Your company name, shown on the invoice.'],
   ['payee', 'Required. The Whitechain address that receives the USDT.'],
   ['buyer', "Required. The customer's Tazor company account; its approvers approve and pay."],
@@ -58,6 +60,10 @@ const attrs: [string, string][] = [
 ];
 
 const api: [string, string][] = [
+  ['payOrder({ order, wallet })', 'Signs the order in any wallet (walletSigner(window.ethereum) or accountSigner(viemAccount)) and has the relayer submit it. Also refundOrder, subscribe, cancelSubscription, chargeSubscription, getOrder, watchOrder.'],
+  ['depositOrder({ merchant, amount, ref, refundTo })', 'The per-order address to send USDT to by plain transfer, read from TazorDepositCheckout; watchDeposit(order, onUpdate) follows it.'],
+  ['verifyWebhook(rawBody, header, secret)', 'Checks the Tazor-Signature header (t=…,v1=HMAC-SHA256) within ±300 s and returns the event.'],
+  ['payFetch(url, { account, maxValue })', 'For agents: pays an HTTP 402 (x402 exact, USDT on Whitechain) once, refusing anything above maxValue.'],
   ['createInvoiceLink(input)', 'Promise of { id, url, invoiceHash, amount, amountBaseUnits, invoice }. Input: supplierName, payee, buyerAccount, lines, dueDate (YYYY-MM-DD, Date or unix seconds), and optional supplierAccount, taxRate, taxLabel, memo, id, appUrl.'],
   ['watchPayment({ invoiceHash, onPaid, payee?, intervalMs?, explorer?, onError? })', 'Polls Whitechain every 4 s by default and calls onPaid({ txHash, amount, at, payer, payee, viaL1, explorerUrl }) once. Returns stop().'],
   ['isPaid(invoiceHash, opts?)', 'Promise of true once the invoice is paid.'],
@@ -67,6 +73,7 @@ const api: [string, string][] = [
 ];
 
 const events: [string, string][] = [
+  ['tazor-finality', 'Wallet mode: each finality stage of the payment, { orderId, stage: "pending" | "sequencer" | "ethereum" | "finalized" }.'],
   ['tazor-link', 'The payment link is ready: { id, url, invoiceHash, amount, invoice }. element.link is the same value as a promise, if you need it before your listener exists.'],
   ['tazor-paid', 'Paid on Whitechain: { txHash, amount, at, payer, payee, explorerUrl, invoiceHash, url, id }.'],
   ['tazor-error', 'Bad attributes or a failed link: { message }.'],
@@ -93,10 +100,11 @@ export default function Page() {
         writes <code>dist/index.js</code> (ES module) and <code>dist/tazor-pay.js</code> (one script for a{' '}
         <code>{'<script>'}</code> tag). The merchant demo in <code>examples/merchant-demo</code> already has a copy.
       </p>
-      <h2>The whole integration: 16 lines</h2>
+      <h2>The whole integration: 15 lines</h2>
       <p>
         This is the integration from the Bluejay Logistics demo: one script, one element, one listener. There is no build
-        step and no framework.
+        step and no framework. In <code>mode=&quot;wallet&quot;</code> the customer pays from any wallet holding USDT with one
+        signature (no gas, no WBT; Tazor&apos;s relayer submits it), or by a plain transfer from WhiteBIT or any exchange.
       </p>
       <pre><code>{example}</code></pre>
       <h2>From code</h2>
