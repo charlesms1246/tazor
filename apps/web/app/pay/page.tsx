@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatEther, formatUnits, type Hex } from 'viem';
-import { type Invoice } from '@/lib/invoice.ts';
+import { invoiceHash, type Invoice } from '@/lib/invoice.ts';
 import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
 import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/invoice-auth.ts';
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
@@ -11,7 +11,7 @@ import { getRelayerUrl } from '@/lib/relayer-url.ts';
 import { counterfactualApproval, unwrap6492 } from '@/lib/erc6492.ts';
 import { ethCall, getBlockTimestamp, getReceipt, rpc } from '@/lib/rpc.ts';
 import { encodeForward, estimateForwardFee, findInvoicePaidViaL1, sendWithInjectedWallet } from '@/lib/ensgate.ts';
-import { appendPayment, loadPasskey } from '@/lib/storage.ts';
+import { appendPayment, loadPasskey, loadPayments } from '@/lib/storage.ts';
 import { verifyCompany, type CompanyVerification } from '@/lib/soul.ts';
 import {
   decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals, parseApprovals,
@@ -21,6 +21,7 @@ import { configV2 } from '@/lib/config-v2.ts';
 import { encodePayAsAgent, encodePayOneV2, isV2Account, v2Digest } from '@/lib/pay-v2.ts';
 import { Addr, Card, Field, Notice, PageHeader, Pill } from '../_ui/index.tsx';
 import { NoLink } from './no-link.tsx';
+import { InvoicePaper, paperFromInvoice } from '../_invoice/paper.tsx';
 
 type Loaded = { invoice: Invoice; auth: InvoiceAuth };
 type L1 = { data: Hex; gas?: bigint; fee?: bigint; feeError?: string; hash?: Hex; started?: number; fromBlock?: bigint; l2Tx?: Hex; seconds?: number };
@@ -43,6 +44,7 @@ export default function PayPage() {
   const [l1, setL1] = useState<L1 | null>(null);
   const [supplier, setSupplier] = useState<CompanyVerification | 'checking' | 'error'>('checking');
   const [v2, setV2] = useState<boolean | null>(null);
+  const [paidBefore, setPaidBefore] = useState<Hex | null>(null);
 
   useEffect(() => {
     const load = () => (location.hash.length <= 1 ? Promise.resolve(setState('none')) :
@@ -56,6 +58,13 @@ export default function PayPage() {
     addEventListener('hashchange', load);
     return () => removeEventListener('hashchange', load);
   }, []);
+
+  useEffect(() => {
+    if (typeof state !== 'object') return;
+    const h = invoiceHash(state.invoice);
+    const hit = loadPayments().find((p) => { try { return invoiceHash(p.invoice) === h; } catch { return false; } });
+    setPaidBefore((hit?.txHash as Hex | undefined) ?? null);
+  }, [state]);
 
   useEffect(() => {
     if (typeof state !== 'object') return;
@@ -210,6 +219,7 @@ export default function PayPage() {
 
   const pm = (v2 ? configV2.paymentModule : config.paymentModule) ?? '(not configured)';
   const explorer = (a: string) => `${config.explorer}/address/${a}`;
+  const paidTx = (tx?.status === 'success' ? tx.hash : null) ?? l1?.l2Tx ?? paidBefore;
 
   return (
     <div className="page">
@@ -219,54 +229,32 @@ export default function PayPage() {
       />
       {v2 && <Notice tone="info" testId="v2-account">v2 company: signed for PaymentModuleV2 <span className="mono break">{configV2.paymentModule}</span> (EIP-712 domain version 2).</Notice>}
 
-      <div className="grid-2">
+      <div className="pay-split">
         <div className="stack">
-          <Card title="Invoice" subtitle="Decrypted from the link on this device; nothing was sent to a server.">
-            <dl className="kv">
-              <dt>From</dt>
-              <dd>
-                <span className="stack" style={{ gap: 4 }}>
-                  <span>{i.supplierName}</span>
-                  <Addr value={i.supplierAccount} href={explorer(i.supplierAccount)} />
-                  <span>
-                    {supplier === 'checking' ? <Pill testId="supplier-checking">checking…</Pill>
-                      : typeof supplier === 'object' && supplier.verified
-                        ? <span title={`admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT (simulated on testnet)</Pill></span>
-                        : <Pill testId="supplier-unverified">Not verified</Pill>}
-                  </span>
-                </span>
-              </dd>
-              <dt>Pay to</dt><dd><Addr value={i.payee} href={explorer(i.payee)} /></dd>
-              <dt>Buyer account</dt><dd><Addr value={i.buyerAccount} href={explorer(i.buyerAccount)} /></dd>
-              <dt>Token</dt><dd><Addr value={i.token} href={explorer(i.token)} /></dd>
-              <dt>Amount</dt><dd className="num" data-testid="amount">{amt(i.amount)}</dd>
-              <dt>Due</dt><dd className="num">{day(i.dueDate)}</dd>
-              <dt>Memo</dt><dd>{i.memo || <span className="faint">None</span>}</dd>
-              <dt>invoiceHash</dt><dd><span className="mono break" data-testid="invoice-hash">{auth.invoiceHash}</span></dd>
-              <dt>Approval valid until</dt><dd className="num">{day(auth.expiry)}</dd>
-            </dl>
-          </Card>
-
-          <Card title="Lines" flush>
-            <div className="table-wrap"><table className="table table-stack">
-              <thead><tr><th>Description</th><th className="num">Qty</th><th className="num">Unit price</th><th className="num">Total</th></tr></thead>
-              <tbody>
-                {i.lines.map((l, n) => (
-                  <tr key={n}>
-                    <td>{l.description}</td>
-                    <td className="num">{l.quantity.toString()}</td>
-                    <td className="num">{amt(l.unitPrice)}</td>
-                    <td className="num">{amt(l.quantity * l.unitPrice)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-          </Card>
+          <InvoicePaper invoice={paperFromInvoice(i)} status={paidTx ? 'paid' : 'sent'} link={location.href} txHash={paidTx} />
+          <p className="small muted">Decrypted from the link on this device; nothing was sent to a server.</p>
         </div>
 
-        <div className="stack">
+        <div className="stack paper-sticky">
           <Card title="Approve and pay" subtitle="Approvers sign the invoice digest; anyone can submit the payment.">
             <div className="stack">
+              <dl className="kv">
+                <dt>From</dt>
+                <dd>
+                  <span className="stack" style={{ gap: 4 }}>
+                    <span>{i.supplierName}</span>
+                    <Addr value={i.supplierAccount} href={explorer(i.supplierAccount)} />
+                    <span>
+                      {supplier === 'checking' ? <Pill testId="supplier-checking">checking…</Pill>
+                        : typeof supplier === 'object' && supplier.verified
+                          ? <span title={`admin ${supplier.admin}, soul ${supplier.soulId}`}><Pill tone="positive" testId="supplier-verified">✓ Verified by WhiteBIT (simulated on testnet)</Pill></span>
+                          : <Pill testId="supplier-unverified">Not verified</Pill>}
+                    </span>
+                  </span>
+                </dd>
+                <dt>Amount</dt><dd className="num" data-testid="amount">{amt(i.amount)}</dd>
+                <dt>Due</dt><dd className="num">{day(i.dueDate)}</dd>
+              </dl>
               {guard.status === 'checking' && <Notice testId="guard-checking">Checking what you will sign against the contract…</Notice>}
               {guard.status === 'refused' && <Notice tone="negative" testId="guard-refused">Refusing to sign: {guard.reason}</Notice>}
               {guard.status === 'ok' && <Notice tone="positive" testId="guard-ok">The contract digest matches this invoice: <span className="mono break">{guard.digest}</span></Notice>}
@@ -300,12 +288,7 @@ export default function PayPage() {
               {(calldata || l1) && pendingDeploys.map((u) => (
                 <Notice key={u.factoryCalldata} tone="warning" testId="deploy-first">Not deployed yet: first send to the ApproverAccountFactory <span className="mono">{u.factory}</span>: <code className="mono break">{u.factoryCalldata}</code></Notice>
               ))}
-              {calldata && (
-                <div className="well">
-                  <p className="small muted">Send this calldata to PaymentModule <span className="mono">{pm}</span> from any wallet on Whitechain</p>
-                  <code data-testid="calldata-out" className="mono break">{calldata}</code>
-                </div>
-              )}
+              {calldata && <p className="small muted">Calldata ready: see Technical details below.</p>}
             </div>
           </Card>
 
@@ -334,10 +317,7 @@ export default function PayPage() {
                     <button data-testid="copy-l1" className="btn" onClick={() => navigator.clipboard?.writeText(JSON.stringify({ to: gate, data: l1.data })).catch(() => undefined)}>Copy calldata</button>
                     <button data-testid="watch-l1" className="btn" onClick={onWatchL1} disabled={busy || !!l1.started}>I sent it myself, watch for delivery</button>
                   </div>
-                  <div className="well">
-                    <p className="small muted">Calldata for any wallet or Etherscan (to <span className="mono">{gate}</span>)</p>
-                    <code data-testid="l1-data" className="mono break">{l1.data}</code>
-                  </div>
+                  <p className="small muted">The raw calldata is under Technical details below.</p>
                   {l1.hash && <p>Ethereum tx <a href={`${config.sepolia.explorer}/tx/${l1.hash}`} target="_blank" rel="noreferrer" className="mono break">{l1.hash}</a></p>}
                   {l1.started && (
                     <Notice tone={l1.l2Tx ? 'positive' : 'info'} testId="l1-status">{l1.l2Tx
@@ -347,6 +327,33 @@ export default function PayPage() {
                 </div>
               )}
             </div>
+          </Card>
+
+          <Card>
+            <details className="tech-details" open={!!(calldata || l1)}>
+              <summary>Technical details</summary>
+              <div className="stack">
+                <dl className="kv">
+                  <dt>Pay to</dt><dd><Addr value={i.payee} href={explorer(i.payee)} /></dd>
+                  <dt>Buyer account</dt><dd><Addr value={i.buyerAccount} href={explorer(i.buyerAccount)} /></dd>
+                  <dt>Token</dt><dd><Addr value={i.token} href={explorer(i.token)} /></dd>
+                  <dt>invoiceHash</dt><dd><span className="mono break" data-testid="invoice-hash">{auth.invoiceHash}</span></dd>
+                  <dt>Approval valid until</dt><dd className="num">{day(auth.expiry)}</dd>
+                </dl>
+                {calldata && (
+                  <div className="well">
+                    <p className="small muted">Send this calldata to PaymentModule <span className="mono">{pm}</span> from any wallet on Whitechain</p>
+                    <code data-testid="calldata-out" className="mono break">{calldata}</code>
+                  </div>
+                )}
+                {l1 && (
+                  <div className="well">
+                    <p className="small muted">Calldata for any wallet or Etherscan (to <span className="mono">{gate}</span>)</p>
+                    <code data-testid="l1-data" className="mono break">{l1.data}</code>
+                  </div>
+                )}
+              </div>
+            </details>
           </Card>
         </div>
       </div>
