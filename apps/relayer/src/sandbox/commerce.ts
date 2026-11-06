@@ -12,11 +12,12 @@ import type { SandboxConfig } from './config.ts';
 import type { ActionResult, SandboxPorts } from './service.ts';
 import { SandboxRefused, txUrl } from './service.ts';
 
-export const COMMERCE_ACTIONS = ['checkout-customer-pay', 'checkout-merchant-refund', 'deposit-customer-pay', 'agent-x402'] as const;
+export const COMMERCE_ACTIONS = ['checkout-customer-pay', 'checkout-merchant-refund', 'deposit-customer-pay', 'agent-x402', 'fund-demo-wallet'] as const;
 export type CommerceAction = (typeof COMMERCE_ACTIONS)[number];
 
 /** Each action spends real test USDT and gas, so each has its own daily cap (per server instance). */
-export const COMMERCE_DAILY_CAP: Record<CommerceAction, number> = { 'checkout-customer-pay': 40, 'checkout-merchant-refund': 40, 'deposit-customer-pay': 30, 'agent-x402': 60 };
+export const COMMERCE_DAILY_CAP: Record<CommerceAction, number> = { 'checkout-customer-pay': 40, 'checkout-merchant-refund': 40, 'deposit-customer-pay': 30, 'agent-x402': 60, 'fund-demo-wallet': 60 };
+const DEMO_WALLET_TOPUP = 300_000n; // 0.30 USDT
 const CUSTOMER_PAYMENT = 120_000n; // 0.12 USDT
 const AGENT_PAYMENT = 10_000n;     // 0.01 USDT, the demo resource's price
 const MAX_ORDER = 1_000_000n;
@@ -77,7 +78,24 @@ export function createCommerce(o: {
   const res = (action: CommerceAction, status: string, tx: Hex | null, detail: string, extra: Record<string, unknown>): ActionResult =>
     ({ action, status, tx, chain: 'whitechain', explorerUrl: txUrl('whitechain', tx), detail, ...extra });
 
+  const funded = new Map<string, number>();
   const handlers: Record<CommerceAction, (q: Record<string, unknown>) => Promise<ActionResult>> = {
+    /** A wallet created inside a demo page (no extension, testnet only) gets 0.30 test USDT once a day to pay with. */
+    async 'fund-demo-wallet'(q) {
+      if (typeof q.address !== 'string' || !isAddress(q.address)) throw new BadRequest('address must be an address');
+      const who = getAddress(q.address);
+      const day = Math.floor(p.now() / 86_400_000);
+      if (funded.get(who) === day) throw new SandboxRefused('this demo wallet was already topped up today');
+      const bal = await p.read<bigint>('whitechain', token, erc20Abi, 'balanceOf', [who]);
+      if (bal >= DEMO_WALLET_TOPUP) return res('fund-demo-wallet', 'enough', null, `The demo wallet already holds ${usdt(bal)}`, { address: who, balance: bal.toString() });
+      cap('fund-demo-wallet');
+      await o.budget?.();
+      await supplierHas(DEMO_WALLET_TOPUP - bal);
+      funded.set(who, day);
+      const tx = await fund(who, DEMO_WALLET_TOPUP - bal);
+      return res('fund-demo-wallet', 'funded', tx, `The demo wallet received ${usdt(DEMO_WALLET_TOPUP - bal)} of test USDT (no WBT)`, { address: who, txHash: tx });
+    },
+
     /** A customer with USDT and no WBT pays an order with one signature (EIP-3009); the relayer submits. */
     async 'checkout-customer-pay'(q) {
       if (!o.checkout) throw new SandboxRefused('checkout is not configured on this relayer');
