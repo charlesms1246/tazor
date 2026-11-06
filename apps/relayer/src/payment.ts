@@ -11,17 +11,17 @@ export type PayRequest = { account: Address; auth: InvoiceAuth; approvers: Addre
 export class BadRequest extends Error {}
 
 const UINT64_MAX = (1n << 64n) - 1n;
-const UINT256_MAX = (1n << 256n) - 1n;
+export const UINT256_MAX = (1n << 256n) - 1n;
 
-const addr = (v: unknown, f: string): Address => {
+export const addr = (v: unknown, f: string): Address => {
   try { return getAddress(v as string); } catch { throw new BadRequest(`${f} must be an address`); }
 };
-const hex = (v: unknown, f: string, bytes?: number): Hex => {
+export const hex = (v: unknown, f: string, bytes?: number): Hex => {
   if (typeof v !== 'string' || !isHex(v, { strict: true }) || v.length % 2 !== 0) throw new BadRequest(`${f} must be hex`);
   if (bytes !== undefined && v.length !== 2 + bytes * 2) throw new BadRequest(`${f} must be ${bytes} bytes`);
   return v;
 };
-const uint = (v: unknown, f: string, max: bigint): bigint => {
+export const uint = (v: unknown, f: string, max: bigint): bigint => {
   if (!((typeof v === 'string' && /^(0|[1-9]\d*|0x[0-9a-fA-F]+)$/.test(v)) || (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0))) {
     throw new BadRequest(`${f} must be a non-negative integer (decimal string)`);
   }

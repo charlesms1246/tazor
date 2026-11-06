@@ -34,7 +34,7 @@ export function encodeBackupApproval(eoa: Address, sig65: Hex): Hex {
   return encodeApproval(backupSigner(eoa), sig65);
 }
 
-export async function signInvoiceAuthWithPasskey(
+export async function signDigestWithPasskey(
   credentialId: string,
   digest: Hex,
   key: { verifier: Address; x: Hex; y: Hex },
@@ -44,3 +44,5 @@ export async function signInvoiceAuthWithPasskey(
   const sig = await signChallenge(credentialId, challenge as Uint8Array<ArrayBuffer>);
   return encodePasskeyApproval(key.verifier, key.x, key.y, sig);
 }
+
+export const signInvoiceAuthWithPasskey = signDigestWithPasskey;

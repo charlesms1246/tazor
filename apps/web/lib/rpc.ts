@@ -16,3 +16,6 @@ export const ethCall = (to: Address, data: Hex) => rpc<Hex>('eth_call', [{ to, d
 
 export type Receipt = { status: Hex; blockNumber: Hex; transactionHash: Hex } | null;
 export const getReceipt = (hash: Hex) => rpc<Receipt>('eth_getTransactionReceipt', [hash]);
+
+export const getBlockTimestamp = async (blockNumber: Hex) =>
+  Number(BigInt((await rpc<{ timestamp: Hex }>('eth_getBlockByNumber', [blockNumber, false])).timestamp));

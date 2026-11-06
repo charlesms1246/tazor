@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { BadRequest, encodePayOne, parsePayRequest } from './payment.ts';
 import { SimulationFailed, type Sender } from './sender.ts';
 import { parseSigner, type ApproverDeployer } from './approver.ts';
+import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -21,7 +22,9 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new BadRequest('invalid JSON'); }
 }
 
-export function createHandler(deps: { sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer }) {
+export function createHandler(deps: {
+  sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer; revocationList?: `0x${string}`;
+}) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json', ...CORS }).end(JSON.stringify(body));
@@ -32,8 +35,13 @@ export function createHandler(deps: { sender?: Sender; paymentModule?: `0x${stri
       if (req.method === 'GET' && req.url === '/health') {
         return reply(200, {
           ok: true, relayer: deps.sender?.address ?? null, paymentModule: deps.paymentModule ?? null,
-          approverAccountFactory: deps.approvers?.factory ?? null,
+          approverAccountFactory: deps.approvers?.factory ?? null, revocationList: deps.revocationList ?? null,
         });
+      }
+      if (req.method === 'POST' && req.url === '/revoke') {
+        const data = encodeRevoke(parseRevokeRequest(await readJson(req)));
+        if (!deps.sender || !deps.revocationList) return reply(503, { error: 'relayer not configured', to: deps.revocationList ?? null, data });
+        return reply(200, { txHash: await deps.sender.send(deps.revocationList, data) });
       }
       if (req.method === 'POST' && req.url === '/approver') {
         const a = deps.approvers;

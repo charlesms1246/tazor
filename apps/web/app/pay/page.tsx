@@ -7,8 +7,8 @@ import { decodeInvoiceLink } from '@/lib/invoice-link.ts';
 import { buildInvoiceAuth, invoiceAuthDigest, type InvoiceAuth } from '@/lib/invoice-auth.ts';
 import { signInvoiceAuthWithPasskey } from '@/lib/approver-signature.ts';
 import { config } from '@/lib/config.ts';
-import { ethCall, getReceipt } from '@/lib/rpc.ts';
-import { loadPasskey } from '@/lib/storage.ts';
+import { ethCall, getBlockTimestamp, getReceipt } from '@/lib/rpc.ts';
+import { appendPayment, loadPasskey } from '@/lib/storage.ts';
 import {
   decodeInvoiceDigest, defaultAuthParams, encodeInvoiceDigestCall, encodePayOne, mergeApprovals, parseApprovals,
   relayerBody, serializeApproval, type Approval,
@@ -64,11 +64,15 @@ export default function PayPage() {
     const t = setInterval(async () => {
       try {
         const r = await getReceipt(tx.hash);
-        if (r) setTx({ ...tx, seconds: (Date.now() - tx.started) / 1000, status: r.status === '0x1' ? 'success' : 'reverted' });
+        if (!r) return;
+        setTx({ ...tx, seconds: (Date.now() - tx.started) / 1000, status: r.status === '0x1' ? 'success' : 'reverted' });
+        if (r.status === '0x1' && typeof state === 'object') {
+          appendPayment({ invoice: state.invoice, txHash: tx.hash, blockTimestamp: await getBlockTimestamp(r.blockNumber) });
+        }
       } catch { /* keep polling */ }
     }, 1000);
     return () => clearInterval(t);
-  }, [tx]);
+  }, [tx, state]);
 
   if (state === 'loading') return <main>Decrypting invoice…</main>;
   if (state === 'invalid') return <main><h1 data-testid="invalid">Invalid or tampered link</h1></main>;
@@ -163,6 +167,7 @@ export default function PayPage() {
         <p data-testid="tx">
           Transaction <a href={`${config.explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.hash}</a>{' '}
           {tx.seconds === undefined ? 'pending…' : `${tx.status} in ${tx.seconds.toFixed(1)} s`}
+          {tx.status === 'success' && <> · <a href="/export/">Export for accounting</a></>}
         </p>
       )}
       {calldata && (
