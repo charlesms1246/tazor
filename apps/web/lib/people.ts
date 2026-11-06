@@ -5,6 +5,7 @@ import { ROLE_AGENT, ROLE_APPROVER, ROLE_TAZOR_ADMIN, decodeConfigV2, encodeConf
 import { decodeIsRevoked, encodeIsRevokedCall } from './revoke.ts';
 import { rpc } from './rpc.ts';
 import { verifiedSoulOf } from './soul.ts';
+import { cachedDirectory, ensLabelOf, refreshDirectory, type Directory, type DirectoryMember } from './ens-directory.ts';
 
 export type Person = {
   address: Address; label: string; roles: string[];
@@ -17,6 +18,10 @@ export type Person = {
   /** Raw role bitmaps: live ENS (source of truth) and Whitechain's role cache; undefined if unreadable. */
   ensBits?: bigint;
   cacheBits?: bigint;
+  /** Where the label came from: ENS (a member's name text, subname or primary name), the static fallback, or the address. */
+  labelSource?: 'ens' | 'fallback' | 'address';
+  /** The person's ENS subname under the company, if any. */
+  ensName?: string;
 };
 
 /** Ethereum (Sepolia) block time used to turn L1 block distance into seconds. */
@@ -58,7 +63,20 @@ export const DEMO_PEOPLE: Record<string, Address[]> = {
   ],
 };
 
-export const labelOf = (a: Address): string => KNOWN_PEOPLE[a.toLowerCase()] ?? `${a.slice(0, 6)}…${a.slice(-4)}`;
+const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const isShort = (label: string) => /^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/.test(label);
+
+/** A person's label and its source: ENS first, then the static demo labels, then the short address. */
+export function labelInfo(a: Address, member?: DirectoryMember | null, d: Directory | null = cachedDirectory()): { label: string; source: 'ens' | 'fallback' | 'address' } {
+  const fromMember = member && !isShort(member.label) ? member.label : null;
+  const ens = fromMember ?? ensLabelOf(a, d);
+  if (ens && !isShort(ens)) return { label: ens, source: 'ens' };
+  const fb = KNOWN_PEOPLE[a.toLowerCase()];
+  if (fb) return { label: fb, source: 'fallback' };
+  return { label: shortAddr(a), source: 'address' };
+}
+
+export const labelOf = (a: Address): string => labelInfo(a).label;
 
 export const roleList = (bits: bigint): string[] =>
   [bits & ROLE_APPROVER ? 'Approver' : '', bits & ROLE_TAZOR_ADMIN ? 'Admin' : '', bits & ROLE_AGENT ? 'Agent' : ''].filter(Boolean);
@@ -149,7 +167,13 @@ export async function companyRegistry(account: Address): Promise<{ registry: Add
 /** Everyone who acts for a company: its admin signers plus the known demo people, with roles and status. */
 export async function loadPeople(account: Address): Promise<Person[]> {
   const admins = await adminSigners(account).catch(() => [] as Address[]);
-  const all = uniqueAddresses([...admins, ...(DEMO_PEOPLE[account.toLowerCase()] ?? [])]);
+  const dir = await refreshDirectory().catch(() => null);
+  const company = dir?.companies.find((c) => c.account?.toLowerCase() === account.toLowerCase());
+  const members = (company && dir?.members[company.label]) || [];
+  const memberOf = (a: Address) => members.find((m) => m.address.toLowerCase() === a.toLowerCase()) ?? null;
+  // ENS members are the source of truth; the demo list only fills in when ENS lists nobody for this company.
+  const candidates = members.length ? members.map((m) => m.address) : DEMO_PEOPLE[account.toLowerCase()] ?? [];
+  const all = uniqueAddresses([...admins, ...candidates]);
   const [reg, l1Now] = await Promise.all([companyRegistry(account), l1BlockNumber()]);
   const views: ApproverView[] = reg
     ? await readApprovers(account, reg.registry, reg.revocationList, all, admins)
@@ -160,8 +184,11 @@ export async function loadPeople(account: Address): Promise<Person[]> {
       soul = await verifiedSoulOf(config.wbSoulMirror, v.approver).then((id) => (id === null ? 'unverified' : 'verified'), () => 'unknown' as const);
     }
     const age = cacheAgeSeconds(v.cachedAt, l1Now);
+    const m = memberOf(v.approver);
+    const info = labelInfo(v.approver, m, dir);
     return {
-      address: v.approver, label: labelOf(v.approver), roles: rolesFor(v), soul, whitechain: whitechainStatus(v, l1Now),
+      address: v.approver, label: info.label, labelSource: info.source, ...(m?.ens ? { ensName: m.ens } : {}),
+      roles: rolesFor(v), soul, whitechain: whitechainStatus(v, l1Now),
       ...(v.cachedAt !== null ? { cachedAt: Number(v.cachedAt) } : {}), ...(age !== null ? { cacheAgeSec: age } : {}),
       ...(v.ens !== null ? { ensBits: v.ens } : {}), ...(v.cached !== null ? { cacheBits: v.cached } : {}),
     };

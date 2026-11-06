@@ -1,4 +1,5 @@
 import { getAddress, type Address } from 'viem';
+import { ensLabelOf } from './ens-directory.ts';
 
 export type Transfer = { id: string; time: string; from: Address; to: Address; amount: bigint; txHash: string; incoming: boolean };
 
@@ -43,4 +44,5 @@ export const KNOWN: Record<string, string> = {
   '0xb99a12652bee98429ae31ea0529a0b63f1073721': 'acme.taz0r.eth',
   '0xce4389acb79463062c362facb8cb04513fa3d8d8': 'Tazor test treasury',
 };
-export const nameOf = (a: string): string | null => KNOWN[a.toLowerCase()] ?? null;
+/** ENS name from the cached directory (company names and member labels), then the static demo names. */
+export const nameOf = (a: string): string | null => ensLabelOf(a) ?? KNOWN[a.toLowerCase()] ?? null;
