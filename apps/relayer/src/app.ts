@@ -4,6 +4,11 @@ import { SimulationFailed, type Sender } from './sender.ts';
 import { parseSigner, type ApproverDeployer } from './approver.ts';
 import { encodeRevoke, parseRevokeRequest } from './revoke.ts';
 import { encodeCreateMandate, encodePull, parseMandateRequest, parsePullRequest } from './mandate.ts';
+import type { PublicClient } from 'viem';
+import { PAYMENT_MODULE_V2, parsePayRunRequest, preparePayRun } from './payrun.ts';
+import { preparePayOne } from './pay-counterfactual.ts';
+import { REVOCATION_LIST_V2, pickRevocationList } from './revoke-list.ts';
+import { ENTRY_POINT_V08, RpcError, encodeHandleOps, parseUserOp, paymasterRpc } from './userop.ts';
 
 const MAX_BODY = 64 * 1024;
 const CORS = {
@@ -25,7 +30,8 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 export function createHandler(deps: {
   sender?: Sender; paymentModule?: `0x${string}`; approvers?: ApproverDeployer; revocationList?: `0x${string}`;
-  mandateModule?: `0x${string}`;
+  mandateModule?: `0x${string}`; client?: PublicClient; paymentModuleV2?: `0x${string}`; revocationListV2?: `0x${string}`;
+  paymaster?: `0x${string}`; chainId?: number;
 }) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -48,9 +54,11 @@ export function createHandler(deps: {
         return reply(200, { txHash: await deps.sender.send(deps.mandateModule, data) });
       }
       if (req.method === 'POST' && req.url === '/revoke') {
-        const data = encodeRevoke(parseRevokeRequest(await readJson(req)));
-        if (!deps.sender || !deps.revocationList) return reply(503, { error: 'relayer not configured', to: deps.revocationList ?? null, data });
-        return reply(200, { txHash: await deps.sender.send(deps.revocationList, data) });
+        const json = await readJson(req);
+        const data = encodeRevoke(parseRevokeRequest(json));
+        const list = pickRevocationList(json, deps.revocationList, deps.revocationListV2 ?? REVOCATION_LIST_V2);
+        if (!deps.sender || !list) return reply(503, { error: 'relayer not configured', to: list ?? null, data });
+        return reply(200, { txHash: await deps.sender.send(list, data) });
       }
       if (req.method === 'POST' && req.url === '/approver') {
         const a = deps.approvers;
@@ -62,10 +70,40 @@ export function createHandler(deps: {
         return reply(200, { account, txHash: await deps.sender.send(a.factory, a.createCalldata(signer)) });
       }
       if (req.method === 'POST' && (req.url === '/pay' || req.url === '/pay/calldata')) {
-        const data = encodePayOne(parsePayRequest(await readJson(req)));
+        const parsed = parsePayRequest(await readJson(req));
+        const data = encodePayOne(parsed);
         if (req.url === '/pay/calldata') return reply(200, { to: deps.paymentModule ?? null, data });
         if (!deps.sender || !deps.paymentModule) return reply(503, { error: 'relayer not configured; submit /pay/calldata yourself' });
-        return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
+        if (!deps.client || !deps.approvers) return reply(200, { txHash: await deps.sender.send(deps.paymentModule, data) });
+        const p = await preparePayOne(deps.client, deps.approvers.factory, deps.paymentModule, parsed);
+        const deployTxs = [];
+        for (const d of p.deploys) deployTxs.push(await deps.sender.send(d.to, d.data));
+        return reply(200, { txHash: await deps.sender.send(deps.paymentModule, p.data), deployTxs });
+      }
+      if (req.method === 'POST' && req.url === '/payrun') {
+        const parsed = parsePayRunRequest(await readJson(req));
+        if (!deps.sender || !deps.paymentModule || !deps.client || !deps.approvers) return reply(503, { error: 'relayer not configured; use Copy calldata' });
+        const p = await preparePayRun(deps.client, deps.approvers.factory, deps.paymentModule, deps.paymentModuleV2 ?? PAYMENT_MODULE_V2, parsed);
+        const deployTxs = [];
+        for (const d of p.deploys) deployTxs.push(await deps.sender.send(d.to, d.data));
+        return reply(200, { txHash: await deps.sender.send(p.to, p.data), paymentModule: p.to, deployTxs });
+      }
+      if (req.method === 'POST' && req.url === '/rpc') {
+        const body = (await readJson(req)) as { id?: unknown; method?: unknown; params?: unknown } | null;
+        const id = body?.id ?? null;
+        try {
+          const result = await paymasterRpc(String(body?.method), body?.params, { paymaster: deps.paymaster, chainId: deps.chainId ?? 1874, client: deps.client });
+          return reply(200, { jsonrpc: '2.0', id, result });
+        } catch (e) {
+          if (!(e instanceof RpcError)) throw e;
+          return reply(200, { jsonrpc: '2.0', id, error: { code: e.code, message: e.message } });
+        }
+      }
+      if (req.method === 'POST' && req.url === '/userop') {
+        const body = (await readJson(req)) as { userOp?: unknown } | null;
+        const op = parseUserOp(body?.userOp, { requireSignature: true });
+        if (!deps.sender) return reply(503, { error: 'relayer not configured' });
+        return reply(200, { txHash: await deps.sender.send(ENTRY_POINT_V08, encodeHandleOps(op, deps.sender.address)) });
       }
       return reply(404, { error: 'not found' });
     } catch (e) {

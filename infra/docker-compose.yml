@@ -11,6 +11,7 @@ services:
       APPROVER_ACCOUNT_FACTORY: ${APPROVER_ACCOUNT_FACTORY:-}
       REVOCATION_LIST: ${REVOCATION_LIST:-}
       MANDATE_MODULE: ${MANDATE_MODULE:-}
+      PAYMASTER: ${PAYMASTER:-}
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]

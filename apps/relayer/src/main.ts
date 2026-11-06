@@ -21,6 +21,7 @@ const client = createPublicClient({ chain: whitechainSepolia, transport: http(rp
 const approvers = createApproverDeployer(client, approverFactory);
 const port = Number(process.env.PORT ?? 8787);
 
-createServer(createHandler({ sender, paymentModule, approvers, revocationList, mandateModule })).listen(port, '0.0.0.0', () => {
-  console.log(`relayer on :${port} chain ${whitechainSepolia.id} sender=${sender?.address ?? 'none'} paymentModule=${paymentModule} approverFactory=${approverFactory} revocationList=${revocationList} mandateModule=${mandateModule}`);
+const paymaster = process.env.PAYMASTER ? getAddress(process.env.PAYMASTER) : undefined;
+createServer(createHandler({ sender, paymentModule, approvers, revocationList, mandateModule, client: client as never, paymaster, chainId: whitechainSepolia.id })).listen(port, '0.0.0.0', () => {
+  console.log(`relayer on :${port} chain ${whitechainSepolia.id} sender=${sender?.address ?? 'none'} paymentModule=${paymentModule} approverFactory=${approverFactory} revocationList=${revocationList} mandateModule=${mandateModule} paymaster=${paymaster ?? 'unset'}`);
 });
