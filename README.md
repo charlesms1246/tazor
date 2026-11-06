@@ -40,7 +40,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 
 **Beachhead: cross-border SMEs.** Small exporters and importers lose 1–3 business days, a 1–3% FX spread and wire fees on every SWIFT payment. With Tazor they settle in USDT in seconds, with refunds and books built in.
 
-**First merchant: Healthsoft, India.** I work with Healthsoft, and Tazor is built around its payment flows. Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
+**First merchant: Healthsoft, India.** I work with Healthsoft and have a strong connection to bring Tazor into its payment flow. That is where the pilot starts. Healthsoft imports components from China and exports packaged Remote Patient Monitoring systems worldwide. Every Tazor flow maps to its business:
 
 | Healthsoft needs to… | Tazor flow |
 |---|---|
