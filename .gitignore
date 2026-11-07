@@ -31,3 +31,4 @@ vendor/
 .taste-skill/
 examples/.deploy/
 !WHITECHAIN_FEEDBACK.md
+brag-output/
