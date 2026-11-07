@@ -170,21 +170,25 @@
         <p class="muted">Add 15 lines to your shop: one script, one button, one listener, no build step. No website? Share a payment link or a QR instead.</p>
         <p class="links"><a class="btn" href="https://bluejay-shop.vercel.app">Try the demo shop</a></p>
       </div>
-<pre class="glass code" data-reveal><code>&lt;script src="./tazor-pay.js"&gt;&lt;/script&gt;
-&lt;tazor-pay-button
-  mode="wallet" demo-wallet="true"
-  merchant="0xc1dce946D192e344251972470237F1471C93876c"
-  amount="0.20"
-  order-ref="BJ-1042"
-  label="Pay 0.20 USDT"&gt;&lt;/tazor-pay-button&gt;
-&lt;script&gt;
-  document.querySelector('tazor-pay-button').addEventListener('tazor-paid', (e) =&gt; {
-    document.querySelector('#order-status').textContent = 'Paid';
-    const tx = document.querySelector('#order-tx');
+<figure class="mac" data-reveal>
+        <div class="mac-bar" aria-hidden="true"><span class="mac-dot r"></span><span class="mac-dot y"></span><span class="mac-dot g"></span><span class="mac-title">checkout.html · bluejay-shop</span></div>
+<pre class="code mac-code"><code><span class="t-tag">&lt;script</span> <span class="t-attr">src</span>=<span class="t-str">&quot;./tazor-pay.js&quot;</span><span class="t-tag">&gt;&lt;/script&gt;</span>
+<span class="t-tag">&lt;tazor-pay-button</span>
+  <span class="t-attr">mode</span>=<span class="t-str">&quot;wallet&quot;</span> <span class="t-attr">demo-wallet</span>=<span class="t-str">&quot;true&quot;</span>
+  <span class="t-attr">merchant</span>=<span class="t-str">&quot;0xc1dce946D192e344251972470237F1471C93876c&quot;</span>
+  <span class="t-attr">amount</span>=<span class="t-str">&quot;0.20&quot;</span>
+  <span class="t-attr">order-ref</span>=<span class="t-str">&quot;BJ-1042&quot;</span>
+  <span class="t-attr">label</span>=<span class="t-str">&quot;Pay 0.20 USDT&quot;</span><span class="t-tag">&gt;&lt;/tazor-pay-button&gt;</span>
+<span class="t-tag">&lt;script&gt;</span>
+  document.querySelector(<span class="t-str">&#39;tazor-pay-button&#39;</span>).addEventListener(<span class="t-str">&#39;tazor-paid&#39;</span>, (e) =&gt; {
+    document.querySelector(<span class="t-str">&#39;#order-status&#39;</span>).textContent = <span class="t-str">&#39;Paid&#39;</span>;
+    <span class="t-key">const</span> tx = document.querySelector(<span class="t-str">&#39;#order-tx&#39;</span>);
     tx.href = e.detail.explorerUrl;
-    tx.hidden = false;
+    tx.hidden = <span class="t-key">false</span>;
   });
-&lt;/script&gt;</code></pre>
+<span class="t-tag">&lt;/script&gt;</span></code></pre>
+        <figcaption class="visually-hidden">The 15-line Tazor integration from the demo shop</figcaption>
+      </figure>
     </section>
 
     <!-- Who it is for -->

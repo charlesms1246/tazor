@@ -296,3 +296,15 @@ html[data-motion="on"] [data-ui], html[data-motion="on"] [data-hero-word] { opac
 .story[data-mode="stage"] .engine-head { margin-bottom: 96px; }
 .rail-label { display: none; }
 @media (min-width: 1560px) { .rail-label { display: block; } }
+
+/* the snippet in a macOS window */
+.mac { margin: 0; border-radius: 14px; overflow: hidden; background: #ffffff; border: 1px solid #dfe6f2;
+  box-shadow: 0 30px 60px -20px rgba(0, 40, 120, 0.28), 0 8px 18px -8px rgba(0, 40, 120, 0.16); min-width: 0; }
+.mac-bar { position: relative; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; background: #f3f6fb; border-bottom: 1px solid #e3e9f3; }
+.mac-dot { width: 12px; height: 12px; border-radius: 50%; }
+.mac-dot.r { background: #ff5f57; } .mac-dot.y { background: #febc2e; } .mac-dot.g { background: #28c840; }
+.mac-title { position: absolute; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 500; color: #5b6478; white-space: nowrap; }
+pre.mac-code { margin: 0; background: #ffffff; border: 0; border-radius: 0; box-shadow: none; padding: clamp(18px, 2.2vw, 28px); color: #1d2440; }
+.t-tag { color: #0066ff; } .t-attr { color: #0a0b1f; font-weight: 600; } .t-str { color: #0052cc; } .t-key { color: #0066ff; font-weight: 600; }
+@media (max-width: 760px) { .mac-title { display: none; } }
+@media (min-width: 761px) { .sec-code { grid-template-columns: 4fr 8fr; } pre.mac-code { font-size: clamp(11.5px, 0.9vw, 13.5px); } }
