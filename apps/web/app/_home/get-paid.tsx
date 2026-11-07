@@ -1,7 +1,7 @@
 import './get-paid.css';
 
 const STEPS: { n: string; title: string; benefit: string; href: string; cta: string; external?: boolean; testId: string }[] = [
-  { n: '1', title: 'Customer pays', benefit: 'One signature, no gas, no WBT', href: 'https://bluejay-shop.vercel.app', cta: 'Try the demo shop', external: true, testId: 'story-pay' },
+  { n: '1', title: 'Customer pays', benefit: 'One signature, no gas, no WBT', href: 'https://bluejay.charlesms.dev', cta: 'Try the demo shop', external: true, testId: 'story-pay' },
   { n: '2', title: 'Merchant refunds part of it', benefit: 'Only to the payer, never more than was paid', href: '/checkout/', cta: 'Open Checkout', testId: 'story-refund' },
   { n: '3', title: 'Accountant gets the export', benefit: 'Every payment and refund, as a CSV', href: '/export/#checkout', cta: 'Open Reports', testId: 'story-export' },
 ];

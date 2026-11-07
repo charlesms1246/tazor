@@ -71,7 +71,7 @@ test('/autopilot/: the 2-minute story comes first, the full tour under More', as
 test('Home: the three-step story strip, and nothing links to financing', async ({ page }) => {
   await setup(page);
   await page.goto('/');
-  await expect(page.getByTestId('story-pay')).toHaveAttribute('href', 'https://bluejay-shop.vercel.app');
+  await expect(page.getByTestId('story-pay')).toHaveAttribute('href', 'https://bluejay.charlesms.dev');
   await expect(page.getByTestId('story-pay')).toHaveAttribute('target', '_blank');
   await expect(page.getByTestId('story-refund')).toHaveAttribute('href', '/checkout/');
   await expect(page.getByTestId('story-export')).toHaveAttribute('href', '/export/#checkout');

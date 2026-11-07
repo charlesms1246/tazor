@@ -4,7 +4,7 @@ import { TIMINGS } from '../../lib/timings.ts';
 
 /** The pitch, end to end, on the real pages. Values the run learns (links, accounts, txs) live in ctx. */
 
-const SHOP = 'https://bluejay-shop.vercel.app';
+const SHOP = 'https://bluejay.charlesms.dev';
 /** A relayer address that never answers: the page sees exactly what it sees when our servers are down. */
 export { OFFLINE_RELAYER } from '../../lib/relayer-off.ts';
 const in90days = () => new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);

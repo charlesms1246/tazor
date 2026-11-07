@@ -210,10 +210,10 @@ test('expectRefusal passes on a refusal and fails on success; mode filters steps
 
 test('openTab waits for the click on the panel link', async () => {
   const w = world();
-  const r = createRunner([{ id: 'o', title: 'Shop', why: '', actions: [{ do: 'openTab', url: 'https://bluejay-shop.vercel.app', prompt: 'Open the shop' }] }], w.deps());
+  const r = createRunner([{ id: 'o', title: 'Shop', why: '', actions: [{ do: 'openTab', url: 'https://bluejay.charlesms.dev', prompt: 'Open the shop' }] }], w.deps());
   r.start('presenter');
   await settle(r, w, (s) => s?.status === 'waiting-user');
-  assert.equal(r.state()!.link, 'https://bluejay-shop.vercel.app');
+  assert.equal(r.state()!.link, 'https://bluejay.charlesms.dev');
   r.ack();
   await settle(r, w, (s) => s?.status === 'done');
 });

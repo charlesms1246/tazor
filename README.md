@@ -2,7 +2,7 @@
 
 **USDT checkout for businesses on Whitechain. The customer pays without gas, the merchant refunds in one click, and the accountant gets the export.**
 
-**Website:** https://tazor.charlesms.dev · **App:** https://app.tazor.charlesms.dev · **Demo shop:** https://bluejay-shop.vercel.app
+**Website:** https://tazor.charlesms.dev · **App:** https://app.tazor.charlesms.dev · **Demo shop:** https://bluejay.charlesms.dev
 
 Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everything runs on Whitechain Sepolia with the official USDT (`0xcedf…55a7`).
 
@@ -11,13 +11,13 @@ Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everythin
 | | What happens | Live on Whitechain Sepolia |
 |---|---|---|
 | **1. The customer pays without gas** | A shop adds Tazor in 15 lines. The customer signs **one message** (EIP-3009) in any wallet, or in a demo wallet inside the page. They hold **no WBT**; Tazor's relayer pays the gas. The signature commits to this merchant, order and amount, so nobody can redirect it. | [`0xd064…a4aa`](https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa): 0.12 USDT in 4.0 s from a fresh wallet with 0 WBT |
-| **2. The merchant refunds part of it** | One click and one signature from the merchant. The contract sends the refund **only to the original payer** and never more than was paid. The customer can check it on a public receipt read from Whitechain. | [`0x891a…f9a6`](https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6): 0.02 USDT back |
+| **2. The merchant refunds part of it** | The merchant side is one more tag, `<tazor-merchant-orders>`: orders read from Whitechain, one-click refunds and the CSV. One click and one signature from the merchant. The contract sends the refund **only to the original payer** and never more than was paid. The customer can check it on a public receipt read from Whitechain. | [`0x891a…f9a6`](https://explorer.testnet.whitechain.io/tx/0x891ab36355f28290f5cef50f80a791067d71c48c4bebfed4e16adb386d55f9a6): 0.02 USDT back |
 | **3. The accountant gets the export** | Every payment and refund for the merchant, read straight from Whitechain, as CSV with dates, gross, refunds and net (also Tally, Xero, QuickBooks and camt.054-style from the app's Reports). | [`scripts/checkout-live/accountant-export.csv`](scripts/checkout-live/accountant-export.csv) |
 
 The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `order.refunded` and `order.finality`. In the live hosted run, the paid, refunded and finality signatures all verified ([`hosted-last-run.json`](scripts/checkout-live/hosted-last-run.json)).
 
 **Try it (testnet only):**
-- **The shop, in about a minute, with no wallet extension:** https://bluejay-shop.vercel.app
+- **The shop, in about a minute, with no wallet extension:** https://bluejay.charlesms.dev
   1. "Use a demo merchant wallet" (right);
   2. "Pay with a demo wallet" (left);
   3. "Refund 0.05" (right): the customer card shows the refund;
@@ -36,7 +36,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 ## Who it's for: B2B2C, and how it reaches them
 
 **B2B2C:** Tazor serves the **business**. The business serves **its customers**, who are other businesses, clinics or consumers, and they pay without gas, a seed phrase or a chain choice. A business starts in about a minute at [`/start/`](https://app.tazor.charlesms.dev/start/). It gets:
-- a 15-line snippet for its site;
+- a 15-line snippet for its site, plus one tag (`<tazor-merchant-orders>`) for its orders, refunds and export;
 - a hosted payment link and QR if it has no site;
 - its dashboard and accountant export.
 
@@ -255,7 +255,7 @@ flowchart LR
   - Endpoints: `/pay`, `/pay/calldata`, `/payrun`, `/approver`, `/revoke`, `/mandate`, `/pull`, `/rpc` (ERC-7677), `/userop`, `/sync` (ENS role sync on demand), `/watch` (daily sweep), `/mirror`, and `/sandbox/*` for the Autopilot sandbox.
   - Role sync proves ENS roles in-process; anyone can also submit the proof.
 - `packages/pay/`: `@tazor/pay`, the drop-in SDK: `createInvoiceLink`, `watchPayment`, and a `<tazor-pay-button>` web component.
-- `examples/merchant-demo/`: a separate merchant site that integrates the SDK in 15 lines.
+- `examples/merchant-demo/`: a separate merchant site: the customer side in 15 lines, the merchant side in one tag.
 - `packages/ens/`: company tooling on ENSv2.
 - `packages/prover/`: ENS storage proofs for Whitechain.
 - `infra/`: docker-compose for the relayer.
@@ -358,7 +358,7 @@ cd apps/web && NEXT_PUBLIC_BUILD_TIME=2026-11-07T00:00:00Z pnpm build:ipfs
 ## Prize tracks
 
 - **Whitechain: Operate.** The story above:
-  - a drop-in checkout in 15 lines on a separate shop;
+  - a drop-in checkout in 15 lines on a separate shop, and a drop-in merchant view (`<tazor-merchant-orders>`: orders, refunds, CSV) in one tag;
   - a gasless customer payment;
   - a partial refund the customer can check;
   - the accountant export;
