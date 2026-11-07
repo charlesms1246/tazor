@@ -112,7 +112,7 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 20px; color: var(--text); }
 .brand:hover { text-decoration: none; }
 .brand-name { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
-.mark { display: block; flex: none; border-radius: 8px; }
+.mark { display: block; flex: none; }
 .wordmark { font-family: "Tektur", var(--font); font-weight: 600; font-size: 24px; line-height: 1; letter-spacing: 0.01em; color: var(--wc-navy); text-transform: lowercase; }
 .switcher {
   display: flex; align-items: center; gap: 10px; width: 100%;

@@ -36,7 +36,7 @@ const ICONS: Record<string, ReactNode> = {
 const Icon = ({ name }: { name: string }) => <svg viewBox="0 0 16 16" aria-hidden="true">{ICONS[name]}</svg>;
 
 export function Mark({ size = 32 }: { size?: number }) {
-  return <img className="mark" src="/brand/tazor-tile.png" width={size} height={size} alt="" aria-hidden="true" />;
+  return <img className="mark" src="/brand/tazor.svg" width={size} height={size} alt="" aria-hidden="true" />;
 }
 
 export function Wordmark() {
