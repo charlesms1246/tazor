@@ -2,4 +2,5 @@
 import * as TazorPay from './index.ts';
 
 TazorPay.defineTazorPayButton();
+TazorPay.defineTazorMerchantOrders();
 (globalThis as { TazorPay?: typeof TazorPay }).TazorPay = TazorPay;

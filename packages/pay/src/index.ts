@@ -16,3 +16,4 @@ export { DEPOSIT_CHECKOUT, depositOrder, depositStatus, watchDeposit, depositRef
 export { verifyWebhook, signWebhook, parseSignatureHeader, type WebhookEvent, type VerifyResult } from './webhooks.ts';
 export { payFetch, buildPayment, pickRequirement, encodePaymentHeader, decodePaymentHeader, decodePaymentResponse, type PaymentRequirements, type PaymentPayload } from './x402.ts';
 export { demoWallet } from './demo-wallet.ts';
+export { defineTazorMerchantOrders, MERCHANT_ATTRIBUTES } from './merchant-element.ts';
