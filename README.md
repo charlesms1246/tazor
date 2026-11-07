@@ -56,7 +56,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 | Healthsoft needs to… | Tazor flow |
 |---|---|
 | Get paid by overseas distributors and hospitals | Payment links, invoices and checkout in USDT, with **partial refunds** for returned kits |
-| Bill clinics monthly for the monitoring service (the "C" end) | **Subscriptions** that renew without anyone clicking, and can be cancelled anytime |
+| Bill clinics monthly for the monitoring service (the "C" end) | **Subscriptions** that the relayer renews on a daily schedule (no one clicks), and can be cancelled anytime |
 | Pay its Chinese component suppliers | **B2B payment runs** approved by verified people with Face ID or fingerprint |
 | Keep export and tax records | The **accountant export**: every payment and refund with date, gross, refund, net and transaction |
 
@@ -109,11 +109,11 @@ The pay button has a `ship-above` attribute and a `tazor-ready` event; webhooks 
 
 ## Under the hood: payments nobody notices (Scale)
 
-Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, never writes down a seed phrase and never picks a chain:
+Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, never has to back up a seed phrase and never picks a chain:
 
 - **No WBT:** the customer signs an EIP-3009 `receiveWithAuthorization` on the track USDT, and Tazor's relayer submits it and pays the WBT. The nonce commits to merchant, order and amount, so the relayer can't redirect or change it.
-- **No seed phrase:**
-  - **demo wallet:** a testnet wallet kept in the page, with no extension;
+- **No extension or seed phrase to back up:**
+  - **demo wallet:** on testnet, a key kept in the page (fine for a demo, not for real money); a passkey wallet for customers is on the roadmap;
   - **passkeys:** B2B approvers sign with Face ID or fingerprint (P-256, verified on-chain);
   - **any wallet:** EIP-1193 or ERC-1271.
 - **No chain to choose:** pay with a plain transfer to the order's own deposit address. On testnet any transfer stands in for an exchange withdrawal; whether WhiteBIT withdrawals can target these addresses is being checked with the Whitechain team.
@@ -129,7 +129,7 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 
 ## Also built (one slide)
 
-- **Subscriptions:** permit-based pulls that can't run early or exceed the plan, cancel anytime by signature. The relayer's cron renews them and sends reminders. Live renewal: [`0x3c0b…06d1`](https://explorer.testnet.whitechain.io/tx/0x3c0b7ce52ce4cd1d817090dd5efe87ceb7ac3382776bab91d3f068b7b95406d1).
+- **Subscriptions:** permit-based pulls that can't run early or exceed the plan, cancel anytime by signature. The relayer's daily cron renews any that are due and sends reminders a day ahead; anyone can also trigger a due charge. Live renewal: [`0x3c0b…06d1`](https://explorer.testnet.whitechain.io/tx/0x3c0b7ce52ce4cd1d817090dd5efe87ceb7ac3382776bab91d3f068b7b95406d1).
 - **Pay from an exchange:** every order has its own deposit address, shown as an EIP-681 payment QR, so a plain transfer pays it, and any extra goes back in the same tx ([`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d)). Simulated on testnet; whether WhiteBIT withdrawals can target it is being checked with the Whitechain team.
 - **AI agents over x402** (`eip155:1874`, through a facilitator I run, with a spend cap): [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea).
 - **B2B invoices** approved by WhiteBIT-verified people with Face ID or fingerprint passkeys. Company roles live on ENS (details below).
