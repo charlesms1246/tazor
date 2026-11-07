@@ -29,7 +29,7 @@
   <header class="nav">
     <a class="nav-logo" href="#top" aria-label="Tazor, top of the page"><img src="./assets/tazor.svg" alt="" width="40" height="40" /></a>
     <nav class="nav-links" aria-label="Main">
-      <a class="btn" href="https://bluejay-shop.vercel.app">Demo shop</a>
+      <a class="btn" href="https://bluejay.charlesms.dev">Demo shop</a>
       <a class="btn" href="https://app.tazor.charlesms.dev/docs/">Docs</a>
       <a class="btn" href="https://app.tazor.charlesms.dev/">Open app</a>
       <span class="nav-status"><span class="dot" aria-hidden="true"></span>Whitechain Sepolia</span>
@@ -88,7 +88,7 @@
         <div class="story-group" data-group>
           <div data-part class="engine-head"><h2 class="display">One engine for every way <span class="muted">to get paid.</span></h2></div>
           <div class="arc arc-engine" data-arc="engine">
-            <a class="glass glass-quiet card" data-card href="https://bluejay-shop.vercel.app" style="--cw:19vw"><span class="code">01</span><h3>Checkout</h3><p>A shop adds Tazor in 15 lines. A customer paid in 4.0 s from a wallet with 0 WBT.</p></a>
+            <a class="glass glass-quiet card" data-card href="https://bluejay.charlesms.dev" style="--cw:19vw"><span class="code">01</span><h3>Checkout</h3><p>A shop adds Tazor in 15 lines. A customer paid in 4.0 s from a wallet with 0 WBT.</p></a>
             <a class="glass glass-quiet card" data-card href="https://explorer.testnet.whitechain.io/tx/0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19" style="--cw:14vw"><span class="code">02</span><h3>Refunds</h3><p>One click, confirmed in 3.5 s. Only to the original payer, never more than they paid.</p></a>
             <a class="glass glass-quiet card" data-card href="https://github.com/charlesms1246/tazor/blob/main/scripts/checkout-live/accountant-export.csv" style="--cw:15.5vw"><span class="code">03</span><h3>Accountant export</h3><p>A dated CSV with gross, refund and net, every row linked to its transaction.</p></a>
             <a class="glass glass-quiet card" data-card href="https://app.tazor.charlesms.dev/start/" style="--cw:15vw"><span class="code">04</span><h3>Payment links</h3><p>No website? Share a link on WhatsApp or print its QR for the counter.</p></a>
@@ -167,8 +167,8 @@
     <section class="sec sec-code" id="b2b2c" data-chapter="4" aria-labelledby="code-title">
       <div class="sec-text" data-reveal>
         <h2 id="code-title" class="display">Tazor serves you. You serve your customers. <span class="muted">They pay without gas.</span></h2>
-        <p class="muted">Add 15 lines to your shop: one script, one button, one listener, no build step. No website? Share a payment link or a QR instead.</p>
-        <p class="links"><a class="btn" href="https://bluejay-shop.vercel.app">Try the demo shop</a></p>
+        <p class="muted">Add 15 lines to your shop: one script, one button, one listener, no build step. The merchant side is one more tag: orders, refunds and the accountant export. No website? Share a payment link or a QR instead.</p>
+        <p class="links"><a class="btn" href="https://bluejay.charlesms.dev">Try the demo shop</a></p>
       </div>
 <figure class="mac" data-reveal>
         <div class="mac-bar" aria-hidden="true"><span class="mac-dot r"></span><span class="mac-dot y"></span><span class="mac-dot g"></span><span class="mac-title">checkout.html · bluejay-shop</span></div>
@@ -186,7 +186,12 @@
     tx.href = e.detail.explorerUrl;
     tx.hidden = <span class="t-key">false</span>;
   });
-<span class="t-tag">&lt;/script&gt;</span></code></pre>
+<span class="t-tag">&lt;/script&gt;</span>
+
+<span class="t-com">&lt;!-- the merchant side: orders, refunds, CSV --&gt;</span>
+<span class="t-tag">&lt;tazor-merchant-orders</span>
+  <span class="t-attr">merchant</span>=<span class="t-str">&quot;0xc1dce946D192e344251972470237F1471C93876c&quot;</span>
+  <span class="t-attr">wallet</span>=<span class="t-str">&quot;browser&quot;</span><span class="t-tag">&gt;&lt;/tazor-merchant-orders&gt;</span></code></pre>
         <figcaption class="visually-hidden">The 15-line Tazor integration from the demo shop</figcaption>
       </figure>
     </section>
@@ -272,7 +277,7 @@
       <a href="#top" aria-label="Tazor, top of the page" class="foot-mark"><img src="./assets/tazor.svg" alt="" width="44" height="44" /></a>
       <nav class="foot-links" aria-label="Footer">
         <a href="https://app.tazor.charlesms.dev/start/">Start</a>
-        <a href="https://bluejay-shop.vercel.app">Demo shop</a>
+        <a href="https://bluejay.charlesms.dev">Demo shop</a>
         <a href="https://app.tazor.charlesms.dev/docs/">Docs</a>
         <a href="https://app.tazor.charlesms.dev/autopilot/">Watch the story</a>
         <a href="https://github.com/charlesms1246/tazor">GitHub</a>
