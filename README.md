@@ -123,7 +123,7 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 - **Pay from an exchange:** every order has its own deposit address, shown as an EIP-681 payment QR, so a plain transfer pays it, and any extra goes back in the same tx ([`0xc177…184d`](https://explorer.testnet.whitechain.io/tx/0xc17736b36c772385624ff58bf8309591c7d2776bf0cf42415f10a5c0ca83184d)). Simulated on testnet; whether WhiteBIT withdrawals can target it is being checked with the Whitechain team.
 - **AI agents over x402** (`eip155:1874`, through a facilitator I run, with a spend cap): [`0xd198…b2ea`](https://explorer.testnet.whitechain.io/tx/0xd198ce094200b4c1b75120d1652d3e4cd1b9d5f3cda9828b4d4916dd76a1b2ea).
 - **B2B invoices** approved by WhiteBIT-verified people with Face ID or fingerprint passkeys. Company roles live on ENS (details below).
-- **An Ethereum fallback** for when Tazor's servers are gone: [details below](#crops).
+- **An Ethereum fallback** for when Tazor's servers are gone: [details below](#crops-c-and-s).
 
 ## Checkout contracts and tests
 
@@ -189,7 +189,7 @@ Company `acme-p2` runs PaymentModuleV2 + MandateModuleV2. The demo uses short ti
 | Time-locked exit | after the delay, the company's whole balance moved to its own registered exit account | [`0x4107…b92e`](https://explorer.testnet.whitechain.io/tx/0x410740006cd8cc8886d077e2cb9341d76acbd88eec28babbd048d394d74eb92e), [`0x8d9a…6888`](https://explorer.testnet.whitechain.io/tx/0x8d9a949fa37e8c44469694760a725ac221e7d9000d80d9e81a37c7e537136888) |
 | One-tx company creation (ENS) | `meridian.taz0r.eth`: registry, name, parent and approvers in one Sepolia tx | [`0x1950e3…8b34`](https://sepolia.etherscan.io/tx/0x1950e3e1e8ab5ab1de88f4943a3a436eb1065d211bf1e3250cc6b710b2ab8b34) |
 | EIP-7702 onboarding | a 0-WBT wallet delegated by a sponsored type-4 tx; keeps its address | [`0x2bce…4aae`](https://explorer.testnet.whitechain.io/tx/0x2bceff13d9809c76ff2c2a16a2963e02ece0ac89fa95deabc68b8d489dcd4aae) |
-| Revocation mirrored to ENS | after the Whitechain revocation, the APPROVER role was removed on Sepolia | [`0x184fe4…7249`](https://sepolia.etherscan.io/tx/0x184fe4afe72691fd38ea4e94f268d16218ab91eff268a8d80a8d4baf17027249) |
+| Revocation mirrored to ENS (scripted run; the live mirror is off) | after the Whitechain revocation, the APPROVER role was removed on Sepolia | [`0x184fe4…7249`](https://sepolia.etherscan.io/tx/0x184fe4afe72691fd38ea4e94f268d16218ab91eff268a8d80a8d4baf17027249) |
 
 ### Typical bank vs Tazor
 
@@ -231,7 +231,7 @@ flowchart LR
   end
   ENS -. "storage proof (watcher or anyone)" .-> RC
   PORTAL -->|"aliased sender"| PM
-  PHONE["Browser at taz0r.eth.limo<br/>(IPFS via ENS, Face ID)"] -->|"signed InvoiceAuth"| RELAYER["Relayer (optional, stateless)"] --> PM
+  PHONE["Browser at taz0r.eth.limo<br/>(IPFS via ENS, Face ID)"] -->|"signed InvoiceAuth"| RELAYER["Relayer (optional)"] --> PM
   PHONE -->|"calldata, any wallet"| PM
   PHONE -->|"Send via Ethereum"| GATE
 ```
@@ -251,7 +251,7 @@ flowchart LR
 **Repo layout:**
 - `contracts/`: Foundry. The accounts, PaymentModule, MandateModule, RevocationList, RoleCache, PolicyHook, EnsGate and the WB Soul mirror.
 - `apps/web/`: the Next.js static export: Home, Invoices (live invoice generator), Collect (mandates), Checkout, Approvals, Payment runs, Company (ENS roles and people), Policies, Security & settings, Reports, Docs and Autopilot. Companies, members and accounts are read from ENS.
-- `apps/relayer/`: an optional, stateless submitter, hosted on Vercel.
+- `apps/relayer/`: an optional submitter, hosted on Vercel. Payments never depend on it; its rate limits and webhook log are per serverless instance (an Upstash store makes them shared).
   - Endpoints: `/pay`, `/pay/calldata`, `/payrun`, `/approver`, `/revoke`, `/mandate`, `/pull`, `/rpc` (ERC-7677), `/userop`, `/sync` (ENS role sync on demand), `/watch` (daily sweep), `/mirror`, and `/sandbox/*` for the Autopilot sandbox.
   - Role sync proves ENS roles in-process; anyone can also submit the proof.
 - `packages/pay/`: `@tazor/pay`, the drop-in SDK: `createInvoiceLink`, `watchPayment`, and a `<tazor-pay-button>` web component.
@@ -368,7 +368,7 @@ cd apps/web && NEXT_PUBLIC_BUILD_TIME=2026-11-07T00:00:00Z pnpm build:ipfs
 - **ENS: Best Use of ENSv2.** For the B2B approvals, a company's ENSv2 sub-registry is its authority, and its roles are proven onto Whitechain by storage proof.
 - **Ethereum Foundation: Best CROPS App.** I claim **C** and **S** (below).
 
-## CROPS
+## CROPS: C and S
 
 I claim **C (censorship resistance)** and **S (security)** as the lead properties. O and P are documented here, not claimed.
 
