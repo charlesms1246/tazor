@@ -7,80 +7,154 @@
   <meta name="description" content="USDT checkout for businesses on Whitechain. Your customers pay without gas, you refund in one click, your accountant gets the export. Testnet." />
   <meta name="theme-color" content="#ffffff" />
   <link rel="icon" href="./assets/tazor-mark.png" type="image/png" />
+  <link rel="preload" href="./assets/tektur-600.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="./assets/onest.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="./style.css" />
+  <script>
+    // Motion is on unless the visitor asked for less; the loader only runs then.
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.dataset.motion = 'on';
+  </script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
 
-  <nav class="bar" aria-label="Main">
-    <a class="brand" href="#top" aria-label="Tazor home"><img src="./assets/tazor-tile.png" alt="" width="32" height="32" /><span>Tazor</span></a>
-    <span class="bar-links"><a href="#story">How it works</a><a href="#pricing">Pricing</a><a href="#code-title">Developers</a><a href="https://github.com/charlesms1246/tazor">GitHub</a></span>
-    <a class="button button-small" href="https://app.tazor.charlesms.dev/">Open the app</a>
+  <!-- The intro: a count to 100%, then a shockwave of pixels opens the page -->
+  <div class="loader" data-loader role="status" aria-label="Loading Tazor">
+    <div class="loader-veil"></div>
+    <span class="loader-count">0%</span>
+  </div>
+
+  <canvas class="pixel-field" id="field" aria-hidden="true"></canvas>
+
+  <header class="nav">
+    <a class="nav-logo" href="#top" aria-label="Tazor, top of the page"><img src="./assets/tazor-tile.png" alt="" width="40" height="40" /></a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="btn" href="https://bluejay-shop.vercel.app">Demo shop</a>
+      <a class="btn" href="https://app.tazor.charlesms.dev/docs/">Docs</a>
+      <a class="btn" href="https://app.tazor.charlesms.dev/">Open app</a>
+      <span class="nav-status"><span class="dot" aria-hidden="true"></span>Whitechain Sepolia</span>
+    </nav>
+  </header>
+
+  <nav class="rail" aria-label="Sections">
+    <ol>
+      <li><a href="#top" data-rail="0" aria-current="step"><span class="visually-hidden">Tazor</span></a></li>
+      <li><a href="#about" data-rail="1"><span class="visually-hidden">About</span></a></li>
+      <li><a href="#engine" data-rail="2"><span class="visually-hidden">One engine</span></a></li>
+      <li><a href="#how" data-rail="3"><span class="visually-hidden">How it works</span></a></li>
+      <li><a href="#b2b2c" data-rail="4"><span class="visually-hidden">B2B2C</span></a></li>
+      <li><a href="#pricing" data-rail="5"><span class="visually-hidden">Pricing</span></a></li>
+      <li><a href="#trust" data-rail="6"><span class="visually-hidden">Trust</span></a></li>
+      <li><a href="#start" data-rail="7"><span class="visually-hidden">Start</span></a></li>
+    </ol>
+    <p class="rail-label" aria-hidden="true">Tazor</p>
   </nav>
 
-  <!-- First screen: what Tazor is, the action, and the fee worked out on your own number -->
-  <header class="hero" id="top">
-    <div class="hero-text">
-      <h1 class="masked"><span class="line"><span>USDT checkout</span></span> <span class="line"><span>for businesses</span></span></h1>
-      <p class="lede">On Whitechain. Your customers pay without gas, you refund in one click, and your accountant gets the export.</p>
-      <div class="actions">
-        <a class="button" href="https://app.tazor.charlesms.dev/start/">Start accepting USDT</a>
-        <a class="button button-quiet" href="https://bluejay-shop.vercel.app">Try the demo shop</a>
+  <!-- The story: on a desktop one pinned stage (hero, about, one engine); stacked sections otherwise -->
+  <section class="story" id="top" aria-label="Tazor">
+    <div class="story-layer story-intro" data-layer="intro">
+      <canvas class="rain" aria-hidden="true"></canvas>
+      <div class="floor-wrap" data-floor-wrap aria-hidden="true">
+        <div class="floor-line" data-floor></div>
+        <div class="floor-labels"><span data-ui>Checkout</span><span data-ui>On Whitechain</span></div>
       </div>
-      <p class="hero-facts">Live on Whitechain Sepolia · contracts verified · 0.5% per payment, gas included</p>
+      <div class="hero-word" data-hero-fade="word">
+        <h1 class="wordmark" data-hero-word><span data-word-text>Tazor</span><span data-baseline class="baseline" aria-hidden="true"></span></h1>
+      </div>
+      <div class="hero-sub" data-hero-fade="sub">
+        <p class="tagline" data-ui>USDT checkout for businesses. Your customers pay without gas.</p>
+        <p class="hero-actions" data-ui><a class="btn btn-primary" href="https://app.tazor.charlesms.dev/start/">Start accepting USDT</a></p>
+      </div>
+      <div class="hero-bar" data-hero-fade="bar"><a href="#about" class="scroll-cue" data-ui>Scroll ↓</a></div>
     </div>
 
-    <div class="hero-tool">
-      <form class="calc" data-ui aria-labelledby="calc-title" onsubmit="return false">
-        <p class="calc-title" id="calc-title">One payment, worked out</p>
-        <label class="calc-field">
-          <span>Your customer pays</span>
+    <div class="story-layer" id="about" data-layer="about">
+      <div class="story-inner" data-camera>
+        <div class="story-group about-grid" data-group>
+          <div class="about-text" data-part>
+            <h2 class="display">Your customers hold USDT. They shouldn’t need gas to spend it.</h2>
+            <p class="muted">On most chains a buyer needs a second token just to pay you. A refund is a new transfer, and the books are rebuilt by hand.</p>
+            <p>Tazor is USDT checkout on Whitechain: the customer signs once, Tazor pays the gas, refunds go back to the payer, and the books come straight from the chain.</p>
+          </div>
+          <div class="arc arc-about" data-arc="about">
+            <article class="glass card" data-card><span class="code">A</span><h3>Pays without gas</h3><p>The customer signs one message and holds 0 WBT. Tazor’s relayer pays the gas.</p></article>
+            <article class="glass card" data-card><span class="code">B</span><h3>Refunds to the payer only</h3><p>The merchant signs the refund; the contract sends it only to the customer who paid.</p></article>
+            <article class="glass card" data-card><span class="code">C</span><h3>Books from the chain</h3><p>Every payment, refund and charge as a dated CSV row, linked to its transaction.</p></article>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="story-layer" id="engine" data-layer="engine">
+      <div class="story-inner" data-camera>
+        <div class="story-group" data-group>
+          <div data-part class="engine-head"><h2 class="display">One engine for every way <span class="muted">to get paid.</span></h2></div>
+          <div class="arc arc-engine" data-arc="engine">
+            <a class="glass glass-quiet card" data-card href="https://bluejay-shop.vercel.app" style="--cw:19vw"><span class="code">01</span><h3>Checkout</h3><p>A shop adds Tazor in 15 lines. A customer paid in 4.0 s from a wallet with 0 WBT.</p></a>
+            <a class="glass glass-quiet card" data-card href="https://explorer.testnet.whitechain.io/tx/0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19" style="--cw:14vw"><span class="code">02</span><h3>Refunds</h3><p>One click, confirmed in 3.5 s. Only to the original payer, never more than they paid.</p></a>
+            <a class="glass glass-quiet card" data-card href="https://github.com/charlesms1246/tazor/blob/main/scripts/checkout-live/accountant-export.csv" style="--cw:15.5vw"><span class="code">03</span><h3>Accountant export</h3><p>A dated CSV with gross, refund and net, every row linked to its transaction.</p></a>
+            <a class="glass glass-quiet card" data-card href="https://app.tazor.charlesms.dev/start/" style="--cw:15vw"><span class="code">04</span><h3>Payment links</h3><p>No website? Share a link on WhatsApp or print its QR for the counter.</p></a>
+            <a class="glass glass-quiet card" data-card href="https://app.tazor.charlesms.dev/me/" style="--cw:14vw"><span class="code">05</span><h3>My payments</h3><p>Customers find every payment and refund they made, each with its receipt.</p></a>
+            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-arrow" /></svg></span></span>
+            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-slash" /></svg></span></span>
+            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-plus" /></svg></span></span>
+            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-hash" /></svg></span></span>
+            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-braces" /></svg></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main id="main">
+    <!-- The fee, worked out on your own number -->
+    <section class="sec sec-calc" data-chapter="2" aria-labelledby="calc-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">The numbers</p>
+        <h2 id="calc-title" class="display">One payment, worked out.</h2>
+        <p class="muted">Type your order’s amount. Your customer needs no gas, the whole amount arrives, and the 0.5% fee is billed monthly.</p>
+      </div>
+      <form class="glass calc" data-reveal onsubmit="return false">
+        <label class="calc-field"><span class="label">Your customer pays</span>
           <span class="calc-input"><input id="calc-amount" inputmode="decimal" value="1250" aria-describedby="calc-note" /><span>USDT</span></span>
         </label>
-        <dl class="calc-rows">
+        <dl class="rows">
           <div><dt>Gas your customer needs</dt><dd>0 WBT</dd></div>
           <div><dt>Arrives in your wallet</dt><dd><output id="calc-arrives">1,250.00</output> USDT</dd></div>
           <div><dt>Tazor fee, 0.5%, billed monthly</dt><dd><output id="calc-fee">6.25</output> USDT</dd></div>
-          <div class="calc-vs"><dt>Same payment by SWIFT</dt><dd><output id="calc-swift">12.50–37.50</output> USDT lost to the FX spread, 1–3 days</dd></div>
+          <div><dt>Same payment by SWIFT</dt><dd><output id="calc-swift">12.50–37.50</output> USDT lost to the FX spread, 1–3 days</dd></div>
         </dl>
-        <p class="calc-note" id="calc-note">Testnet: nothing is charged. A payment took 4.0 s from a wallet with 0 WBT.</p>
+        <p class="note" id="calc-note">Testnet: nothing is charged. A payment took 4.0 s from a wallet with 0 WBT.</p>
       </form>
-    </div>
-  </header>
+    </section>
 
-  <main id="main">
-    <!-- 1. The story: pay, refund, export, each with its real record -->
-    <section class="stages" id="story" aria-labelledby="stage-title">
-      <div class="stage-row">
-      <div class="stage-text">
-        <h2 id="stage-title" class="stage-clause" aria-live="polite">Your customer pays without gas</h2>
-        <p class="stage-sentence" id="stage-sentence">One signature in any wallet that holds USDT. They hold no WBT; Tazor's relayer pays the gas. The signature names this merchant, order and amount, so nobody can redirect it.</p>
+    <!-- How it works: pay, refund, export, each with its real record -->
+    <section class="sec sec-how" id="how" data-chapter="3" aria-labelledby="stage-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">How it works</p>
+        <h2 id="stage-title" class="display stage-clause" aria-live="polite">Your customer pays without gas</h2>
+        <p id="stage-sentence">One signature in any wallet that holds USDT. They hold no WBT; Tazor's relayer pays the gas. The signature names this merchant, order and amount, so nobody can redirect it.</p>
+        <div class="stage-control">
+          <label class="visually-hidden" for="stage-range">Step of the story</label>
+          <input id="stage-range" type="range" min="0" max="2" step="1" value="0" />
+          <ol class="stage-names"><li data-i="0" class="on">01 Pay</li><li data-i="1">02 Refund</li><li data-i="2">03 Export</li></ol>
+        </div>
       </div>
-      <div class="stage-exhibit">
-        <article class="exhibit receipt" data-ui data-stage="0">
-          <p class="ex-head">Payment received</p>
+      <div class="exhibits" data-reveal>
+        <article class="glass exhibit" data-stage="0">
+          <p class="label">Payment received</p>
           <p class="ex-amount">0.12 <span>USDT</span></p>
-          <dl class="ex-rows">
-            <div><dt>Customer's WBT balance</dt><dd>0</dd></div>
-            <div><dt>From click to paid</dt><dd>4.0 s</dd></div>
-            <div><dt>Network</dt><dd>Whitechain Sepolia</dd></div>
-          </dl>
-          <a class="ex-link" href="https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa">See the transaction</a>
+          <dl class="rows"><div><dt>Customer’s WBT balance</dt><dd>0</dd></div><div><dt>From click to paid</dt><dd>4.0 s</dd></div><div><dt>Network</dt><dd>Whitechain Sepolia</dd></div></dl>
+          <a class="ex-link" href="https://explorer.testnet.whitechain.io/tx/0xd0645d4adc8c7d7aab44c1fa9a8a0a7a3a1d67271a21a623009c72977396a4aa">See the transaction ↗</a>
         </article>
-        <article class="exhibit receipt" data-ui data-stage="1" hidden>
-          <p class="ex-head">Refund sent</p>
+        <article class="glass exhibit" data-stage="1" hidden>
+          <p class="label">Refund sent</p>
           <p class="ex-amount">0.10 <span>USDT</span></p>
-          <dl class="ex-rows">
-            <div><dt>Goes to</dt><dd>the original payer only</dd></div>
-            <div><dt>Signed by</dt><dd>the merchant, no gas</dd></div>
-            <div><dt>Confirmed in</dt><dd>3.5 s</dd></div>
-            <div><dt>Left to refund</dt><dd>0.15 of 0.25</dd></div>
-          </dl>
-          <a class="ex-link" href="https://explorer.testnet.whitechain.io/tx/0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19">See the transaction</a>
+          <dl class="rows"><div><dt>Goes to</dt><dd>the original payer only</dd></div><div><dt>Confirmed in</dt><dd>3.5 s</dd></div><div><dt>Left to refund</dt><dd>0.15 of 0.25</dd></div></dl>
+          <a class="ex-link" href="https://explorer.testnet.whitechain.io/tx/0xff03d2f10023137aaf91ccce903524c3cbaa573cd8dc097fad6ac1f690a1bb19">See the transaction ↗</a>
         </article>
-        <article class="exhibit sheet" data-ui data-stage="2" hidden>
-          <p class="ex-head">accountant-export.csv</p>
+        <article class="glass exhibit sheet" data-stage="2" hidden>
+          <p class="label">accountant-export.csv</p>
           <table>
             <thead><tr><th scope="col">Date (UTC)</th><th scope="col">Type</th><th scope="col" class="num">Net</th></tr></thead>
             <tbody>
@@ -91,49 +165,20 @@
               <tr><td>6 Nov 18:07</td><td>Exchange transfer</td><td class="num">0.20</td></tr>
             </tbody>
           </table>
-          <a class="ex-link" href="https://github.com/charlesms1246/tazor/blob/main/scripts/checkout-live/accountant-export.csv">Open the real export</a>
+          <a class="ex-link" href="https://github.com/charlesms1246/tazor/blob/main/scripts/checkout-live/accountant-export.csv">Open the real export ↗</a>
         </article>
       </div>
-      </div>
-      <div class="stage-control">
-        <label class="visually-hidden" for="stage-range">Step of the story</label>
-        <input id="stage-range" type="range" min="0" max="2" step="1" value="0" />
-        <ol class="stage-names">
-          <li data-i="0" class="on">Pay</li>
-          <li data-i="1">Refund</li>
-          <li data-i="2">Export</li>
-        </ol>
-      </div>
     </section>
 
-    <!-- 2. B2B2C: who serves whom, and the ways a customer can pay -->
-    <section class="board" aria-labelledby="board-title">
-      <div class="tile t-head"><h2 id="board-title">Tazor serves you, you serve your customers</h2></div>
-      <div class="tile t-a" data-ui><span class="big-figure">0.5%</span><p class="tile-cap"><b>You</b> One fee per payment, gas included, no monthly fee.</p></div>
-      <div class="tile t-b" data-ui><span class="big-figure">0 WBT</span><p class="tile-cap"><b>Your customers</b> Pay with USDT alone; they never need gas.</p></div>
-      <div class="tile t-c" data-ui>
-        <span class="mini-link">app.tazor.charlesms.dev/paylink/?a=12.50&amp;ref=INV-42</span>
-        <p class="tile-cap"><b>No website?</b> Share a payment link on WhatsApp or print its QR for the counter.</p>
+    <!-- B2B2C and the 15-line integration -->
+    <section class="sec sec-code" id="b2b2c" data-chapter="4" aria-labelledby="code-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">B2B2C</p>
+        <h2 id="code-title" class="display">Tazor serves you. You serve your customers. <span class="muted">They pay without gas.</span></h2>
+        <p class="muted">Add 15 lines to your shop: one script, one button, one listener, no build step. No website? Share a payment link or a QR instead.</p>
+        <p class="links"><a class="btn" href="https://bluejay-shop.vercel.app">Try the demo shop</a></p>
       </div>
-      <div class="tile t-d" data-ui>
-        <span class="status-word">Ready to ship</span>
-        <p class="tile-cap"><b>Ship with confidence</b> Small payments now; from 100 USDT, once Whitechain posts the block to Ethereum.</p>
-      </div>
-      <div class="tile t-e" data-ui>
-        <span class="mini-qr" aria-hidden="true"><svg viewBox="0 0 13 13" shape-rendering="crispEdges"><path fill="#0a0b1f" d="M0 0h5v5H0zM1 1v3h3V1zM8 0h5v5H8zM9 1v3h3V1zM0 8h5v5H0zM1 9v3h3V9zM2 2h1v1H2zM10 2h1v1h-1zM2 10h1v1H2zM6 0h1v2H6zM6 3h1v1H6zM7 6h2v1H7zM6 6h1v3H6zM10 6h3v1h-3zM8 8h1v1H8zM9 9h2v1H9zM11 8h2v1h-2zM8 11h2v2H8zM11 11h2v2h-2zM6 10h1v3H6zM0 6h2v1H0zM3 6h2v1H3z"/></svg></span>
-        <p class="tile-cap"><b>From an exchange</b> A plain USDT transfer to the order's own address, from WhiteBIT or any wallet.</p>
-      </div>
-    </section>
-
-    <!-- 3. Integration: the real snippet from the demo shop -->
-    <section class="code-room" aria-labelledby="code-title">
-      <div class="code-inner">
-      <div class="code-text">
-        <h2 id="code-title">Fifteen lines on your shop</h2>
-        <p>One script, one button, one listener. No build step, no framework. This is the exact code running in the demo shop.</p>
-        <a class="text-link" href="https://bluejay-shop.vercel.app">Try the demo shop</a>
-      </div>
-<pre class="code" data-ui><code>&lt;script src="./tazor-pay.js"&gt;&lt;/script&gt;
+<pre class="glass code" data-reveal><code>&lt;script src="./tazor-pay.js"&gt;&lt;/script&gt;
 &lt;tazor-pay-button
   mode="wallet" demo-wallet="true"
   merchant="0xc1dce946D192e344251972470237F1471C93876c"
@@ -148,98 +193,120 @@
     tx.hidden = false;
   });
 &lt;/script&gt;</code></pre>
-      </div>
     </section>
 
-    <!-- 4. Who it is for: cross-border SMEs, and the first merchant -->
-    <section class="who" aria-labelledby="who-title">
-      <figure class="who-picture">
-        <img src="./assets/container-ship-colombo-express-altenwerder.webp" alt="A container ship loaded under lit cranes at night, reflected in the water of the Port of Hamburg" width="1024" height="674" loading="lazy" />
-        <figcaption>Cross-border trade runs on ships like this one, and on payments that take days.</figcaption>
-      </figure>
-      <div class="who-text">
-        <h2 id="who-title">Built for cross-border SMEs</h2>
-        <p>Today a payment between countries takes 1–3 days by SWIFT and loses a 1–3% FX spread on the way, plus wire fees.</p>
+    <!-- Who it is for -->
+    <section class="sec sec-who" data-chapter="4" aria-labelledby="who-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">Who it’s for</p>
+        <h2 id="who-title" class="display">Built for cross-border SMEs.</h2>
+        <p class="muted">Today a payment between countries takes 1–3 days by SWIFT and loses a 1–3% FX spread on the way, plus wire fees.</p>
         <p><b>First merchant: Healthsoft (India),</b> which imports components from China and exports remote patient monitoring systems worldwide. We have a strong connection to bring Tazor into its payment flow; the pilot starts there.</p>
       </div>
-      <table class="compare" data-ui>
-        <caption class="visually-hidden">SWIFT compared with Tazor</caption>
-        <thead><tr><th scope="col"></th><th scope="col">SWIFT today</th><th scope="col">Tazor</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Time</th><td>1–3 days</td><td>Seconds; 4.0 s measured</td></tr>
-          <tr><th scope="row">Cost</th><td>1–3% FX spread, plus wire fees</td><td>0.5%, gas included</td></tr>
-          <tr><th scope="row">Refund</th><td>A new wire</td><td>One click, to the original payer only</td></tr>
-          <tr><th scope="row">Records</th><td>Bank statement, later</td><td>Dated export, every transaction linked</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- 5. Pricing, set like a menu -->
-    <section class="menu" id="pricing" aria-labelledby="price-title">
-      <h2 id="price-title">Pricing</h2>
-      <div class="menu-list">
-        <div class="menu-group">
-          <h3>Per payment</h3>
-          <div class="item"><p class="item-row"><span>Each payment</span><span>0.5%</span></p><p class="item-note">Gas included: your customers and you never pay network fees.</p></div>
-          <div class="item"><p class="item-row"><span>Monthly fee</span><span>None</span></p><p class="item-note">No plan to choose and nothing to cancel.</p></div>
-        </div>
-        <div class="menu-group">
-          <h3>How it is billed</h3>
-          <div class="item"><p class="item-row"><span>Billing</span><span>Monthly</span></p><p class="item-note">Invoiced from your export. The contracts move 100% of each payment to you.</p></div>
-          <div class="item"><p class="item-row"><span>On testnet</span><span>Free</span></p><p class="item-note">Nothing is charged while you try it.</p></div>
-        </div>
+      <div class="glass compare-wrap" data-reveal>
+        <table class="compare">
+          <caption class="visually-hidden">SWIFT compared with Tazor</caption>
+          <thead><tr><th scope="col"><span class="visually-hidden">Topic</span></th><th scope="col">SWIFT today</th><th scope="col">Tazor</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Time</th><td>1–3 days</td><td>Seconds; 4.0 s measured</td></tr>
+            <tr><th scope="row">Cost</th><td>1–3% FX spread, plus wire fees</td><td>0.5%, gas included</td></tr>
+            <tr><th scope="row">Refund</th><td>A new wire</td><td>One click, to the original payer only</td></tr>
+            <tr><th scope="row">Records</th><td>Bank statement, later</td><td>Dated export, every transaction linked</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
-    <!-- 6. Trust, in plain words, with the contracts to check -->
-    <section class="trust" aria-labelledby="trust-title">
-      <h2 id="trust-title">Why your money is safe</h2>
+    <!-- Pricing -->
+    <section class="sec sec-price" id="pricing" data-chapter="5" aria-labelledby="price-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">Pricing</p>
+        <h2 id="price-title" class="display"><span class="big">0.5%</span> per payment.</h2>
+        <p class="muted">Gas included, no monthly fee.</p>
+      </div>
+      <div class="price-grid">
+        <article class="glass card-flat" data-reveal><span class="code">01</span><h3>Each payment · 0.5%</h3><p>Gas included: your customers and you never pay network fees.</p></article>
+        <article class="glass card-flat" data-reveal><span class="code">02</span><h3>Monthly fee · none</h3><p>No plan to choose and nothing to cancel.</p></article>
+        <article class="glass card-flat" data-reveal><span class="code">03</span><h3>Billed monthly</h3><p>Invoiced from your export. The contracts move 100% of each payment to you.</p></article>
+        <article class="glass card-flat" data-reveal><span class="code">04</span><h3>Testnet · free</h3><p>Nothing is charged while you try it.</p></article>
+      </div>
+    </section>
+
+    <!-- Trust -->
+    <section class="sec sec-trust" id="trust" data-chapter="6" aria-labelledby="trust-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">Trust</p>
+        <h2 id="trust-title" class="display">Why your money is safe.</h2>
+      </div>
       <ul class="trust-list">
-        <li><b>No owner key.</b> The contracts have no owner: Tazor cannot change them, take a payment or send it elsewhere.</li>
-        <li><b>Our relayer can only refuse.</b> It cannot change who is paid or how much: the customer's signature fixes both.</li>
-        <li><b>Anyone can submit.</b> A signed payment works without Tazor's servers; anyone can send it.</li>
-        <li><b>Verified contracts.</b> <a href="https://explorer.testnet.whitechain.io/address/0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670">TazorCheckout</a> and <a href="https://explorer.testnet.whitechain.io/address/0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab">TazorDepositCheckout</a>, tested against the real Whitechain USDT.</li>
+        <li class="glass card-flat" data-reveal><h3>No owner key</h3><p>The contracts have no owner: Tazor cannot change them, take a payment or send it elsewhere.</p></li>
+        <li class="glass card-flat" data-reveal><h3>Our relayer can only refuse</h3><p>It cannot change who is paid or how much: the customer’s signature fixes both.</p></li>
+        <li class="glass card-flat" data-reveal><h3>Anyone can submit</h3><p>A signed payment works without Tazor’s servers; anyone can send it.</p></li>
+        <li class="glass card-flat" data-reveal><h3>Verified contracts</h3><p><a href="https://explorer.testnet.whitechain.io/address/0x8Ce727e6B4099b68f667B1ffEcAd7e1BeB511670">TazorCheckout ↗</a> and <a href="https://explorer.testnet.whitechain.io/address/0xcb3515398C8Cd9459a1Dce75aB42ec664a07B3ab">TazorDepositCheckout ↗</a>, tested against the real Whitechain USDT.</p></li>
       </ul>
     </section>
 
-    <!-- 7. Also built: an active list with its exhibit -->
-    <section class="also" aria-labelledby="also-title">
-      <div class="also-figure" aria-hidden="true">
-        <div class="exhibit also-ex" data-ui data-i="0"><p class="ex-head">Subscription</p><p class="ex-amount">0.05 <span>USDT / cycle</span></p><p class="ex-small">Cycle 2 charged · cancel any time</p></div>
-        <div class="exhibit also-ex" data-ui data-i="1" hidden><p class="ex-head">Pay from an exchange</p><p class="ex-amount">0.20 <span>USDT</span></p><p class="ex-small">Plain transfer · 0.05 extra sent back</p></div>
-        <div class="exhibit also-ex" data-ui data-i="2" hidden><p class="ex-head">HTTP 402 · paid</p><p class="ex-amount">0.01 <span>USDT</span></p><p class="ex-small">One freight quote, bought by an AI agent</p></div>
-        <div class="exhibit also-ex" data-ui data-i="3" hidden><p class="ex-head">B2B approvals</p><p class="ex-amount">Face ID</p><p class="ex-small">Invoices approved by verified people with passkeys</p></div>
+    <!-- Also built -->
+    <section class="sec sec-also" data-chapter="6" aria-labelledby="also-title">
+      <div class="sec-text" data-reveal>
+        <p class="eyebrow">Also built</p>
+        <h2 id="also-title" class="display">More ways to get paid.</h2>
       </div>
-      <div class="also-list">
-        <h2 id="also-title">Also built</h2>
-        <ul>
-          <li><button type="button" class="also-item on" data-i="0" aria-expanded="true"><span>Subscriptions</span><span class="also-meta">permit-based</span></button><p class="also-desc">Customers sign once; you charge each cycle; they cancel any time, with one signature.</p></li>
-          <li><button type="button" class="also-item" data-i="1" aria-expanded="false"><span>Pay from an exchange</span><span class="also-meta">EIP-681 QR</span></button><p class="also-desc" hidden>Each order gets its own deposit address. Any extra, or a late transfer, goes back to the customer.</p></li>
-          <li><button type="button" class="also-item" data-i="2" aria-expanded="false"><span>AI agents over x402</span><span class="also-meta">pay per request</span></button><p class="also-desc" hidden>Agents pay in USDT per API call; we run the facilitator for Whitechain.</p></li>
-          <li><button type="button" class="also-item" data-i="3" aria-expanded="false"><span>Verified B2B approvals</span><span class="also-meta">passkeys</span></button><p class="also-desc" hidden>Company payments need approvers with passkeys and roles on ENS. WB Soul verification is simulated on testnet.</p></li>
-        </ul>
-      </div>
+      <ul class="also-list" data-reveal>
+        <li><button type="button" class="also-item on" aria-expanded="true"><span>Subscriptions</span><span class="also-meta">permit-based</span></button><p class="also-desc">Customers sign once; you charge each cycle; they cancel any time, with one signature.</p></li>
+        <li><button type="button" class="also-item" aria-expanded="false"><span>Pay from an exchange</span><span class="also-meta">EIP-681 QR</span></button><p class="also-desc" hidden>Each order gets its own deposit address. Any extra, or a late transfer, goes back to the customer.</p></li>
+        <li><button type="button" class="also-item" aria-expanded="false"><span>AI agents over x402</span><span class="also-meta">pay per request</span></button><p class="also-desc" hidden>Agents pay in USDT per API call; we run the facilitator for Whitechain.</p></li>
+        <li><button type="button" class="also-item" aria-expanded="false"><span>Verified B2B approvals</span><span class="also-meta">passkeys</span></button><p class="also-desc" hidden>Company payments need approvers with passkeys and roles on ENS. WB Soul verification is simulated on testnet.</p></li>
+      </ul>
     </section>
 
-    <!-- 8. The close -->
-    <section class="close" aria-labelledby="close-title">
-      <h2 id="close-title" class="visually-hidden">Start</h2>
-      <p class="close-line">Take your first USDT payment today.</p>
-      <p class="close-sub">Free on testnet. Your customers never need gas.</p>
-      <div class="actions">
-        <a class="button" href="https://app.tazor.charlesms.dev/start/">Start accepting USDT</a>
-        <a class="text-link" href="https://app.tazor.charlesms.dev/autopilot/">Watch the story</a>
+    <!-- Start: three steps, fanned in 3D as they arrive -->
+    <section class="sec sec-start" id="start" data-chapter="7" aria-labelledby="start-title">
+      <div class="sec-text" data-reveal>
+        <h2 id="start-title" class="display">Live on Whitechain Sepolia. <span class="muted">Start here.</span></h2>
+        <p class="facts">4.0 s from click to paid · 0 WBT for the customer · refunds confirmed in 3.5 s · <span>measured on testnet</span></p>
       </div>
+      <div class="steps" data-steps>
+        <article class="glass card step" data-step><span class="code">01</span><h3>Start</h3><p>Set up your business on Tazor. Testnet: nothing is charged.</p></article>
+        <article class="glass card step" data-step><span class="code">02</span><h3>Share a link or add the button</h3><p>Send a payment link, print its QR, or add 15 lines to your shop.</p></article>
+        <article class="glass card step" data-step><span class="code">03</span><h3>Get paid</h3><p>USDT arrives in your wallet; refunds and the export are one click away.</p></article>
+      </div>
+      <p class="start-cta" data-reveal><a class="btn btn-primary" href="https://app.tazor.charlesms.dev/start/">Start accepting USDT</a></p>
     </section>
   </main>
 
-  <footer class="foot">
-    <span class="foot-what">Tazor · USDT checkout</span>
-    <span class="foot-links"><a href="https://github.com/charlesms1246/tazor">GitHub</a><a href="https://bluejay-shop.vercel.app">Demo shop</a><a href="https://app.tazor.charlesms.dev/start/">Start</a></span>
-    <span class="foot-note">Built on Whitechain · ETHGlobal Mumbai 2026 · testnet only</span>
-    <p class="credits">Picture: <a href="https://www.rawpixel.com/image/3337645/free-photo-image-hamburg-port-architecture">“Container ship Colombo Express Altenwerder”</a>, <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>, via rawpixel.</p>
+  <footer class="foot" id="footer" data-chapter="7">
+    <div class="glass foot-card" data-foot>
+      <a href="#top" aria-label="Tazor, top of the page" class="foot-mark"><img src="./assets/tazor-tile.png" alt="" width="44" height="44" /></a>
+      <nav class="foot-links" aria-label="Footer">
+        <a href="https://app.tazor.charlesms.dev/start/">Start</a>
+        <a href="https://bluejay-shop.vercel.app">Demo shop</a>
+        <a href="https://app.tazor.charlesms.dev/docs/">Docs</a>
+        <a href="https://app.tazor.charlesms.dev/autopilot/">Watch the story</a>
+        <a href="https://github.com/charlesms1246/tazor">GitHub</a>
+      </nav>
+      <p class="foot-word" aria-hidden="true">Tazor</p>
+      <div class="foot-meta"><span>Running on Whitechain Sepolia. Testnet only.</span><span>ETHGlobal Mumbai · 2026</span></div>
+    </div>
   </footer>
 
+  <!-- Glass glyphs in blue and white, drawn once -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#a8ccff"/><stop offset="1" stop-color="#0066ff"/></linearGradient>
+      <linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+      <g id="g-arrow"><path d="M24 16 L78 50 L24 84" fill="none" stroke="url(#gl)" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/><path d="M28 19 L70 45" fill="none" stroke="url(#gh)" stroke-width="5" stroke-linecap="round"/></g>
+      <g id="g-slash"><path d="M40 12 L20 88 M80 12 L60 88" fill="none" stroke="url(#gl)" stroke-width="16" stroke-linecap="round"/><path d="M42 16 L36 36 M82 16 L76 36" stroke="url(#gh)" stroke-width="4" stroke-linecap="round"/></g>
+      <g id="g-plus"><path d="M50 14 V86 M14 50 H86" fill="none" stroke="url(#gl)" stroke-width="22" stroke-linecap="round"/><path d="M48 20 V40 M20 48 H40" stroke="url(#gh)" stroke-width="5" stroke-linecap="round"/></g>
+      <g id="g-hash"><path d="M40 12 L32 88 M70 12 L62 88 M14 36 H88 M10 64 H84" fill="none" stroke="url(#gl)" stroke-width="12" stroke-linecap="round"/><path d="M18 34 H44" stroke="url(#gh)" stroke-width="3" stroke-linecap="round"/></g>
+      <g id="g-braces"><path d="M40 12 C24 12 30 40 16 50 C30 60 24 88 40 88 M60 12 C76 12 70 40 84 50 C70 60 76 88 60 88" fill="none" stroke="url(#gl)" stroke-width="11" stroke-linecap="round"/><path d="M38 16 C30 18 32 30 28 38" fill="none" stroke="url(#gh)" stroke-width="3" stroke-linecap="round"/></g>
+    </defs>
+  </svg>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js" integrity="sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly" crossorigin="anonymous" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js" integrity="sha384-wl5TeDVvOWt30Pbf8aSo2ZrzsOjddu3avOBvHe+p+OhJt9gP6w9YXmDkN5DK2/dF" crossorigin="anonymous" defer></script>
+  <script src="./field.js" defer></script>
+  <script src="./motion.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>
