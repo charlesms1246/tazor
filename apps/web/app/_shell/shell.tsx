@@ -59,12 +59,15 @@ const B2B: Item[] = [
   { href: '/mandates/', label: 'Collect', icon: 'mandate' },
   { href: '/approvals/', label: 'Approvals', icon: 'approvals' },
   { href: '/runs/', label: 'Payment runs', icon: 'runs' },
-  { href: '/company/', label: 'Company', icon: 'company' },
-  { href: '/policies/', label: 'Policies', icon: 'policy' },
 ];
-const FOOT: Item[] = [
+/** Admin: who may approve, the company's rules, and this device's settings. Always visible. */
+const ADMIN: Item[] = [
+  { href: '/company/', label: 'Company & people', icon: 'company' },
+  { href: '/policies/', label: 'Policies & limits', icon: 'policy' },
   { href: '/onboard/', label: 'Set up my passkey', icon: 'onboard' },
   { href: '/security/', label: 'Security & settings', icon: 'security' },
+];
+const FOOT: Item[] = [
   { href: '/docs/', label: 'Docs', icon: 'docs' },
 ];
 const BOTTOM: Item[] = [
@@ -105,6 +108,10 @@ function NavLinks({ path, onNavigate }: { path: string; onNavigate?: () => void 
       <nav aria-label="Main">
         {MAIN.map(link)}
         <B2BGroup path={path} link={link} />
+        <div className="nav-group" data-testid="nav-admin">
+          <div className="nav-label">Admin</div>
+          {ADMIN.map(link)}
+        </div>
       </nav>
       <div className="sidebar-foot">
         {FOOT.map(link)}
