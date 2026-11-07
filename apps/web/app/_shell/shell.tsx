@@ -63,6 +63,7 @@ const B2B: Item[] = [
   { href: '/policies/', label: 'Policies', icon: 'policy' },
 ];
 const FOOT: Item[] = [
+  { href: '/onboard/', label: 'Set up my passkey', icon: 'onboard' },
   { href: '/security/', label: 'Security & settings', icon: 'security' },
   { href: '/docs/', label: 'Docs', icon: 'docs' },
 ];
