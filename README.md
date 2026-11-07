@@ -2,7 +2,7 @@
 
 **USDT checkout for businesses on Whitechain. The customer pays without gas, the merchant refunds in one click, and the accountant gets the export.**
 
-**Website:** https://tazor.charlesms.dev · **App:** https://app.tazor.charlesms.dev · **Demo shop:** https://bluejay.charlesms.dev
+**Website:** [tazor.charlesms.dev](https://tazor.charlesms.dev) · **App:** [app.tazor.charlesms.dev](https://app.tazor.charlesms.dev) · **Demo shop:** [bluejay.charlesms.dev](https://bluejay.charlesms.dev)
 
 Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everything runs on Whitechain Sepolia with the official USDT (`0xcedf…55a7`).
 
@@ -17,18 +17,20 @@ Built at ETHGlobal Mumbai (November 2026) for **Whitechain: Operate**. Everythin
 The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `order.refunded` and `order.finality`. In the live hosted run, the paid, refunded and finality signatures all verified ([`hosted-last-run.json`](scripts/checkout-live/hosted-last-run.json)).
 
 **Try it (testnet only):**
-- **The shop, in about a minute, with no wallet extension:** https://bluejay.charlesms.dev
+
+- **The shop, in about a minute, with no wallet extension:** [bluejay.charlesms.dev](https://bluejay.charlesms.dev)
   1. "Use a demo merchant wallet" (right);
   2. "Pay with a demo wallet" (left);
   3. "Refund 0.05" (right): the customer card shows the refund;
   4. "Accountant export (CSV)".
 
   Both demo wallets live in your browser, are testnet-only, and are topped up with test USDT by Tazor's sandbox. Live run: pay [`0x0750…304b`](https://explorer.testnet.whitechain.io/tx/0x0750f8241c6093f45048908fbc0aa37a1aafdebb895d8185aa866dfa321a304b), refund [`0x2d24…9496`](https://explorer.testnet.whitechain.io/tx/0x2d24a044e637d714ce09ab4438bf57961c9f71870729ef69a3f5f75eddd19496).
-- **The merchant console and receipts:** https://app.tazor.charlesms.dev/checkout/ (mirror: tazor-app.vercel.app)
-- **The whole story in one click:** https://app.tazor.charlesms.dev/autopilot/
+- **The merchant console and receipts:** [app.tazor.charlesms.dev/checkout](https://app.tazor.charlesms.dev/checkout/) (mirror: tazor-app.vercel.app)
+- **The whole story in one click:** [app.tazor.charlesms.dev/autopilot](https://app.tazor.charlesms.dev/autopilot/)
 - **Reproduce from a terminal:** `scripts/hosted-checkout-live.ts` (pay → refund → webhooks) and `scripts/accountant-export.ts`.
 
 **Why on-chain USDT on Whitechain, not a card or bank rail:**
+
 - The customer authorises an exact amount to an exact merchant with one signature, and anyone can settle it in about 4 s for a fraction of a cent.
 - The refund rule ("only to the payer, never more than paid") is enforced by the contract that moves the money, not by a processor's goodwill.
 - The accountant's ledger is the chain itself, so the export can't disagree with the money.
@@ -36,11 +38,13 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 ## Who it's for: B2B2C, and how it reaches them
 
 **B2B2C:** Tazor serves the **business**. The business serves **its customers**, who are other businesses, clinics or consumers, and they pay without gas, a seed phrase or a chain choice. A business starts in about a minute at [`/start/`](https://app.tazor.charlesms.dev/start/). It gets:
+
 - a 15-line snippet for its site, plus one tag (`<tazor-merchant-orders>`) for its orders, refunds and export;
 - a hosted payment link and QR if it has no site;
 - its dashboard and accountant export.
 
 **For the customers (the "C"):**
+
 - **My payments** ([`/me/`](https://app.tazor.charlesms.dev/me/)): every payment across all businesses, with refunds received and subscriptions they can cancel. It's read straight from Whitechain, so there's no account and no merchant login.
 - **A verified-business badge** on payment links and receipts, shown when the business owner is WhiteBIT-verified (WB Soul, simulated on testnet).
 - **"Request a refund"** on every receipt: it opens WhatsApp or email to the merchant, with a link that opens the refund already filled in.
@@ -59,6 +63,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 **Pricing:** 0.5% per payment, gas included, no monthly fee. Cards charge 2–3%, and SWIFT costs a 1–3% FX spread plus wire fees. The fee is billed to the merchant monthly from the export, not taken on-chain: the contracts move 100% of the payment to the merchant, and nothing is charged on testnet.
 
 **Go-to-market, in three phases** (each a Builders Program milestone):
+
 1. **One real merchant (months 0–3):** Healthsoft live on Whitechain mainnet. Then its supply chain: each merchant brings its suppliers and distributors, who start receiving and paying in USDT on Whitechain. Target: 10 cross-border SMEs.
 2. **Ride WhiteBIT's distribution (months 3–6):**
    - "Pay with WhiteBIT" for WhiteBIT's 10M+ ecosystem users, once withdrawals to deposit addresses are confirmed;
@@ -71,10 +76,12 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
    - **API sellers:** they charge AI agents per request over x402.
 
 **Why it grows Whitechain:**
+
 - Every merchant brings its counterparties onto the chain.
 - Every payment settles in USDT on Whitechain.
 
 **Metrics:**
+
 - merchants live;
 - monthly USDT volume;
 - repeat payers;
@@ -94,6 +101,7 @@ The shop is told at each step by signed webhooks: `order.paid`, `order.ready`, `
 ## Finality: merchants decide by amount
 
 Whitechain confirms a payment in about a second, then posts it to Ethereum (`safe`) and later finalizes it. On testnet I saw the lag vary from about 15 to 45 minutes, which Whitechain DevRel told me is normal. So the merchant chooses by amount:
+
 - **Small payments** (default: under 100 USDT) are ready to ship as soon as Whitechain confirms them.
 - **Big payments** wait until Whitechain has posted them to Ethereum.
 
@@ -102,6 +110,7 @@ The pay button has a `ship-above` attribute and a `tazor-ready` event; webhooks 
 ## Under the hood: payments nobody notices (Scale)
 
 Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, never writes down a seed phrase and never picks a chain:
+
 - **No WBT:** the customer signs an EIP-3009 `receiveWithAuthorization` on the track USDT, and Tazor's relayer submits it and pays the WBT. The nonce commits to merchant, order and amount, so the relayer can't redirect or change it.
 - **No seed phrase:**
   - **demo wallet:** a testnet wallet kept in the page, with no extension;
@@ -111,6 +120,7 @@ Step 1 of the story is Whitechain's Scale brief. The payer never holds WBT, neve
 - **AI agents:** an agent holding only USDT pays per API request over **x402** (`eip155:1874`, `exact` scheme, `transferWithAuthorization`). The facilitator is Tazor's own (`/x402/supported`, `/verify`, `/settle`), and the agent refuses any price above its spend cap (enforced in the agent before it signs, not on-chain).
 
 **How the business pays gas, and what stops relayer drain:**
+
 - The relayer holds WBT, funded by the operator (faucet on testnet; WBT from WhiteBIT on mainnet). `/health` shows the gas runway.
 - Every request is checked before it costs gas: the signature, the payer's balance, that the authorization is unused, a validity window of at most 1 h, and an `eth_call` simulation.
 - There are limits per IP, per payer, per merchant and per order, plus a daily WBT budget and a balance floor. A failed check costs nothing.
@@ -237,6 +247,7 @@ flowchart LR
 ```
 
 **How a payment works:**
+
 1. The supplier shares an invoice link. The invoice is encrypted with AES-GCM, and the key sits in the URL fragment, so no server ever sees it.
 2. The approver's phone rebuilds the EIP-712 `InvoiceAuth` from the link alone. It compares that with `PaymentModule.invoiceDigest` and refuses to sign if the two differ.
 3. The approver signs with a passkey, and their `ApproverAccount` verifies it through OpenZeppelin's ERC-7913 WebAuthn verifier, which uses the P-256 precompile.
@@ -249,6 +260,7 @@ flowchart LR
 5. Only then does it execute the USDT transfer through the company account. The account's `PolicyHook` only lets installed Tazor executors move funds. There is no owner key and no upgrade key.
 
 **Repo layout:**
+
 - `contracts/`: Foundry. The accounts, PaymentModule, MandateModule, RevocationList, RoleCache, PolicyHook, EnsGate and the WB Soul mirror.
 - `apps/web/`: the Next.js static export: Home, Invoices (live invoice generator), Collect (mandates), Checkout, Approvals, Payment runs, Company (ENS roles and people), Policies, Security & settings, Reports, Docs and Autopilot. Companies, members and accounts are read from ENS.
 - `apps/relayer/`: an optional submitter, hosted on Vercel. Payments never depend on it; its rate limits and webhook log are per serverless instance (an Upstash store makes them shared).
@@ -290,6 +302,7 @@ cd packages/ens && pnpm install && pnpm test:fork
 ```
 
 **Configuration:**
+
 - **Web app:** the defaults point at the testnet deployment below. You can override them at build time with these variables:
   - Whitechain: `NEXT_PUBLIC_RELAYER_URL`, `NEXT_PUBLIC_WC_RPC`, `NEXT_PUBLIC_PAYMENT_MODULE`, `NEXT_PUBLIC_APPROVER_ACCOUNT_FACTORY`, `NEXT_PUBLIC_TAZOR_ACCOUNT_FACTORY`, `NEXT_PUBLIC_ROLE_CACHE`, `NEXT_PUBLIC_REVOCATION_LIST`, `NEXT_PUBLIC_MANDATE_MODULE`.
   - Sepolia: `NEXT_PUBLIC_SEPOLIA_RPC`, `NEXT_PUBLIC_ENS_GATE`.
@@ -416,6 +429,7 @@ I claim **C (censorship resistance)** and **S (security)** as the lead propertie
 ## After the event: the Builders Program
 
 I plan to apply. The milestone that makes the strongest case is **one real merchant on Whitechain mainnet**:
+
 1. **Mainnet checkout:** deploy `TazorCheckout` (ownerless, about 0.3M gas per payment, far below mainnet's 16.7M per-tx cap) once mainnet USDT is confirmed with the Whitechain team.
 2. **One real merchant: Healthsoft**, where I work. It takes live USDT payments from overseas buyers through payment links and checkout, issues refunds, bills clinics through subscriptions, pays suppliers through approved payment runs, and its accountant uses the export.
 3. **Pay with WhiteBIT:** if WhiteBIT withdrawals can target a per-order deposit address (being checked by the Whitechain team), WhiteBIT users pay from their exchange balance.
