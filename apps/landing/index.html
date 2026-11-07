@@ -56,14 +56,12 @@
       <canvas class="rain" aria-hidden="true"></canvas>
       <div class="floor-wrap" data-floor-wrap aria-hidden="true">
         <div class="floor-line" data-floor></div>
-        <div class="floor-labels"><span data-ui>Checkout</span><span data-ui>On Whitechain</span></div>
       </div>
       <div class="hero-word" data-hero-fade="word">
         <h1 class="wordmark" data-hero-word><span data-word-text>Tazor</span><span data-baseline class="baseline" aria-hidden="true"></span></h1>
       </div>
       <div class="hero-sub" data-hero-fade="sub">
         <p class="tagline" data-ui>USDT checkout for businesses. Your customers pay without gas.</p>
-        <p class="hero-actions" data-ui><a class="btn btn-primary" href="https://app.tazor.charlesms.dev/start/">Start accepting USDT</a></p>
       </div>
       <div class="hero-bar" data-hero-fade="bar"><a href="#about" class="scroll-cue" data-ui>Scroll ↓</a></div>
     </div>
@@ -95,11 +93,6 @@
             <a class="glass glass-quiet card" data-card href="https://github.com/charlesms1246/tazor/blob/main/scripts/checkout-live/accountant-export.csv" style="--cw:15.5vw"><span class="code">03</span><h3>Accountant export</h3><p>A dated CSV with gross, refund and net, every row linked to its transaction.</p></a>
             <a class="glass glass-quiet card" data-card href="https://app.tazor.charlesms.dev/start/" style="--cw:15vw"><span class="code">04</span><h3>Payment links</h3><p>No website? Share a link on WhatsApp or print its QR for the counter.</p></a>
             <a class="glass glass-quiet card" data-card href="https://app.tazor.charlesms.dev/me/" style="--cw:14vw"><span class="code">05</span><h3>My payments</h3><p>Customers find every payment and refund they made, each with its receipt.</p></a>
-            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-arrow" /></svg></span></span>
-            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-slash" /></svg></span></span>
-            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-plus" /></svg></span></span>
-            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-hash" /></svg></span></span>
-            <span class="glyph" data-obj aria-hidden="true"><span class="glyph-in"><svg viewBox="0 0 100 100"><use href="#g-braces" /></svg></span></span>
           </div>
         </div>
       </div>
@@ -135,9 +128,11 @@
         <h2 id="stage-title" class="display stage-clause" aria-live="polite">Your customer pays without gas</h2>
         <p id="stage-sentence">One signature in any wallet that holds USDT. They hold no WBT; Tazor's relayer pays the gas. The signature names this merchant, order and amount, so nobody can redirect it.</p>
         <div class="stage-control">
-          <label class="visually-hidden" for="stage-range">Step of the story</label>
-          <input id="stage-range" type="range" min="0" max="2" step="1" value="0" />
-          <ol class="stage-names"><li data-i="0" class="on">01 Pay</li><li data-i="1">02 Refund</li><li data-i="2">03 Export</li></ol>
+          <ol class="stage-timeline" aria-label="Steps of the story">
+            <li><button type="button" class="seg on" data-i="0" aria-current="step"><span class="seg-track"><span class="seg-fill"></span></span><span class="seg-name">Pay</span></button></li>
+            <li><button type="button" class="seg" data-i="1"><span class="seg-track"><span class="seg-fill"></span></span><span class="seg-name">Refund</span></button></li>
+            <li><button type="button" class="seg" data-i="2"><span class="seg-track"><span class="seg-fill"></span></span><span class="seg-name">Export</span></button></li>
+          </ol>
         </div>
       </div>
       <div class="exhibits" data-reveal>

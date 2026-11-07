@@ -22,10 +22,10 @@
     { clause: 'You refund in one click', sentence: 'The merchant signs the refund, also without gas. The contract sends it only to the customer who paid, and never more than they paid.' },
     { clause: 'Your accountant gets the export', sentence: 'Every payment, refund and subscription charge as a dated CSV row with gross, refund and net, each linked to its transaction.' },
   ];
-  const range = document.getElementById('stage-range');
+  const timeline = document.querySelector('.stage-timeline');
   const clause = document.getElementById('stage-title');
   const sentence = document.getElementById('stage-sentence');
-  const names = [...document.querySelectorAll('.stage-names li[data-i]')];
+  const names = [...document.querySelectorAll('.stage-timeline .seg')];
   const exhibits = [...document.querySelectorAll('.exhibits .exhibit[data-stage]')];
   let timer = 0;
   const show = (i) => {
@@ -38,11 +38,31 @@
       e.hidden = !on;
       if (on && !calm) { e.classList.remove('swap'); void e.offsetWidth; e.classList.add('swap'); }
     });
-    names.forEach((n) => n.classList.toggle('on', Number(n.dataset.i) === i));
+    names.forEach((n) => {
+      const k = Number(n.dataset.i);
+      n.classList.toggle('done', k < i);
+      n.classList.remove('on'); void n.offsetWidth; // restart the fill
+      n.classList.toggle('on', k === i);
+      if (k === i) n.setAttribute('aria-current', 'step'); else n.removeAttribute('aria-current');
+    });
+    current = i;
   };
-  if (range && clause && sentence) {
-    range.addEventListener('input', () => show(Number(range.value)));
-    names.forEach((n) => n.addEventListener('click', () => { range.value = n.dataset.i; show(Number(n.dataset.i)); }));
+  let current = 0;
+  if (timeline && clause && sentence) {
+    // the timeline plays by itself: each step's bar fills, then the next step shows; click a step to jump
+    const STEP_MS = 5000;
+    timeline.style.setProperty('--seg-ms', `${STEP_MS}ms`);
+    names.forEach((n) => {
+      n.addEventListener('click', () => show(Number(n.dataset.i)));
+      n.querySelector('.seg-fill')?.addEventListener('animationend', () => { if (n.classList.contains('on')) show((current + 1) % STAGES.length); });
+    });
+    // pause while the story is off screen or the pointer rests on it
+    const pause = (on) => timeline.classList.toggle('paused', on);
+    const box = timeline.closest('section') ?? timeline;
+    if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => pause(!e.isIntersecting), { threshold: 0.25 }).observe(box);
+    box.addEventListener('pointerenter', () => pause(true));
+    box.addEventListener('pointerleave', () => pause(false));
+    show(0);
   }
 
   // ---- also built: one item open at a time
