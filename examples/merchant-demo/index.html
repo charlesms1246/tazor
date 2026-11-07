@@ -69,19 +69,18 @@
     <section class="card" aria-labelledby="merchant-h">
       <p class="eyebrow">Merchant view</p>
       <h2 id="merchant-h">Orders</h2>
-      <p class="muted">Read straight from Whitechain (TazorCheckout events for this merchant), on any device.</p>
+      <p class="muted">The merchant side is one more tag: orders read straight from Whitechain, one-click refunds and the accountant export.</p>
       <div class="row">
         <span class="small">Merchant <span class="mono" id="merchant-addr"></span></span>
         <button type="button" id="merchant-demo" class="btn btn-sm">Use a demo merchant wallet</button>
         <button type="button" id="merchant-connect" class="btn btn-sm btn-ghost">Use my wallet</button>
-        <button type="button" id="export-csv" class="btn btn-sm btn-ghost">Accountant export (CSV)</button>
       </div>
       <p class="muted small" id="merchant-note"></p>
-      <table class="items" id="orders">
-        <thead><tr><th>Order</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <p class="muted small" id="orders-empty">No orders yet: the checkout on the left creates one.</p>
+      <!-- tazor:merchant-begin -->
+      <tazor-merchant-orders
+        merchant="0xc1dce946D192e344251972470237F1471C93876c"
+        wallet="browser"></tazor-merchant-orders>
+      <!-- tazor:merchant-end -->
 
       <h2>Subscriptions</h2>
       <table class="items" id="subs">

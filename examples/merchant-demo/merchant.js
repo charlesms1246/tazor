@@ -2,6 +2,7 @@
 // orders, refunds and subscriptions straight from Whitechain, refunds with one signature, verifies webhooks and exports CSV.
 const T = window.TazorPay;
 const button = document.querySelector('tazor-pay-button');
+const orders = document.querySelector('tazor-merchant-orders');
 const $ = (s) => document.querySelector(s);
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const usdt = (v) => { const s = BigInt(v).toString().padStart(7, '0'); return `${s.slice(0, -6)}.${s.slice(-6).replace(/0{1,4}$/, '')}`; };
@@ -15,7 +16,7 @@ const PLAN = { amount: 100000n, period: 604800, cycles: 4, ref: T.orderRef('week
 let merchantWallet = null;
 const merchant = () => button.getAttribute('merchant');
 const SAVED = 'bluejay.merchant.v1';
-if (localStorage.getItem(SAVED)) button.setAttribute('merchant', localStorage.getItem(SAVED));
+if (localStorage.getItem(SAVED)) { button.setAttribute('merchant', localStorage.getItem(SAVED)); orders.setAttribute('merchant', localStorage.getItem(SAVED)); }
 $('#merchant-addr').textContent = short(merchant());
 $('#merchant-addr').title = merchant();
 
@@ -62,9 +63,12 @@ if (localStorage.getItem(subKey)) $('#sub-cancel').hidden = false;
 
 // ---- merchant: wallet, orders, refunds
 const DEMO_MERCHANT = 'bluejay.demo-merchant.v1';
-function useMerchant(wallet, note) {
+function useMerchant(wallet, note, kind) {
   merchantWallet = wallet;
   button.setAttribute('merchant', wallet.address);
+  orders.setAttribute('wallet', kind);
+  if (kind === 'demo') orders.setAttribute('demo-key', DEMO_MERCHANT);
+  orders.setAttribute('merchant', wallet.address);
   localStorage.setItem(SAVED, wallet.address);
   $('#merchant-addr').textContent = short(wallet.address);
   $('#merchant-addr').title = wallet.address;
@@ -72,13 +76,15 @@ function useMerchant(wallet, note) {
   refresh();
 }
 $('#merchant-demo').addEventListener('click', () => {
-  useMerchant(T.demoWallet(DEMO_MERCHANT), 'Demo merchant wallet (kept in this browser, testnet only). Checkouts on the left now pay it, and it refunds here with one signature: no extension, no gas.');
+  useMerchant(T.demoWallet(DEMO_MERCHANT), 'Demo merchant wallet (kept in this browser, testnet only). Checkouts on the left now pay it, and it refunds here with one signature: no extension, no gas.', 'demo');
 });
-if (localStorage.getItem(DEMO_MERCHANT) && localStorage.getItem(SAVED) === T.demoWallet(DEMO_MERCHANT).address) merchantWallet = T.demoWallet(DEMO_MERCHANT);
+if (localStorage.getItem(DEMO_MERCHANT) && localStorage.getItem(SAVED) === T.demoWallet(DEMO_MERCHANT).address) { merchantWallet = T.demoWallet(DEMO_MERCHANT); orders.setAttribute('wallet', 'demo'); orders.setAttribute('demo-key', DEMO_MERCHANT); }
 $('#merchant-connect').addEventListener('click', async () => {
   try {
     merchantWallet = await T.walletSigner(window.ethereum);
     button.setAttribute('merchant', merchantWallet.address);
+    orders.setAttribute('wallet', 'browser');
+    orders.setAttribute('merchant', merchantWallet.address);
     localStorage.setItem(SAVED, merchantWallet.address);
     $('#merchant-addr').textContent = short(merchantWallet.address);
     $('#merchant-addr').title = merchantWallet.address;
@@ -90,40 +96,8 @@ $('#merchant-connect').addEventListener('click', async () => {
 let history = [];
 async function refresh() {
   try { history = await T.merchantHistory(merchant()); } catch (e) { $('#merchant-note').textContent = `Could not read Whitechain: ${e.message}`; return; }
-  renderOrders();
   renderSubs();
   renderCustomerRefund();
-}
-
-function renderOrders() {
-  const paid = history.filter((r) => r.kind === 'paid');
-  const refunded = (id) => history.filter((r) => r.kind === 'refunded' && r.id === id).reduce((s, r) => s + r.amount, 0n);
-  const body = $('#orders tbody');
-  body.replaceChildren(...paid.slice().reverse().map((o) => {
-    const tr = document.createElement('tr');
-    const back = refunded(o.id);
-    const status = el('td');
-    status.append(el('span', back === 0n ? 'Paid' : back >= o.amount ? 'Refunded' : `Refunded ${usdt(back)}`, `pill ${back === 0n ? 'paid' : ''}`), document.createTextNode(' '), txLink(o.tx, 'tx'));
-    const action = el('td');
-    if (merchantWallet && merchantWallet.address.toLowerCase() === merchant().toLowerCase() && back < o.amount) {
-      const left = o.amount - back;
-      const part = left > o.amount / 4n ? o.amount / 4n : left;
-      const mk = (label, amount) => {
-        const b = el('button', label, 'btn btn-sm');
-        b.addEventListener('click', async () => {
-          b.disabled = true; b.textContent = 'Signing…';
-          try { await T.refundOrder({ id: o.id, amount, wallet: merchantWallet }); b.textContent = 'Refund sent'; setTimeout(refresh, 4000); }
-          catch (e) { b.disabled = false; b.textContent = label; $('#merchant-note').textContent = e.message; }
-        });
-        return b;
-      };
-      action.append(mk(`Refund ${usdt(part)}`, part));
-      if (left > part) action.append(document.createTextNode(' '), mk('Refund all', left));
-    }
-    tr.append(el('td', `${short(o.id)} · from ${short(o.payer)}`, 'mono'), el('td', `${usdt(o.amount)} USDT`, 'num'), status, action);
-    return tr;
-  }));
-  $('#orders-empty').hidden = paid.length > 0;
 }
 
 function renderSubs() {
@@ -148,15 +122,6 @@ function renderCustomerRefund() {
   $('#order-status').textContent = 'Refunded';
 }
 
-// ---- merchant: accountant export
-$('#export-csv').addEventListener('click', () => {
-  const blob = new Blob([T.historyCsv(history)], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `bluejay-tazor-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-});
-
 // ---- merchant: webhook deliveries, each verified in the page
 async function hooks() {
   try {
@@ -180,3 +145,8 @@ refresh();
 hooks();
 setInterval(refresh, 10000);
 setInterval(hooks, 10000);
+
+// the merchant tag refunded an order: refresh the customer's side too
+orders.addEventListener('tazor-refunded', () => setTimeout(refresh, 3000));
+// a new payment shows in the merchant's orders straight away
+button.addEventListener('tazor-paid', () => setTimeout(() => orders.refresh?.(), 2500));
