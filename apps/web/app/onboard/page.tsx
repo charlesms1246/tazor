@@ -18,6 +18,7 @@ import { BackupKey } from './backup-key.tsx';
 
 export default function OnboardPage() {
   const [stored, setStored] = useState<StoredPasskey | null>(null);
+  const [replacing, setReplacing] = useState(false);
   const [signer, setSigner] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -109,9 +110,28 @@ export default function OnboardPage() {
             <div className="stack">
               <span style={{ fontWeight: 500 }}>Create a passkey</span>
               <p className="muted">Your passkey stays in your device keychain. Face ID, fingerprint or your device PIN unlocks it whenever you approve.</p>
-              <div className="row">
-                <button data-testid="create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create passkey</button>
-              </div>
+              {!created ? (
+                <div className="row">
+                  <button data-testid="create" className="btn btn-primary" onClick={onCreate} disabled={busy}>Create passkey</button>
+                </div>
+              ) : (
+                <div className="stack" style={{ gap: 8 }}>
+                  <Notice tone="positive" testId="passkey-ready">✓ Your passkey is set up on this device. You don&apos;t need to create another one.</Notice>
+                  {!replacing ? (
+                    <div className="row">
+                      <button type="button" data-testid="replace-start" className="btn btn-ghost btn-sm" onClick={() => setReplacing(true)}>Replace this passkey…</button>
+                    </div>
+                  ) : (
+                    <Notice tone="warning" testId="replace-confirm">
+                      <span>A new passkey makes a <b>new approver account</b>. The current one stays approved, but this device will forget it, and the new one must be admitted again.</span>
+                      <span className="row" style={{ marginTop: 8 }}>
+                        <button type="button" data-testid="create" className="btn btn-sm" onClick={() => { setReplacing(false); void onCreate(); }} disabled={busy}>Yes, create a new passkey</button>
+                        <button type="button" data-testid="replace-cancel" className="btn btn-ghost btn-sm" onClick={() => setReplacing(false)}>Keep my passkey</button>
+                      </span>
+                    </Notice>
+                  )}
+                </div>
+              )}
               {error && <Notice tone="negative" testId="error">{error}</Notice>}
               {note && <Notice>{note}</Notice>}
             </div>

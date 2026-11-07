@@ -200,6 +200,8 @@ export function createRunner(steps: Step[], deps: Deps) {
         throw new Error(`Timed out waiting for this: ${a.say.replace(/…$/, '')}.`);
       }
       case 'userTap': {
+        // already done (for example a passkey made earlier on this device): nothing to tap
+        if (a.until && (await until(a.until, 400, g))) return 'next';
         await element(a.testid, g);
         s.status = 'waiting-user'; s.prompt = a.prompt; s.highlight = a.testid; emit();
         log('user', a.prompt);

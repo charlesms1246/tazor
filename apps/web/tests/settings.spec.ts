@@ -67,6 +67,13 @@ test('/security/ relayer URL: saved override is used by /pay/, clearing reverts 
   await page.goto('/onboard/');
   await page.getByTestId('create').click();
   await expect(page.getByTestId('approver-account')).toHaveAttribute('data-value', APPROVER_ACCOUNT);
+  // once a passkey exists the page says so, and a new one needs an explicit "replace"
+  await expect(page.getByTestId('passkey-ready')).toBeVisible();
+  await expect(page.getByTestId('create')).toHaveCount(0);
+  await page.getByTestId('replace-start').click();
+  await expect(page.getByTestId('replace-confirm')).toBeVisible();
+  await page.getByTestId('replace-cancel').click();
+  await expect(page.getByTestId('create')).toHaveCount(0);
 
   await page.goto('/security/');
   await expect(page.getByTestId('relayer-current')).toContainText(`${DEFAULT} (default for this build)`);
