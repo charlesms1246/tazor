@@ -35,6 +35,10 @@ const stop = watchPayment({
   onPaid: ({ txHash, amount, at }) => markOrderPaid('BJ-1042', txHash),
 });`;
 
+const merchantTag = `<tazor-merchant-orders
+  merchant="0xc1dce946D192e344251972470237F1471C93876c"
+  wallet="browser"></tazor-merchant-orders>`;
+
 const attrs: [string, string][] = [
   ['mode', '"wallet" for wallet checkout (one EIP-3009 signature, no gas) with a "Pay from WhiteBIT or any exchange" option; leave it out for Tazor company invoices.'],
   ['merchant', 'Wallet mode, required. The address that receives the USDT (and signs refunds).'],
@@ -108,6 +112,15 @@ export default function Page() {
         signature (no gas, no WBT; Tazor&apos;s relayer submits it), or by a plain transfer from WhiteBIT or any exchange.
       </p>
       <pre><code>{example}</code></pre>
+      <h2>The merchant side: one tag</h2>
+      <p>
+        <code>&lt;tazor-merchant-orders&gt;</code> lists the merchant&apos;s orders straight from Whitechain, refunds part or all of an
+        order with one signature (no gas; only to the customer who paid, never more than they paid) and downloads the
+        accountant&apos;s CSV. <code>wallet=&quot;browser&quot;</code> signs refunds with the page&apos;s wallet; on testnet demos,
+        <code>wallet=&quot;demo&quot;</code> with a wallet kept in the browser. It fires <code>tazor-refunded</code> with the order id,
+        amount and transaction.
+      </p>
+      <pre><code>{merchantTag}</code></pre>
       <h2>From code</h2>
       <pre><code>{server}</code></pre>
       <h2>&lt;tazor-pay-button&gt; attributes</h2>
