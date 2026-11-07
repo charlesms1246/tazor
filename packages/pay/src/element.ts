@@ -70,6 +70,8 @@ a { color: inherit; }
 const DEPOSIT_STEPS: [DepositStatus['status'][], string][] = [
   [['waiting'], 'Waiting for your transfer'], [['received'], 'Transfer received'], [['paid'], 'Paid to the merchant'], [['ethereum', 'finalized'], 'Posted to Ethereum'],
 ];
+/** The Tazor logo, drawn in the button's text colour. */
+const TAZOR_LOGO = '<svg viewBox="50 25 564 564" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M119.493 172.655C114.443 167.605 114.173 162.826 118.682 158.317L183.317 93.6825C187.826 89.1731 192.605 89.4432 197.655 94.4929L286.865 183.703C290.231 187.069 293.107 186.438 295.492 181.808C302.679 154.423 307.673 102.299 300.013 51.0476C298.971 41.9897 302.92 36.9192 311.857 35.8363L406.817 30.0867C420.003 29.2439 424.802 34.5441 421.214 45.9871C428.594 218.71 243.71 403.594 70.9871 396.214C59.5441 399.802 54.2439 395.003 55.0867 381.817L60.8363 286.857C61.9192 277.92 66.9897 273.971 76.0476 275.013C127.299 282.673 179.423 277.679 206.808 270.492C211.438 268.107 212.069 265.231 208.703 261.865L119.493 172.655Z"/><path d="M466.238 519.4C471.288 524.45 476.067 524.72 480.577 520.211L545.211 455.577C549.72 451.067 549.45 446.288 544.4 441.238L455.191 352.028C451.824 348.662 452.456 345.786 457.085 343.401C484.47 336.214 536.594 331.22 587.846 338.881C596.904 339.922 601.974 335.974 603.057 327.036L608.807 232.076C609.649 218.89 604.349 214.091 592.906 217.679C420.183 210.299 235.299 395.183 242.679 567.906C239.091 579.349 243.89 584.649 257.076 583.807L352.036 578.057C360.974 576.974 364.922 571.904 363.881 562.846C356.22 511.594 361.214 459.47 368.401 432.085C370.786 427.456 373.662 426.824 377.028 430.191L466.238 519.4Z"/></svg>';
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const due14 = () => new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
@@ -347,7 +349,7 @@ export function defineTazorPayButton(tag = 'tazor-pay-button'): void {
     #render() {
       const label = this.getAttribute('label') || 'Pay with Tazor';
       this.#root.innerHTML = `<style>${STYLE}</style><div class="wrap" part="container">
-        <button part="button" type="button"><span class="mark" part="mark" aria-hidden="true">${this.#state === 'paid' ? '✓' : 'T'}</span><span part="label"></span></button>
+        <button part="button" type="button"><span class="mark" part="mark" aria-hidden="true">${this.#state === 'paid' ? '✓' : TAZOR_LOGO}</span><span part="label"></span></button>
         <span class="status" part="status" role="status" aria-live="polite" data-state="${this.#state}"></span></div>`;
       const button = this.#root.querySelector('button')!;
       const labelEl = this.#root.querySelector('[part="label"]')!;
